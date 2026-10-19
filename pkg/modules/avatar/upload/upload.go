@@ -128,7 +128,6 @@ func (p *Provider) AsDataURI(u *user.User, size int64) (string, error) {
 	return dataURI, nil
 }
 
-// StoreAvatarFile stores src as u's avatar and switches u to provider.
 func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, provider string, src io.Reader) error {
 	data, err := io.ReadAll(src)
 	if err != nil {
@@ -137,7 +136,6 @@ func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, provide
 	return storeAvatar(ctx, s, u, provider, data, func(img image.Image) image.Image { return img })
 }
 
-// StoreSyncedAvatar stores the centred square of raw as u's avatar and switches u to provider.
 func StoreSyncedAvatar(ctx context.Context, s *xorm.Session, u *user.User, provider string, raw []byte) error {
 	return storeAvatar(ctx, s, u, provider, raw, centredSquare)
 }
@@ -192,7 +190,7 @@ func storeAvatar(ctx context.Context, s *xorm.Session, u *user.User, provider st
 		return err
 	}
 
-	// Log only: the new avatar is persisted, so an error here would make callers disagree with the DB.
+	// Log only: the new avatar is already persisted.
 	if oldAvatarFileID != 0 {
 		old := &files.File{ID: oldAvatarFileID}
 		if delErr := old.Delete(s); delErr != nil && !files.IsErrFileDoesNotExist(delErr) {

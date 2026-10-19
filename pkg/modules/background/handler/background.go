@@ -246,7 +246,6 @@ func ValidateAndSaveBackgroundUpload(ctx context.Context, s *xorm.Session, auth 
 		return ErrFileUnsupportedImageFormat{Mime: mime.String()}
 	}
 
-	// SaveBackgroundFile rewinds after DetectReader.
 	if _, err := SaveBackgroundFile(ctx, s, auth, project, srcf, filename); err != nil {
 		return err
 	}

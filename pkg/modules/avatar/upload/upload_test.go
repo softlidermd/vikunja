@@ -148,8 +148,7 @@ func newUserWithAvatarFile(t *testing.T) (*xorm.Session, *user.User) {
 	db.LoadAndAssertFixtures(t)
 	files.InitTestFileFixtures(t)
 
-	// File 1 is a fixture with content in storage. Committed, so a rollback
-	// in the test keeps it.
+	// Committed so the test's rollback keeps the link.
 	setup := db.NewSession()
 	_, err := setup.ID(1).Cols("avatar_file_id").Update(&user.User{AvatarFileID: 1})
 	require.NoError(t, err)
@@ -235,7 +234,6 @@ func gradient(width, height int) *image.NRGBA {
 	return img
 }
 
-// syncAvatar stores raw for user 1 and returns the avatar as read back from storage.
 func syncAvatar(t *testing.T, raw []byte) image.Image {
 	t.Helper()
 	db.LoadAndAssertFixtures(t)
