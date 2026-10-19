@@ -141,16 +141,7 @@ func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, src io.
 		return
 	}
 
-	// Only now: storage deletes are not rolled back with the session.
-	if u.AvatarFileID != 0 {
-		f := &files.File{ID: u.AvatarFileID}
-		if err := f.Delete(s); err != nil {
-			if !files.IsErrFileDoesNotExist(err) {
-				return err
-			}
-		}
-		u.AvatarFileID = 0
-	}
+	oldAvatarFileID := u.AvatarFileID
 
 	err = (&Provider{}).FlushCache(u)
 	if err != nil {
@@ -166,5 +157,17 @@ func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, src io.
 	u.AvatarFileID = f.ID
 
 	_, err = user.UpdateUser(s, u, false)
-	return
+	if err != nil {
+		return err
+	}
+
+	// Only now: storage deletes are not rolled back with the session.
+	if oldAvatarFileID != 0 {
+		old := &files.File{ID: oldAvatarFileID}
+		if err := old.Delete(s); err != nil && !files.IsErrFileDoesNotExist(err) {
+			return err
+		}
+	}
+
+	return nil
 }
