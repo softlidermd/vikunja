@@ -24,6 +24,7 @@ import (
 	"image"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -44,7 +45,11 @@ func BytesOpener(data []byte) Opener {
 const maxHeaderBytes = 12 << 20
 
 // Below MaxPixels the largest allowed image could never acquire.
-var bounded = newDecoder(2*MaxPixels, 30*time.Second)
+var bounded atomic.Pointer[decoder]
+
+func init() {
+	bounded.Store(newDecoder(2*MaxPixels, 30*time.Second))
+}
 
 type decoder struct {
 	budget       int64
@@ -64,19 +69,19 @@ func newDecoder(pixelBudget int64, queueTimeout time.Duration) *decoder {
 // because the decoded image stays in memory while use resizes or encodes it.
 // Returns ErrDecodeBusy when no capacity frees up in time.
 func Decode(ctx context.Context, open Opener, use func(img image.Image, format string) error) error {
-	return bounded.decode(ctx, open, use)
+	return bounded.Load().decode(ctx, open, use)
 }
 
 // ExhaustBudgetForTests makes every Decode queue until release is called or queueTimeout passes.
 func ExhaustBudgetForTests(queueTimeout time.Duration) (release func()) {
-	original := bounded
+	original := bounded.Load()
 	exhausted := newDecoder(original.budget, queueTimeout)
 	exhausted.slots.TryAcquire(exhausted.budget)
-	bounded = exhausted
+	bounded.Store(exhausted)
 	var once sync.Once
 	return func() {
 		once.Do(func() {
-			bounded = original
+			bounded.Store(original)
 			exhausted.slots.Release(exhausted.budget)
 		})
 	}
