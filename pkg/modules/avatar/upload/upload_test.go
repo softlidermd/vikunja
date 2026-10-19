@@ -141,9 +141,8 @@ func TestStoreAvatarFile(t *testing.T) {
 	// Incompressible, so the encoded avatar exceeds the 1MB limit below.
 	noise := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
 	rng := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic test data
-	for i := range noise.Pix {
-		noise.Pix[i] = uint8(rng.Intn(256))
-	}
+	_, err := rng.Read(noise.Pix)
+	require.NoError(t, err)
 	for i := 3; i < len(noise.Pix); i += 4 {
 		noise.Pix[i] = 255
 	}
