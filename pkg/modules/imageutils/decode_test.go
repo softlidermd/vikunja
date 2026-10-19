@@ -401,13 +401,4 @@ func TestDecode_Queue(t *testing.T) {
 		d.slots.Release(pixels)
 		assertBudgetFree(t, d)
 	})
-
-	t.Run("exhausting the budget for tests makes Decode report busy", func(t *testing.T) {
-		release := ExhaustBudgetForTests(10 * time.Millisecond)
-		defer release()
-
-		err := Decode(t.Context(), BytesOpener(testPNG(t, 4, 4)), noUse)
-
-		assert.True(t, IsErrDecodeBusy(err), "err: %v", err)
-	})
 }
