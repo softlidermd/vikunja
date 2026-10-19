@@ -376,7 +376,7 @@ func syncUserAvatarFromOpenID(ctx context.Context, s *xorm.Session, u *user.User
 	log.Debugf("Found avatar URL for user %s: %s", u.Username, pictureURL)
 
 	// Download avatar
-	avatarData, err := utils.DownloadImage(pictureURL) //nolint:contextcheck // DownloadImage owns its timeout context.
+	avatarData, err := utils.DownloadImage(ctx, pictureURL)
 	if err != nil {
 		return fmt.Errorf("error downloading avatar: %w", err)
 	}

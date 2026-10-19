@@ -27,9 +27,9 @@ import (
 )
 
 // DownloadImage downloads an image from a URL and returns the image data
-func DownloadImage(url string) ([]byte, error) {
+func DownloadImage(ctx context.Context, url string) ([]byte, error) {
 	// 3 seconds is enough for downloading an avatar
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

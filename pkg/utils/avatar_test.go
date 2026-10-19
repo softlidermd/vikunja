@@ -44,7 +44,7 @@ func TestDownloadImageIsBounded(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	_, err := DownloadImage(srv.URL)
+	_, err := DownloadImage(t.Context(), srv.URL)
 	require.Error(t, err, "a response larger than the max file size must not be buffered in full")
 
 	picture := &bytes.Buffer{}
@@ -55,7 +55,7 @@ func TestDownloadImageIsBounded(t *testing.T) {
 	}))
 	t.Cleanup(small.Close)
 
-	data, err := DownloadImage(small.URL)
+	data, err := DownloadImage(t.Context(), small.URL)
 	require.NoError(t, err)
 	assert.NotEmpty(t, data)
 }
