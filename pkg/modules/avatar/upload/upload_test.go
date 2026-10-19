@@ -18,10 +18,14 @@ package upload
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
+	"image/color"
 	"image/png"
 	"math/rand"
 	"os"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -29,6 +33,7 @@ import (
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/files"
 	"code.vikunja.io/api/pkg/log"
+	"code.vikunja.io/api/pkg/modules/imageutils"
 	"code.vikunja.io/api/pkg/modules/keyvalue"
 	"code.vikunja.io/api/pkg/user"
 	"github.com/stretchr/testify/assert"
@@ -168,7 +173,7 @@ func TestStoreAvatarFile(t *testing.T) {
 		require.NoError(t, config.SetMaxFileSizeMBytesFromString("1MB"))
 		t.Cleanup(func() { _ = config.SetMaxFileSizeMBytesFromString(oldMax) })
 
-		err = StoreAvatarFile(t.Context(), s, u, bytes.NewReader(src.Bytes()))
+		err = StoreAvatarFile(t.Context(), s, u, "upload", bytes.NewReader(src.Bytes()))
 		require.Error(t, err)
 		assert.True(t, files.IsErrFileIsTooLarge(err))
 
@@ -193,10 +198,152 @@ func TestStoreAvatarFile(t *testing.T) {
 		small := &bytes.Buffer{}
 		require.NoError(t, png.Encode(small, image.NewNRGBA(image.Rect(0, 0, 8, 8))))
 
-		require.NoError(t, StoreAvatarFile(t.Context(), s, u, small))
+		require.NoError(t, StoreAvatarFile(t.Context(), s, u, "upload", small))
 		assert.NotEqual(t, int64(1), u.AvatarFileID)
 		assert.NotZero(t, u.AvatarFileID)
 		_, err = files.FileStat(&files.File{ID: 1})
 		require.Error(t, err, "old avatar blob must be gone")
+	})
+}
+
+func encodePNG(t *testing.T, img image.Image) []byte {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	require.NoError(t, png.Encode(buf, img))
+	return buf.Bytes()
+}
+
+func gradient(width, height int) *image.NRGBA {
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			img.Set(x, y, color.NRGBA{
+				R: uint8(x), //nolint:gosec // test sizes stay below 256
+				G: uint8(y), //nolint:gosec // test sizes stay below 256
+				B: 42,
+				A: 255,
+			})
+		}
+	}
+	return img
+}
+
+// syncAvatar stores raw for user 1 and returns the avatar as read back from storage.
+func syncAvatar(t *testing.T, raw []byte) image.Image {
+	t.Helper()
+	db.LoadAndAssertFixtures(t)
+	files.InitTestFileFixtures(t)
+
+	s := db.NewSession()
+	defer s.Close()
+	u, err := user.GetUserByID(s, 1)
+	require.NoError(t, err)
+
+	require.NoError(t, StoreSyncedAvatar(t.Context(), s, u, "ldap", raw))
+	require.NoError(t, s.Commit())
+
+	require.NotZero(t, u.AvatarFileID)
+	db.AssertExists(t, "users", map[string]interface{}{
+		"id":              1,
+		"avatar_provider": "ldap",
+		"avatar_file_id":  u.AvatarFileID,
+	}, false)
+
+	f := &files.File{ID: u.AvatarFileID}
+	require.NoError(t, f.LoadFileByID())
+	defer f.File.Close()
+	img, _, err := image.Decode(f.File)
+	require.NoError(t, err)
+	return img
+}
+
+// Covers identity-provider image bounds (GHSA-4vh2-39rq-rq8j).
+func TestStoreSyncedAvatar(t *testing.T) {
+	t.Run("crops a non-square image centred", func(t *testing.T) {
+		img := syncAvatar(t, encodePNG(t, gradient(8, 4)))
+
+		assert.Equal(t, image.Rect(0, 0, 4, 4), img.Bounds())
+		assert.Equal(t, color.NRGBA{
+			R: 2,
+			G: 0,
+			B: 42,
+			A: 255,
+		}, color.NRGBAModel.Convert(img.At(0, 0)))
+	})
+
+	t.Run("scales a large image down to the max side", func(t *testing.T) {
+		img := syncAvatar(t, encodePNG(t, image.NewNRGBA(image.Rect(0, 0, 3000, 2000))))
+
+		assert.Equal(t, image.Rect(0, 0, maxAvatarSide, maxAvatarSide), img.Bounds())
+	})
+
+	t.Run("keeps an already square image", func(t *testing.T) {
+		original := gradient(4, 4)
+		img := syncAvatar(t, encodePNG(t, original))
+
+		require.Equal(t, original.Bounds(), img.Bounds())
+		for x := 0; x < 4; x++ {
+			for y := 0; y < 4; y++ {
+				assert.Equal(t, original.At(x, y), color.NRGBAModel.Convert(img.At(x, y)), "pixel %d,%d", x, y)
+			}
+		}
+	})
+
+	t.Run("crops a very thin image without a full-resolution copy", func(t *testing.T) {
+		const width, height = 60, 800_000
+		thin := image.NewGray(image.Rect(0, 0, width, height))
+		centreTop := (height - width) / 2
+		for i := centreTop * width; i < (centreTop+width)*width; i++ {
+			thin.Pix[i] = 200
+		}
+		raw := encodePNG(t, thin)
+
+		runtime.GC()
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		img := syncAvatar(t, raw)
+		runtime.ReadMemStats(&after)
+
+		require.Equal(t, image.Rect(0, 0, width, width), img.Bounds())
+		for x := 0; x < width; x++ {
+			for y := 0; y < width; y++ {
+				require.Equal(t, color.Gray{Y: 200}, color.GrayModel.Convert(img.At(x, y)), "pixel %d,%d", x, y)
+			}
+		}
+		// Decoding holds width*height bytes; a full-resolution NRGBA copy would add four times that.
+		assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(2*width*height))
+	})
+
+	t.Run("leaves the user untouched on error", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		files.InitTestFileFixtures(t)
+
+		s := db.NewSession()
+		defer s.Close()
+		_, err := s.ID(1).Cols("avatar_file_id", "avatar_provider").Update(&user.User{
+			AvatarFileID:   1,
+			AvatarProvider: "initials",
+		})
+		require.NoError(t, err)
+		u, err := user.GetUserByID(s, 1)
+		require.NoError(t, err)
+
+		bomb := encodePNG(t, gradient(4, 4))
+		binary.BigEndian.PutUint32(bomb[16:20], uint32(8000))
+		binary.BigEndian.PutUint32(bomb[20:24], uint32(8000))
+		binary.BigEndian.PutUint32(bomb[29:33], crc32.ChecksumIEEE(bomb[12:29]))
+
+		err = StoreSyncedAvatar(t.Context(), s, u, "ldap", bomb)
+		require.Error(t, err)
+		assert.True(t, imageutils.IsErrImageTooLarge(err), "err: %v", err)
+		assert.Equal(t, int64(1), u.AvatarFileID)
+		assert.Equal(t, "initials", u.AvatarProvider)
+
+		require.NoError(t, s.Commit())
+		db.AssertExists(t, "users", map[string]interface{}{
+			"id":              1,
+			"avatar_provider": "initials",
+			"avatar_file_id":  1,
+		}, false)
 	})
 }

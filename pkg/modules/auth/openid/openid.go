@@ -17,7 +17,6 @@
 package openid
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -382,17 +381,7 @@ func syncUserAvatarFromOpenID(ctx context.Context, s *xorm.Session, u *user.User
 		return fmt.Errorf("error downloading avatar: %w", err)
 	}
 
-	// Process avatar, ensure 1:1 ratio
-	processedAvatar, err := utils.CropAvatarTo1x1(ctx, avatarData)
-	if err != nil {
-		return fmt.Errorf("error processing avatar: %w", err)
-	}
-
-	// Set avatar provider to openid
-	u.AvatarProvider = "openid"
-
-	// Store avatar and update user
-	err = upload.StoreAvatarFile(ctx, s, u, bytes.NewReader(processedAvatar))
+	err = upload.StoreSyncedAvatar(ctx, s, u, "openid", avatarData)
 	if err != nil {
 		return fmt.Errorf("error storing avatar: %w", err)
 	}
