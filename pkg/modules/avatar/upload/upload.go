@@ -137,11 +137,11 @@ func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, provide
 }
 
 func StoreSyncedAvatar(ctx context.Context, s *xorm.Session, u *user.User, provider string, raw []byte) error {
-	return storeAvatar(ctx, s, u, provider, raw, centredSquare)
+	return storeAvatar(ctx, s, u, provider, raw, centeredSquare)
 }
 
 // Zero-copy where possible: a full-resolution copy would escape the decode budget.
-func centredSquare(img image.Image) image.Image {
+func centeredSquare(img image.Image) image.Image {
 	b := img.Bounds()
 	side := min(b.Dx(), b.Dy())
 	sub, ok := img.(interface {

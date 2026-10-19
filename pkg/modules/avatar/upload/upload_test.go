@@ -264,7 +264,7 @@ func syncAvatar(t *testing.T, raw []byte) image.Image {
 
 // Covers identity-provider image bounds (GHSA-4vh2-39rq-rq8j).
 func TestStoreSyncedAvatar(t *testing.T) {
-	t.Run("crops a non-square image centred", func(t *testing.T) {
+	t.Run("crops a non-square image centered", func(t *testing.T) {
 		img := syncAvatar(t, encodePNG(t, gradient(8, 4)))
 
 		assert.Equal(t, image.Rect(0, 0, 4, 4), img.Bounds())
@@ -297,8 +297,8 @@ func TestStoreSyncedAvatar(t *testing.T) {
 	t.Run("crops a very thin image without a full-resolution copy", func(t *testing.T) {
 		const width, height = 60, 800_000
 		thin := image.NewGray(image.Rect(0, 0, width, height))
-		centreTop := (height - width) / 2
-		for i := centreTop * width; i < (centreTop+width)*width; i++ {
+		centerTop := (height - width) / 2
+		for i := centerTop * width; i < (centerTop+width)*width; i++ {
 			thin.Pix[i] = 200
 		}
 		raw := encodePNG(t, thin)
