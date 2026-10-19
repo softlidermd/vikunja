@@ -32,7 +32,6 @@ import (
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/auth"
 	"code.vikunja.io/api/pkg/modules/avatar"
-	"code.vikunja.io/api/pkg/modules/avatar/upload"
 	"code.vikunja.io/api/pkg/modules/keyvalue"
 	"code.vikunja.io/api/pkg/user"
 	"code.vikunja.io/api/pkg/utils"
@@ -381,12 +380,10 @@ func syncUserAvatarFromOpenID(ctx context.Context, s *xorm.Session, u *user.User
 		return fmt.Errorf("error downloading avatar: %w", err)
 	}
 
-	err = upload.StoreSyncedAvatar(ctx, s, u, "openid", avatarData)
+	err = avatar.StoreSyncedAvatar(ctx, s, u, "openid", avatarData)
 	if err != nil {
 		return fmt.Errorf("error storing avatar: %w", err)
 	}
-
-	avatar.FlushAllCaches(u)
 
 	return nil
 }

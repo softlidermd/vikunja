@@ -33,7 +33,6 @@ import (
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/auth"
 	"code.vikunja.io/api/pkg/modules/avatar"
-	"code.vikunja.io/api/pkg/modules/avatar/upload"
 	"code.vikunja.io/api/pkg/user"
 	"code.vikunja.io/api/pkg/utils"
 
@@ -203,10 +202,8 @@ func AuthenticateUserInLDAP(ctx context.Context, s *xorm.Session, username, pass
 	if avatarSyncAttribute != "" {
 		raw := sr.Entries[0].GetRawAttributeValue(avatarSyncAttribute)
 		if len(raw) > 0 {
-			if err := upload.StoreSyncedAvatar(ctx, s, u, "ldap", raw); err != nil {
+			if err := avatar.StoreSyncedAvatar(ctx, s, u, "ldap", raw); err != nil {
 				log.Errorf("Error storing LDAP avatar for user %s: %v", u.Username, err)
-			} else {
-				avatar.FlushAllCaches(u)
 			}
 		}
 	}

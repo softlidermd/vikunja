@@ -159,3 +159,13 @@ func StoreUploadedAvatar(ctx context.Context, s *xorm.Session, u *user.User, src
 
 	return nil
 }
+
+func StoreSyncedAvatar(ctx context.Context, s *xorm.Session, u *user.User, provider string, raw []byte) error {
+	if err := upload.StoreSyncedAvatar(ctx, s, u, provider, raw); err != nil {
+		return err
+	}
+
+	FlushAllCaches(u)
+
+	return nil
+}
