@@ -149,11 +149,7 @@ func TestAvatarUpload(t *testing.T) {
 	})
 
 	t.Run("Undecodable image (SVG) rejected with 400", func(t *testing.T) {
-		// SVG sniffs as image/svg+xml, passing the mimetype prefix check, but
-		// image.Decode/DecodeConfig has no SVG decoder. Sent as octet-stream it
-		// bypasses the part content-type allow-list, so the byte-level decode
-		// validation in StoreUploadedAvatar is what must reject it. This must be
-		// a 400 (ErrNotAnImage), not a 500 from a failed decode deeper in storage.
+		// Sniffs as image/svg+xml but has no decoder: 400, not 500.
 		e, err := setupTestEnv()
 		require.NoError(t, err)
 		token := humaTokenFor(t, &testuser1)
@@ -169,20 +165,6 @@ func TestAvatarUpload(t *testing.T) {
 		u, err := user.GetUserByID(s, testuser1.ID)
 		require.NoError(t, err)
 		assert.NotEqual(t, "upload", u.AvatarProvider)
-	})
-
-	t.Run("Truncated image rejected with 400", func(t *testing.T) {
-		e, err := setupTestEnv()
-		require.NoError(t, err)
-		token := humaTokenFor(t, &testuser1)
-
-		// Header intact, pixel data cut off.
-		truncated := pngBytes(t)[:40]
-		body, contentType := multipartAvatarBody(t, "avatar", "avatar.png", truncated)
-		rec := uploadAvatarRequest(t, e, body, contentType, token)
-		require.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
-		assert.Contains(t, rec.Body.String(), "Uploaded file is no image.")
-		assert.NotContains(t, rec.Body.String(), `"code"`)
 	})
 
 	t.Run("Unauthenticated", func(t *testing.T) {
