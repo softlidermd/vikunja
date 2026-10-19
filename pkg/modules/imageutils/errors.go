@@ -48,3 +48,25 @@ func IsErrImageTooLarge(err error) bool {
 	var e *ErrImageTooLarge
 	return errors.As(err, &e)
 }
+
+// ErrDecodeBusy means an image waited too long for other images to finish decoding.
+type ErrDecodeBusy struct{}
+
+func (err ErrDecodeBusy) Error() string {
+	return "Timed out waiting for capacity to decode an image"
+}
+
+const ErrCodeDecodeBusy = 4040
+
+func (err ErrDecodeBusy) HTTPError() web.HTTPError {
+	return web.HTTPError{
+		HTTPCode: http.StatusServiceUnavailable,
+		Code:     ErrCodeDecodeBusy,
+		Message:  "The server is busy processing other images, please try again later.",
+	}
+}
+
+func IsErrDecodeBusy(err error) bool {
+	var busy ErrDecodeBusy
+	return errors.As(err, &busy)
+}
