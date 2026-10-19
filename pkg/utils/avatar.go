@@ -34,13 +34,13 @@ import (
 )
 
 // CropAvatarTo1x1 crops the avatar image to a 1:1 aspect ratio, centered on the image
-func CropAvatarTo1x1(imageData []byte) ([]byte, error) {
+func CropAvatarTo1x1(ctx context.Context, imageData []byte) ([]byte, error) {
 	if len(imageData) == 0 {
 		return nil, errors.New("empty image data")
 	}
 
 	var cropped []byte
-	err := imageutils.Decode(context.Background(), imageutils.BytesOpener(imageData), func(img image.Image, format string) error {
+	err := imageutils.Decode(ctx, imageutils.BytesOpener(imageData), func(img image.Image, format string) error {
 		var err error
 		cropped, err = cropTo1x1(imageData, img, format)
 		return err

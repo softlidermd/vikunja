@@ -127,13 +127,13 @@ func (p *Provider) AsDataURI(u *user.User, size int64) (string, error) {
 	return dataURI, nil
 }
 
-func StoreAvatarFile(s *xorm.Session, u *user.User, src io.Reader) (err error) {
+func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, src io.Reader) (err error) {
 	data, err := io.ReadAll(src)
 	if err != nil {
 		return
 	}
 	buf := &bytes.Buffer{}
-	err = imageutils.Decode(context.Background(), imageutils.BytesOpener(data), func(img image.Image, _ string) error {
+	err = imageutils.Decode(ctx, imageutils.BytesOpener(data), func(img image.Image, _ string) error {
 		// Fit bounds both dimensions without upscaling.
 		return png.Encode(buf, imaging.Fit(img, 1024, 1024, imaging.Lanczos))
 	})
