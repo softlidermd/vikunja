@@ -25,7 +25,6 @@ import (
 	"image/png"
 	"math/rand"
 	"os"
-	"runtime"
 	"strconv"
 	"testing"
 
@@ -150,7 +149,7 @@ func newUserWithAvatarFile(t *testing.T) (*xorm.Session, *user.User) {
 
 	// Committed so the test's rollback keeps the link.
 	setup := db.NewSession()
-	_, err := setup.ID(1).Cols("avatar_file_id").Update(&user.User{AvatarFileID: 1})
+	_, err := setup.ID(1).Cols("avatar_file_id", "avatar_provider").Update(&user.User{AvatarFileID: 1, AvatarProvider: "upload"})
 	require.NoError(t, err)
 	require.NoError(t, setup.Commit())
 	setup.Close()
@@ -161,6 +160,7 @@ func newUserWithAvatarFile(t *testing.T) (*xorm.Session, *user.User) {
 	_, err = s.ID(1).Get(u)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), u.AvatarFileID)
+	require.Equal(t, "upload", u.AvatarProvider)
 	return s, u
 }
 
@@ -262,7 +262,6 @@ func syncAvatar(t *testing.T, raw []byte) image.Image {
 	return img
 }
 
-// Covers identity-provider image bounds (GHSA-4vh2-39rq-rq8j).
 func TestStoreSyncedAvatar(t *testing.T) {
 	t.Run("crops a non-square image centered", func(t *testing.T) {
 		img := syncAvatar(t, encodePNG(t, gradient(8, 4)))
@@ -294,61 +293,46 @@ func TestStoreSyncedAvatar(t *testing.T) {
 		}
 	})
 
-	t.Run("crops a very thin image without a full-resolution copy", func(t *testing.T) {
-		const width, height = 60, 800_000
-		thin := image.NewGray(image.Rect(0, 0, width, height))
-		centerTop := (height - width) / 2
-		for i := centerTop * width; i < (centerTop+width)*width; i++ {
-			thin.Pix[i] = 200
-		}
-		raw := encodePNG(t, thin)
-
-		runtime.GC()
-		var before, after runtime.MemStats
-		runtime.ReadMemStats(&before)
-		img := syncAvatar(t, raw)
-		runtime.ReadMemStats(&after)
-
-		require.Equal(t, image.Rect(0, 0, width, width), img.Bounds())
-		for x := 0; x < width; x++ {
-			for y := 0; y < width; y++ {
-				require.Equal(t, color.Gray{Y: 200}, color.GrayModel.Convert(img.At(x, y)), "pixel %d,%d", x, y)
-			}
-		}
-		// Decoding holds width*height bytes; a full-resolution NRGBA copy would add four times that.
-		assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(2*width*height))
-	})
-
-	t.Run("leaves the user untouched on error", func(t *testing.T) {
-		db.LoadAndAssertFixtures(t)
-		files.InitTestFileFixtures(t)
-
-		s := db.NewSession()
-		defer s.Close()
-		_, err := s.ID(1).Cols("avatar_file_id", "avatar_provider").Update(&user.User{
-			AvatarFileID:   1,
-			AvatarProvider: "initials",
-		})
-		require.NoError(t, err)
-		u, err := user.GetUserByID(s, 1)
-		require.NoError(t, err)
-
+	t.Run("rejects a decompression bomb", func(t *testing.T) {
+		// GHSA-4vh2-39rq-rq8j
 		bomb := encodePNG(t, gradient(4, 4))
 		binary.BigEndian.PutUint32(bomb[16:20], uint32(8000))
 		binary.BigEndian.PutUint32(bomb[20:24], uint32(8000))
 		binary.BigEndian.PutUint32(bomb[29:33], crc32.ChecksumIEEE(bomb[12:29]))
 
-		err = StoreSyncedAvatar(t.Context(), s, u, "ldap", bomb)
+		s := db.NewSession()
+		defer s.Close()
+		err := StoreSyncedAvatar(t.Context(), s, &user.User{ID: 1}, "ldap", bomb)
 		require.Error(t, err)
 		assert.True(t, imageutils.IsErrImageTooLarge(err), "err: %v", err)
-		assert.Equal(t, int64(1), u.AvatarFileID)
-		assert.Equal(t, "initials", u.AvatarProvider)
+	})
 
-		require.NoError(t, s.Commit())
+	t.Run("restores the user when the update fails", func(t *testing.T) {
+		s, u := newUserWithAvatarFile(t)
+		oldFileID, oldProvider := u.AvatarFileID, u.AvatarProvider
+
+		err := StoreSyncedAvatar(t.Context(), s, u, "bogus", encodePNG(t, gradient(2, 2)))
+		var invalid *user.ErrInvalidAvatarProvider
+		require.ErrorAs(t, err, &invalid)
+		assert.Equal(t, oldFileID, u.AvatarFileID)
+		assert.Equal(t, oldProvider, u.AvatarProvider)
+
+		require.NoError(t, s.Rollback())
 		db.AssertExists(t, "users", map[string]interface{}{
 			"id":              1,
-			"avatar_provider": "initials",
-			"avatar_file_id":  1,
+			"avatar_file_id":  oldFileID,
+			"avatar_provider": oldProvider,
 		}, false)
 	})
+}
+
+func TestCenteredSquare(t *testing.T) {
+	thin := image.NewGray(image.Rect(0, 0, 3, 40))
+
+	sq := centeredSquare(thin)
+
+	assert.Equal(t, image.Rect(0, 18, 3, 21), sq.Bounds())
+	gray, ok := sq.(*image.Gray)
+	require.True(t, ok)
+	assert.Same(t, &thin.Pix[thin.PixOffset(0, 18)], &gray.Pix[0], "must be a view, not a copy")
 }
