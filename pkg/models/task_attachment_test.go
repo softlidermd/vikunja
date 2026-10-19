@@ -434,6 +434,7 @@ func TestTaskAttachment_Preview(t *testing.T) {
 		mime    string
 		content []byte
 		size    uint64
+		cause   func(error) bool
 	}{
 		"non-image": {
 			id:      910010,
@@ -443,10 +444,12 @@ func TestTaskAttachment_Preview(t *testing.T) {
 		"undecodable image": {
 			id:      910002,
 			content: append(pngHeader(400, 300), []byte("not image data")...),
+			cause:   func(err error) bool { return errors.Is(err, imageutils.ErrUndecodable) },
 		},
 		"image over the pixel limit": {
 			id:      910003,
 			content: pngHeader(10000, 10000),
+			cause:   imageutils.IsErrImageTooLarge,
 		},
 		"file over the size limit": {
 			id:      910004,
@@ -465,6 +468,9 @@ func TestTaskAttachment_Preview(t *testing.T) {
 			preview, err := ta.GetPreview(t.Context(), PreviewMedium)
 			require.Error(t, err)
 			assert.True(t, IsErrTaskAttachmentNotPreviewable(err), "err: %v", err)
+			if tc.cause != nil {
+				assert.True(t, tc.cause(err), "err: %v", err)
+			}
 			assert.Nil(t, preview)
 			assert.Nil(t, ta.File.File, "the original must not be opened")
 		})
@@ -490,18 +496,6 @@ func TestGeneratePreviews(t *testing.T) {
 		require.ErrorIs(t, err, openErr)
 		assert.False(t, IsErrTaskAttachmentNotPreviewable(err))
 	})
-
-	notPreviewable := map[string][]byte{
-		"undecodable image":          append(pngHeader(400, 300), []byte("not image data")...),
-		"image over the pixel limit": pngHeader(10000, 10000),
-	}
-	for name, content := range notPreviewable {
-		t.Run(name+" is not previewable", func(t *testing.T) {
-			_, err := generatePreviews(t.Context(), imageutils.BytesOpener(content))
-
-			assert.True(t, IsErrTaskAttachmentNotPreviewable(err), "err: %v", err)
-		})
-	}
 
 	neverUpscaled := map[string]struct {
 		width  int
