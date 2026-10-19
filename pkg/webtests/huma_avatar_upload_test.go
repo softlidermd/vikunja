@@ -171,6 +171,20 @@ func TestAvatarUpload(t *testing.T) {
 		assert.NotEqual(t, "upload", u.AvatarProvider)
 	})
 
+	t.Run("Truncated image rejected with 400", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+		token := humaTokenFor(t, &testuser1)
+
+		// Header intact, pixel data cut off.
+		truncated := pngBytes(t)[:40]
+		body, contentType := multipartAvatarBody(t, "avatar", "avatar.png", truncated)
+		rec := uploadAvatarRequest(t, e, body, contentType, token)
+		require.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
+		assert.Contains(t, rec.Body.String(), "Uploaded file is no image.")
+		assert.NotContains(t, rec.Body.String(), `"code"`)
+	})
+
 	t.Run("Unauthenticated", func(t *testing.T) {
 		e, err := setupTestEnv()
 		require.NoError(t, err)
@@ -229,6 +243,7 @@ func TestAvatarUploadImageBounds(t *testing.T) {
 		body, contentType := multipartAvatarBody(t, "avatar", "bomb.png", pngWithClaimedDimensionsPatch(t, 8000, 8000))
 		rec := uploadAvatarRequest(t, e, body, contentType, token)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
+		assert.Contains(t, rec.Body.String(), fmt.Sprintf(`"code":%d`, imageutils.ErrCodeImageTooLarge))
 	})
 
 	t.Run("avatar reads are fitted, never upscaled", func(t *testing.T) {
