@@ -773,7 +773,7 @@ func TestGetOrCreateUserSkipsAvatarWhenDecodingIsBusy(t *testing.T) {
 	stored, err := user.GetUserByID(s2, u.ID)
 	require.NoError(t, err)
 	assert.Zero(t, stored.AvatarFileID)
-	assert.NotEqual(t, "openid", stored.AvatarProvider)
+	assert.Equal(t, config.DefaultSettingsAvatarProvider.GetString(), stored.AvatarProvider)
 }
 
 func TestEmailVerifiedClaimDecoding(t *testing.T) {
