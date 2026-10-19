@@ -774,9 +774,8 @@ func TestPreviewGenerator_SharesGeneration(t *testing.T) {
 		release := imageutils.ExhaustBudgetForTests(time.Minute)
 		t.Cleanup(release)
 		content := testPNG(t, 100, 100)
-		leaderSource := newGatedSource(content)
-		close(leaderSource.gate)
-		followerSource := newGatedSource(content)
+		leaderSource := &trackedSource{content: content}
+		followerSource := &trackedSource{content: content}
 		fileID := uniquePreviewFileID(t)
 
 		leaderCtx, cancelLeader := context.WithCancel(t.Context())
