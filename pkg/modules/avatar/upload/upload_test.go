@@ -38,6 +38,7 @@ import (
 	"code.vikunja.io/api/pkg/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"xorm.io/xorm"
 )
 
 // TestMain initializes the test environment
@@ -142,58 +143,60 @@ func TestGetAvatar(t *testing.T) {
 	})
 }
 
-func TestStoreAvatarFile(t *testing.T) {
-	// Incompressible, so the encoded avatar exceeds the 1MB limit below.
-	noise := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
-	rng := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic test data
-	_, err := rng.Read(noise.Pix)
+func newUserWithAvatarFile(t *testing.T) (*xorm.Session, *user.User) {
+	t.Helper()
+	db.LoadAndAssertFixtures(t)
+	files.InitTestFileFixtures(t)
+
+	// File 1 is a fixture with content in storage. Committed, so a rollback
+	// in the test keeps it.
+	setup := db.NewSession()
+	_, err := setup.ID(1).Cols("avatar_file_id").Update(&user.User{AvatarFileID: 1})
 	require.NoError(t, err)
-	for i := 3; i < len(noise.Pix); i += 4 {
-		noise.Pix[i] = 255
-	}
-	src := &bytes.Buffer{}
-	require.NoError(t, png.Encode(src, noise))
+	require.NoError(t, setup.Commit())
+	setup.Close()
 
+	s := db.NewSession()
+	t.Cleanup(func() { s.Close() })
+	u := &user.User{ID: 1}
+	_, err = s.ID(1).Get(u)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), u.AvatarFileID)
+	return s, u
+}
+
+func TestStoreAvatarFile(t *testing.T) {
 	t.Run("keeps the old avatar when creating the new file fails", func(t *testing.T) {
-		db.LoadAndAssertFixtures(t)
-		files.InitTestFileFixtures(t)
-
-		s := db.NewSession()
-		defer s.Close()
-
-		// File 1 is a fixture with content in storage.
-		_, err := s.ID(1).Cols("avatar_file_id").Update(&user.User{AvatarFileID: 1})
+		// Incompressible, so the encoded avatar exceeds the 1MB limit below.
+		noise := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
+		rng := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic test data
+		_, err := rng.Read(noise.Pix)
 		require.NoError(t, err)
-		u := &user.User{ID: 1}
-		_, err = s.ID(1).Get(u)
-		require.NoError(t, err)
-		require.Equal(t, int64(1), u.AvatarFileID)
+		for i := 3; i < len(noise.Pix); i += 4 {
+			noise.Pix[i] = 255
+		}
+		src := &bytes.Buffer{}
+		require.NoError(t, png.Encode(src, noise))
+
+		s, u := newUserWithAvatarFile(t)
 
 		oldMax := config.FilesMaxSize.GetString()
 		require.NoError(t, config.SetMaxFileSizeMBytesFromString("1MB"))
 		t.Cleanup(func() { _ = config.SetMaxFileSizeMBytesFromString(oldMax) })
 
-		err = StoreAvatarFile(t.Context(), s, u, "upload", bytes.NewReader(src.Bytes()))
+		err = StoreAvatarFile(t.Context(), s, u, "upload", src)
 		require.Error(t, err)
 		assert.True(t, files.IsErrFileIsTooLarge(err))
 
 		assert.Equal(t, int64(1), u.AvatarFileID)
+		require.NoError(t, s.Rollback())
+		db.AssertExists(t, "users", map[string]interface{}{"id": 1, "avatar_file_id": 1}, false)
 		_, err = files.FileStat(&files.File{ID: 1})
 		require.NoError(t, err, "old avatar blob must still exist")
 	})
 
 	t.Run("replaces the old avatar on success", func(t *testing.T) {
-		db.LoadAndAssertFixtures(t)
-		files.InitTestFileFixtures(t)
-
-		s := db.NewSession()
-		defer s.Close()
-
-		_, err := s.ID(1).Cols("avatar_file_id").Update(&user.User{AvatarFileID: 1})
-		require.NoError(t, err)
-		u := &user.User{ID: 1}
-		_, err = s.ID(1).Get(u)
-		require.NoError(t, err)
+		s, u := newUserWithAvatarFile(t)
 
 		small := &bytes.Buffer{}
 		require.NoError(t, png.Encode(small, image.NewNRGBA(image.Rect(0, 0, 8, 8))))
@@ -201,8 +204,12 @@ func TestStoreAvatarFile(t *testing.T) {
 		require.NoError(t, StoreAvatarFile(t.Context(), s, u, "upload", small))
 		assert.NotEqual(t, int64(1), u.AvatarFileID)
 		assert.NotZero(t, u.AvatarFileID)
-		_, err = files.FileStat(&files.File{ID: 1})
+		require.NoError(t, s.Commit())
+		db.AssertExists(t, "users", map[string]interface{}{"id": 1, "avatar_file_id": u.AvatarFileID}, false)
+		db.AssertMissing(t, "files", map[string]interface{}{"id": 1})
+		_, err := files.FileStat(&files.File{ID: 1})
 		require.Error(t, err, "old avatar blob must be gone")
+		assert.True(t, os.IsNotExist(err))
 	})
 }
 
