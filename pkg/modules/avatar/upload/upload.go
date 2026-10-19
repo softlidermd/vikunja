@@ -192,11 +192,11 @@ func storeAvatar(ctx context.Context, s *xorm.Session, u *user.User, provider st
 		return err
 	}
 
-	// Only now: storage deletes are not rolled back with the session.
+	// Log only: the new avatar is persisted, so an error here would make callers disagree with the DB.
 	if oldAvatarFileID != 0 {
 		old := &files.File{ID: oldAvatarFileID}
-		if err := old.Delete(s); err != nil && !files.IsErrFileDoesNotExist(err) {
-			return err
+		if delErr := old.Delete(s); delErr != nil && !files.IsErrFileDoesNotExist(delErr) {
+			log.Errorf("Could not delete old avatar file %d of user %d: %s", oldAvatarFileID, u.ID, delErr)
 		}
 	}
 
