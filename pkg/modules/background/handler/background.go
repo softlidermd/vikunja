@@ -264,7 +264,6 @@ func SaveBackgroundFile(ctx context.Context, s *xorm.Session, auth web.Auth, pro
 	}
 	buf := bytes.Buffer{}
 	err = imageutils.Decode(ctx, open, func(src image.Image, _ string) error {
-		// Fit bounds both dimensions without upscaling.
 		dst := imaging.Fit(src, background.MaxBackgroundImageHeight, background.MaxBackgroundImageHeight, imaging.Lanczos)
 		if err := imaging.Encode(&buf, dst, imaging.JPEG, imaging.JPEGQuality(80)); err != nil {
 			return err

@@ -62,7 +62,6 @@ func testJPEGWithMetadata(t *testing.T, width, height, segments int) []byte {
 	segment := binary.BigEndian.AppendUint16([]byte{0xff, 0xe1}, 0xffff)
 	segment = append(segment, make([]byte, maxSegmentPayload)...)
 
-	// Insert right after the SOI marker.
 	out := append([]byte{}, encoded[:2]...)
 	for range segments {
 		out = append(out, segment...)
@@ -178,7 +177,6 @@ func TestDecode_ClosesEverySourceHandle(t *testing.T) {
 	})
 }
 
-// Records the pixels of the images currently handed to use.
 type pixelTracker struct {
 	gate chan struct{}
 
@@ -338,7 +336,6 @@ func TestDecode_ReleasesTheBudget(t *testing.T) {
 	})
 }
 
-// Serves the header, then panics while the image data is read.
 type panickingSource struct {
 	content []byte
 	opened  int

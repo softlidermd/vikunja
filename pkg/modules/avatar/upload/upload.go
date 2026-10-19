@@ -89,7 +89,6 @@ func (p *Provider) GetAvatar(u *user.User, size int64) (avatar []byte, mimeType 
 
 		buf := &bytes.Buffer{}
 		err = imageutils.Decode(context.Background(), imageutils.BytesOpener(data), func(img image.Image, _ string) error {
-			// Fit bounds both dimensions without upscaling.
 			return png.Encode(buf, imaging.Fit(img, int(size), int(size), imaging.Lanczos))
 		})
 		if err != nil {
@@ -134,7 +133,6 @@ func StoreAvatarFile(ctx context.Context, s *xorm.Session, u *user.User, src io.
 	}
 	buf := &bytes.Buffer{}
 	err = imageutils.Decode(ctx, imageutils.BytesOpener(data), func(img image.Image, _ string) error {
-		// Fit bounds both dimensions without upscaling.
 		return png.Encode(buf, imaging.Fit(img, 1024, 1024, imaging.Lanczos))
 	})
 	if err != nil {

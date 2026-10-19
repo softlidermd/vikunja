@@ -49,7 +49,6 @@ func IsErrImageTooLarge(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrDecodeBusy means an image waited too long for other images to finish decoding.
 type ErrDecodeBusy struct{}
 
 func (err ErrDecodeBusy) Error() string {

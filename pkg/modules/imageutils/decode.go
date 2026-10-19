@@ -30,7 +30,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// ErrUndecodable wraps the decoder's error when the header or the image data cannot be decoded.
 var ErrUndecodable = errors.New("image cannot be decoded")
 
 // Opener is called twice, so callers queued for capacity hold no storage handle or S3 body while waiting.
@@ -44,10 +43,10 @@ func BytesOpener(data []byte) Opener {
 
 const maxHeaderBytes = 12 << 20
 
-// Below MaxPixels the largest allowed image could never acquire.
 var bounded atomic.Pointer[decoder]
 
 func init() {
+	// Below MaxPixels the largest allowed image could never acquire.
 	bounded.Store(newDecoder(2*MaxPixels, 30*time.Second))
 }
 
@@ -67,12 +66,10 @@ func newDecoder(pixelBudget int64, queueTimeout time.Duration) *decoder {
 
 // Decode holds the image's pixels against a process-wide budget until use returns,
 // because the decoded image stays in memory while use resizes or encodes it.
-// Returns ErrDecodeBusy when no capacity frees up in time.
 func Decode(ctx context.Context, open Opener, use func(img image.Image, format string) error) error {
 	return bounded.Load().decode(ctx, open, use)
 }
 
-// ExhaustBudgetForTests makes every Decode queue until release is called or queueTimeout passes.
 func ExhaustBudgetForTests(queueTimeout time.Duration) (release func()) {
 	original := bounded.Load()
 	exhausted := newDecoder(original.budget, queueTimeout)
@@ -116,7 +113,6 @@ func readConfig(open Opener) (image.Config, error) {
 	}
 	defer header.Close()
 
-	// Rejects decompression bombs (small file, huge pixel dimensions) before the full decode.
 	// DecodeConfig buffers the whole file for formats whose metadata may sit at the end, like TIFF.
 	cfg, _, err := image.DecodeConfig(io.LimitReader(header, maxHeaderBytes))
 	if err != nil {
