@@ -17,6 +17,7 @@
 package user
 
 import (
+	"fmt"
 	"strings"
 
 	"code.vikunja.io/api/pkg/config"
@@ -48,11 +49,40 @@ func SearchUsers(s *xorm.Session, search string, currentUser *User) (users []*Us
 	return users, nil
 }
 
-// ListUsersForEmptySearch lists what a picker shows before anything is typed: users discoverable by
-// name and users sharing a team with currentUser (the team page already shows them), plus own bots.
+// ListUsersForEmptySearch lists what a picker shows before anything is typed: active users discoverable
+// by name and users sharing a team with currentUser (the team page already shows them), plus own bots.
 // Emails are cleared.
 func ListUsersForEmptySearch(s *xorm.Session, currentUser *User) (users []*User, err error) {
-	sharesTeam := builder.In("id", builder.Select("user_id").
+	sharesTeam := teamMateCond(currentUser)
+	cond := builder.Or(builder.Eq{"discoverable_by_name": true}, sharesTeam)
+	if config.ServiceEnableOpenIDTeamUserOnlySearch.GetBool() {
+		cond = sharesTeam
+	}
+
+	// shortcut: the first 50 by id with no paging; fine for small instances, typing narrows larger ones.
+	err = s.
+		Where(builder.And(
+			builder.Or(
+				builder.And(cond, notSomeoneElsesBotCond(currentUser)),
+				builder.Eq{"bot_owner_id": currentUser.ID},
+			),
+			builder.Eq{"status": StatusActive},
+		)).
+		OrderBy("id").
+		Limit(50).
+		Find(&users)
+	if err != nil {
+		return nil, fmt.Errorf("listing users for an empty search: %w", err)
+	}
+	for _, u := range users {
+		u.Email = ""
+	}
+	return users, nil
+}
+
+// teamMateCond matches users who share any team with currentUser.
+func teamMateCond(currentUser *User) builder.Cond {
+	return builder.In("id", builder.Select("user_id").
 		From("team_members").
 		Where(builder.In("team_id",
 			builder.Select("team_id").
@@ -60,29 +90,14 @@ func ListUsersForEmptySearch(s *xorm.Session, currentUser *User) (users []*User,
 				Where(builder.Eq{"team_members.user_id": currentUser.ID}),
 		)),
 	)
-	cond := builder.Or(builder.Eq{"discoverable_by_name": true}, sharesTeam)
-	if config.ServiceEnableOpenIDTeamUserOnlySearch.GetBool() {
-		cond = sharesTeam
-	}
-	notSomeoneElsesBot := builder.Or(
+}
+
+func notSomeoneElsesBotCond(currentUser *User) builder.Cond {
+	return builder.Or(
 		builder.IsNull{"bot_owner_id"},
 		builder.Eq{"bot_owner_id": 0},
 		builder.Eq{"bot_owner_id": currentUser.ID},
 	)
-
-	// shortcut: the first 50 by id with no paging; fine for small instances, typing narrows larger ones.
-	err = s.
-		Where(builder.Or(
-			builder.And(cond, notSomeoneElsesBot),
-			builder.Eq{"bot_owner_id": currentUser.ID},
-		)).
-		OrderBy("id").
-		Limit(50).
-		Find(&users)
-	for _, u := range users {
-		u.Email = ""
-	}
-	return
 }
 
 // ListUsers returns a list with all users, filtered by an optional search string
@@ -171,14 +186,7 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 	}
 
 	if config.ServiceEnableOpenIDTeamUserOnlySearch.GetBool() {
-		teamMemberCond := builder.In("id", builder.Select("user_id").
-			From("team_members").
-			Where(builder.In("team_id",
-				builder.Select("team_id").
-					From("team_members").
-					Where(builder.Eq{"team_members.user_id": currentUser.ID}),
-			)),
-		)
+		teamMemberCond := teamMateCond(currentUser)
 
 		if !opts.MatchFuzzily {
 			cond = builder.And(
@@ -198,12 +206,6 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 			)
 		}
 	}
-
-	notSomeoneElsesBot := builder.Or(
-		builder.IsNull{"bot_owner_id"},
-		builder.Eq{"bot_owner_id": 0},
-		builder.Eq{"bot_owner_id": currentUser.ID},
-	)
 
 	// Own bots: filtered by the search string when one is provided (matched
 	// against username and name), but bypass the discoverable_by_name flag
@@ -234,7 +236,7 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 
 	err = s.
 		Where(builder.Or(
-			builder.And(cond, notSomeoneElsesBot),
+			builder.And(cond, notSomeoneElsesBotCond(currentUser)),
 			ownBotCond,
 		)).
 		OrderBy("id").

@@ -4291,7 +4291,7 @@ export const authRefreshToken = <ThrowOnError extends boolean = true>(options?: 
 /**
  * Search users
  *
- * Searches users by username, name or full email. Matching by name or email requires the target user to have made themselves discoverable, unless both users share an external (OIDC/LDAP) team. Email addresses are never returned.
+ * Searches users by username, name or full email. Matching by name or email requires the target user to have made themselves discoverable, unless both users share an external (OIDC/LDAP) team. An empty query lists up to 50 users who are discoverable by name or share a team with the caller. Email addresses are never returned.
  */
 export const usersSearch = <ThrowOnError extends boolean = true>(options?: Options<UsersSearchData, ThrowOnError>): RequestResult<UsersSearchResponses, UsersSearchErrors, ThrowOnError> => (options?.client ?? client).get<UsersSearchResponses, UsersSearchErrors, ThrowOnError>({
     security: [{

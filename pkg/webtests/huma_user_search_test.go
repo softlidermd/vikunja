@@ -21,6 +21,10 @@ import (
 	"net/http"
 	"testing"
 
+	"code.vikunja.io/api/pkg/config"
+	"code.vikunja.io/api/pkg/db"
+	"code.vikunja.io/api/pkg/user"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,10 +58,50 @@ func TestHumaUserSearch(t *testing.T) {
 			assert.Empty(t, em, "user search must never return email addresses")
 		}
 	})
+	t.Run("Empty query with team-only search hides users who are only discoverable", func(t *testing.T) {
+		config.ServiceEnableOpenIDTeamUserOnlySearch.Set(true)
+		defer config.ServiceEnableOpenIDTeamUserOnlySearch.Set(false)
+
+		rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=", "", token, "")
+		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+		usernames, _ := usersFromSearch(t, rec.Body.Bytes())
+		assert.Contains(t, usernames, "user2", "shares team 1 with user1")
+		assert.NotContains(t, usernames, "user12", "only discoverable by name")
+	})
+	t.Run("Empty query lists the caller's own bots", func(t *testing.T) {
+		rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=", "", humaTokenFor(t, &testuser21), "")
+		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+		usernames, _ := usersFromSearch(t, rec.Body.Bytes())
+		assert.Contains(t, usernames, "bot-owner-a-assistant")
+		assert.NotContains(t, usernames, "bot-owner-b-assistant", "someone else's bot")
+	})
 	t.Run("Unauthenticated", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=user2", "", "", "")
 		assert.Equal(t, http.StatusUnauthorized, rec.Code, "body: %s", rec.Body.String())
 	})
+}
+
+func TestHumaUserSearchEmptyQuerySkipsInactiveUsers(t *testing.T) {
+	e, err := setupTestEnv()
+	require.NoError(t, err)
+
+	s := db.NewSession()
+	defer s.Close()
+	// user2 is a team mate of user1 and user12 is discoverable by name, so both are listed while active.
+	_, err = s.ID(2).Cols("status").Update(&user.User{Status: user.StatusDisabled})
+	require.NoError(t, err)
+	_, err = s.ID(12).Cols("status").Update(&user.User{Status: user.StatusEmailConfirmationRequired})
+	require.NoError(t, err)
+	require.NoError(t, s.Commit())
+
+	rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=", "", humaTokenFor(t, &testuser1), "")
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	usernames, _ := usersFromSearch(t, rec.Body.Bytes())
+	assert.NotContains(t, usernames, "user2", "disabled")
+	assert.NotContains(t, usernames, "user12", "email not confirmed")
 }
 
 // TestHumaProjectUserSearch covers the per-project user search used for share

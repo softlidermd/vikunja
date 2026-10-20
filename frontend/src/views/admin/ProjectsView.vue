@@ -20,7 +20,9 @@
 					:search-results="userResults"
 					:total-results="searchData?.total"
 					label="username"
+					:show-empty="true"
 					@search="searchUsers"
+					@focusin="preloadUsers"
 				>
 					<template #searchResult="{option}">
 						<User
@@ -156,7 +158,9 @@
 							:search-results="userResults"
 							:total-results="searchData?.total"
 							label="username"
+							:show-empty="true"
 							@search="searchUsers"
+							@focusin="preloadUsers"
 						>
 							<template #searchResult="{option}">
 								<User
@@ -236,11 +240,13 @@ const totalPages = computed(() => data.value?.total_pages ?? 1)
 const reassignTarget = ref<AdminProject | null>(null)
 const selectedUser = ref<AdminUser | null>(null)
 const userSearch = ref('')
+// Each admin user list call is audit-logged, so fetch only once a picker is opened.
+const userSearchEnabled = ref(false)
 const {data: searchData, isFetching: userSearchLoading} = useQuery(computed(() => ({
 	...adminUserSearchQuery(userSearch.value),
-	enabled: userSearch.value.length >= 2,
+	enabled: userSearchEnabled.value,
 })))
-const userResults = computed(() => userSearch.value.length >= 2 ? searchData.value?.items ?? [] : [])
+const userResults = computed(() => searchData.value?.items ?? [])
 const reassignMutation = useReassignAdminProjectMutation()
 const {isPending: reassigning} = reassignMutation
 const showReassigning = useDelayedLoading(reassigning)
@@ -259,7 +265,11 @@ function openReassign(p: AdminProject) {
 	userSearch.value = ''
 }
 function closeReassign() { if (!reassigning.value) reassignTarget.value = null }
-function searchUsers(query: string) { userSearch.value = query }
+function preloadUsers() { userSearchEnabled.value = true }
+function searchUsers(query: string) {
+	userSearch.value = query
+	userSearchEnabled.value = true
+}
 async function doReassign() {
 	const target = reassignTarget.value
 	const ownerId = selectedUser.value?.id

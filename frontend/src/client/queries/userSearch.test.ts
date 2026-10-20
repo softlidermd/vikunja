@@ -53,17 +53,26 @@ function withQueryClient<T>(setup: () => T): T {
 
 describe('useUserSearch', () => {
 	it('fetches an empty search so pickers list users before typing', async () => {
-		const sam = {id: 1, username: 'sam'}
+		const sam = {
+			id: 1,
+			username: 'sam',
+		}
 		sdk.usersSearch.mockResolvedValueOnce({data: {items: [sam]}})
 		const {users} = withQueryClient(() => useUserSearch(''))
 		await flushPromises()
-		expect(sdk.usersSearch).toHaveBeenCalledWith({query: {q: ''}, signal: expect.any(AbortSignal)})
+		expect(sdk.usersSearch).toHaveBeenCalledWith({
+			query: {q: ''},
+			signal: expect.any(AbortSignal),
+		})
 		expect(users.value).toEqual([sam])
 	})
 
 	it('keeps previous results while typing and lists the empty-search users again when cleared', async () => {
 		const sam = {id: 1, username: 'sam'}
-		const alex = {id: 2, username: 'alex'}
+		const alex = {
+			id: 2,
+			username: 'alex',
+		}
 		sdk.usersSearch.mockResolvedValueOnce({data: {items: [sam]}})
 		const search = ref('sa')
 		const {users} = withQueryClient(() => useUserSearch(search))
