@@ -37,6 +37,8 @@ func ILIKE(column, search string) builder.Cond {
 	}
 
 	// An ASCII pattern folds the same under SQLite's ASCII-only LIKE, so it keeps the fast native path.
+	// shortcut: a non-ASCII search calls Go once per row and field (~0.5 s over 50k tasks with long
+	// descriptions); if searches get slow, move to PostgreSQL (ILIKE folds Unicode) or an FTS5 index.
 	if Type() == schemas.SQLITE && !isASCII(search) {
 		return builder.Expr(UnicodeLowerFunc+"("+column+") LIKE ?", "%"+strings.ToLower(search)+"%")
 	}
