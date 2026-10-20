@@ -97,6 +97,10 @@
 					:padding="false"
 					:has-content="false"
 				>
+					<AddTask
+						v-if="canWrite"
+						class="table-view__add-task d-print-none"
+					/>
 					<div class="has-horizontal-overflow">
 						<table class="table has-actions is-hoverable is-fullwidth mbe-0">
 							<thead>
@@ -365,6 +369,9 @@ import type {TaskResponse} from '@/client/queries/tasks'
 import {useTableSort} from '@/composables/useTableSort'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
+import AddTask from '@/components/tasks/AddTask.vue'
+import {useCurrentProject} from '@/composables/useCurrentProject'
+import {PERMISSIONS as Permissions} from '@/constants/permissions'
 import {getTaskIdentifier} from '@/helpers/task'
 import { camelCase } from 'change-case'
 import {isSavedFilterProject} from '@/client/queries/projects'
@@ -377,6 +384,12 @@ const props = defineProps<{
 }>()
 
 const projectList = useProjects()
+const {currentProject: project} = useCurrentProject()
+
+const canWrite = computed(() => !project.value?.is_archived &&
+	typeof project.value?.max_permission === 'number' &&
+	project.value.max_permission > Permissions.READ &&
+	project.value.id > 0)
 
 const columnsTrigger = ref<ComponentPublicInstance | null>(null)
 const columnsTriggerEl = computed<HTMLElement | null>(() => (columnsTrigger.value?.$el as HTMLElement) ?? null)
@@ -455,6 +468,10 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 </script>
 
 <style lang="scss" scoped>
+.table-view__add-task {
+	padding: 1rem 1rem 0;
+}
+
 .table {
 	background: transparent;
 	overflow-x: auto;
