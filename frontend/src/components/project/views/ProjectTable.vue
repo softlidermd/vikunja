@@ -278,7 +278,10 @@
 									</td>
 									<td v-if="activeColumns.title">
 										<TaskGlanceTooltip :task="t">
-											<RouterLink :to="taskDetailRoutes[t.id]">
+											<RouterLink
+												:to="taskDetailRoutes[t.id]"
+												:class="{'is-done-title': t.done}"
+											>
 												{{ t.title }}
 											</RouterLink>
 										</TaskGlanceTooltip>
@@ -689,6 +692,12 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 
 	th {
 		white-space: nowrap;
+	}
+
+	// Same look as a done task in the list view.
+	.is-done-title {
+		text-decoration: line-through;
+		color: var(--grey-500);
 	}
 
 	// The relative date ("через 19 часов") would otherwise wrap into a tall row.
