@@ -23,7 +23,7 @@
 		<template #default>
 			<div
 				:class="{ 'is-loading': showLoading }"
-				class="loader-container is-max-width-desktop list-view"
+				class="loader-container list-view"
 			>
 				<Card
 					:padding="false"

@@ -297,13 +297,30 @@
 										/>
 									</td>
 									<td v-if="activeColumns.labels">
-										<Labels :labels="t.labels" />
+										<BaseButton
+											v-if="canWrite"
+											:aria-label="labelsLabel($t('task.attributes.labels'), t.labels)"
+											@click="openPicker('labels', t, $event)"
+										>
+											<Labels
+												v-if="t.labels.length > 0"
+												:labels="t.labels"
+											/>
+											<Icon
+												v-else
+												icon="plus"
+											/>
+										</BaseButton>
+										<Labels
+											v-else
+											:labels="t.labels"
+										/>
 									</td>
 									<td v-if="activeColumns.assignees">
 										<BaseButton
 											v-if="canEditAssignees"
 											:aria-label="assigneesLabel($t('task.attributes.assignees'), t.assignees)"
-											@click="openAssignees(t, $event)"
+											@click="openPicker('assignees', t, $event)"
 										>
 											<span
 												v-if="t.assignees.length > 0"
@@ -390,28 +407,39 @@
 							</tbody>
 						</table>
 					</div>
-					<div
-						v-if="assigneeTask"
-						class="table-assignees-popup"
+					<Popup
+						v-if="pickerTask"
+						v-model:open="pickerOpen"
+						:anchor="pickerAnchor"
+						placement="bottom-start"
+						sheet-on-mobile
+						:sheet-title="$t(`task.attributes.${picker?.field}`)"
 					>
-						<Popup
-							v-model:open="assigneesOpen"
-							:anchor="assigneeAnchor"
-							placement="bottom-start"
-							sheet-on-mobile
-							:sheet-title="$t('task.attributes.assignees')"
-						>
-							<template #content>
-								<Card class="table-assignees-card">
-									<EditAssignees
-										:model-value="assigneeTask.assignees"
-										:task-id="assigneeTask.id"
-										:project-id="assigneeTask.project_id"
-									/>
-								</Card>
-							</template>
-						</Popup>
-					</div>
+						<template #content>
+							<!-- inline: the results push the card open instead of floating outside it. -->
+							<Card
+								class="table-picker"
+								:padding="false"
+							>
+								<EditAssignees
+									v-if="picker?.field === 'assignees'"
+									:model-value="pickerTask.assignees"
+									:task-id="pickerTask.id"
+									:project-id="pickerTask.project_id"
+									inline
+								/>
+								<EditLabels
+									v-else
+									:model-value="pickerTask.labels"
+									:task-id="pickerTask.id"
+									:project-id="pickerTask.project_id"
+									:creatable="!authStore.isLinkShareAuth"
+									:creation-disabled-message="authStore.isLinkShareAuth ? $t('task.label.linkShareCannotCreate') : ''"
+									inline
+								/>
+							</Card>
+						</template>
+					</Popup>
 
 					<Pagination
 						:total-pages="totalPages"
@@ -442,6 +470,7 @@ import Pagination from '@/components/misc/Pagination.vue'
 import Popup from '@/components/misc/Popup.vue'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
 import EditAssignees from '@/components/tasks/partials/EditAssignees.vue'
+import EditLabels from '@/components/tasks/partials/EditLabels.vue'
 import Datepicker from '@/components/input/Datepicker.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 
@@ -597,29 +626,41 @@ async function saveDue(task: TaskResponse) {
 	}
 }
 
-const assigneesOpen = ref(false)
-const assigneeTaskId = ref<number | null>(null)
-const assigneeAnchor = ref<HTMLElement | null>(null)
-const assigneeTask = computed(() => tasks.value.find(x => x.id === assigneeTaskId.value))
+const pickerOpen = ref(false)
+const picker = ref<{
+	field: 'assignees' | 'labels',
+	taskId: number,
+} | null>(null)
+const pickerAnchor = ref<HTMLElement | null>(null)
+const pickerTask = computed(() => tasks.value.find(x => x.id === picker.value?.taskId))
 // The task left the page (paging, filter): close, so the popup doesn't reopen on a detached anchor.
-watch(assigneeTask, task => {
+watch(pickerTask, task => {
 	if (!task) {
-		assigneesOpen.value = false
-		assigneeAnchor.value = null
+		pickerOpen.value = false
+		pickerAnchor.value = null
 	}
 })
 
-// The aria-label replaces the button content, so it has to name the people too.
+// The aria-label replaces the button content, so it has to name the people and labels too.
 function assigneesLabel(label: string, assignees: TaskResponse['assignees']) {
 	return assignees.length > 0
 		? `${label}: ${assignees.map(getDisplayName).join(', ')}`
 		: label
 }
 
-function openAssignees(task: TaskResponse, event: MouseEvent) {
-	assigneeTaskId.value = task.id
-	assigneeAnchor.value = event.currentTarget as HTMLElement
-	assigneesOpen.value = true
+function labelsLabel(label: string, labels: TaskResponse['labels']) {
+	return labels.length > 0
+		? `${label}: ${labels.map(l => l.title).join(', ')}`
+		: label
+}
+
+function openPicker(field: 'assignees' | 'labels', task: TaskResponse, event: MouseEvent) {
+	picker.value = {
+		field,
+		taskId: task.id,
+	}
+	pickerAnchor.value = event.currentTarget as HTMLElement
+	pickerOpen.value = true
 }
 
 // TODO: re-enable opening task detail in modal
@@ -655,8 +696,15 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		white-space: nowrap;
 	}
 
+	// Its padding-block-start would push the box below the text's centre line.
+	.fancy-checkbox {
+		display: flex;
+		padding: 0;
+	}
+
 	.user {
 		margin: 0;
+		align-items: center;
 	}
 
 	// One assignee per line, avatar plus name, so it is clear who it is without hovering.
@@ -680,23 +728,49 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 
 }
 
-// Popup scrolls (overflow-y: auto), which would clip the absolutely positioned assignee search results.
-.table-assignees-popup {
-	:deep(.popup) {
-		overflow: visible;
+// The card is the only frame: the search field and the results inside it drop their own borders.
+.table-picker {
+	// The popover shrinks to its content, which would squeeze the search input.
+	inline-size: 22rem;
+	max-inline-size: calc(100vw - 2rem);
+	margin: 0;
+	overflow: hidden;
+	box-shadow: var(--shadow-md);
+
+	:deep(.multiselect .input-wrapper) {
+		padding: .25rem;
+		border: 0;
+		border-radius: 0;
+		box-shadow: none;
+
+		// A line of its own, so the placeholder is not cut off beside the chosen items.
+		.input {
+			max-inline-size: none;
+			padding-inline: .5rem;
+		}
 	}
 
-	// The popover shrinks to its content, which would squeeze the search input.
-	.card {
-		inline-size: 20rem;
-		max-inline-size: calc(100vw - 2rem);
-		margin: 0;
+	:deep(.has-search-results .input-wrapper) {
+		border-block-end: 1px solid var(--grey-200) !important;
+	}
+
+	:deep(.search-results) {
+		border: 0;
+		border-radius: 0;
+	}
+
+	// The hover hint takes room from the name even while it is invisible.
+	:deep(.hint-text:not(.is-always-visible)) {
+		display: none;
 	}
 }
 
-// The mobile sheet sits at the screen bottom and sizes to its content, so absolute results would hang off-screen.
-.bottom-sheet .table-assignees-card :deep(.search-results) {
-	position: static;
+// The mobile sheet is the frame there.
+.bottom-sheet .table-picker {
+	inline-size: auto;
+	max-inline-size: none;
+	border: 0;
+	box-shadow: none;
 }
 
 .link-share-view .card {
