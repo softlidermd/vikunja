@@ -1,20 +1,21 @@
-
+// Pale pastels, so auto-created labels look like the hand-picked ones and keep dark, readable text.
 const COLORS = [
-	'#ffbe0b',
-	'#fd8a09',
-	'#fb5607',
-	'#ff006e',
-	'#efbdeb',
-	'#8338ec',
-	'#5f5ff6',
-	'#3a86ff',
-	'#4c91ff',
-	'#0ead69',
-	'#25be8b',
-	'#073b4c',
-	'#373f47',
+	'#fecaca',
+	'#fed7aa',
+	'#fde68a',
+	'#d9f99d',
+	'#bbf7d0',
+	'#99f6e4',
+	'#bae6fd',
+	'#c7d2fe',
+	'#ddd6fe',
+	'#f5d0fe',
+	'#fbcfe8',
+	'#e5e7eb',
 ]
 
 export function getRandomColorHex(): string {
 	return COLORS[Math.floor(Math.random() * COLORS.length)]
 }
+
+export const RANDOM_COLORS: readonly string[] = COLORS
