@@ -326,7 +326,7 @@
 									<template v-if="activeColumns.dueDate">
 										<td v-if="canWrite">
 											<Datepicker
-												:model-value="t.id in dueDraft ? dueDraft[t.id] : parseDateOrNull(t.due_date)"
+												:model-value="dueValue(t)"
 												:choose-date-label="$t('task.detail.chooseDueDate')"
 												@update:modelValue="d => dueDraft[t.id] = d"
 												@closeOnChange="saveDue(t)"
@@ -540,14 +540,21 @@ async function saveTask(task: TaskResponse, patch: Partial<Task>) {
 
 const dueDraft = ref<Record<number, Date | null>>({})
 
-function saveDue(task: TaskResponse) {
+function dueValue(task: TaskResponse) {
+	return task.id in dueDraft.value ? dueDraft.value[task.id] ?? null :parseDateOrNull(task.due_date)
+}
+
+async function saveDue(task: TaskResponse) {
 	if (!(task.id in dueDraft.value)) {
 		return
 	}
+	const draft = dueDraft.value[task.id]
 	// '' clears the date (taskWriteBody maps it to the api's zero date).
-	const due = dueDraft.value[task.id]?.toISOString() ?? ''
-	delete dueDraft.value[task.id]
-	saveTask(task, {due_date: due})
+	await saveTask(task, {due_date: draft?.toISOString() ?? ''})
+	// Keep the draft until the save lands, so the old date doesn't flash back; a newer pick stays.
+	if (dueDraft.value[task.id] === draft) {
+		delete dueDraft.value[task.id]
+	}
 }
 
 const assigneesOpen = ref(false)
