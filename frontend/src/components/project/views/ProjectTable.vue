@@ -529,19 +529,38 @@ function setActiveColumnsSortParam() {
 
 const updateTask = useUpdateTaskMutation(true)
 
+// Saves of one task run one after another: each response carries the whole task,
+// so a late response to an earlier edit would put the old value of a newer edit back.
+const pendingSaves = new Map<number, Promise<void>>()
+
 // Partial patch, so concurrent edits to other fields are not overwritten.
-async function saveTask(task: TaskResponse, patch: Partial<Task>) {
-	try {
-		await updateTask.mutateAsync({id: task.id, ...patch})
-	} catch {
-		// rollback and error toast are done by contextMutationOptions
-	}
+function saveTask(task: TaskResponse, patch: Partial<Task>) {
+	const save = (pendingSaves.get(task.id) ?? Promise.resolve()).then(async () => {
+		try {
+			await updateTask.mutateAsync({
+				id: task.id,
+				...patch,
+			})
+		} catch {
+			// rollback and error toast are done by contextMutationOptions
+		}
+	})
+	pendingSaves.set(task.id, save)
+	save.then(() => {
+		if (pendingSaves.get(task.id) === save) {
+			pendingSaves.delete(task.id)
+		}
+	})
+	return save
 }
 
 const dueDraft = ref<Record<number, Date | null>>({})
 
 function dueValue(task: TaskResponse) {
-	return task.id in dueDraft.value ? dueDraft.value[task.id] ?? null :parseDateOrNull(task.due_date)
+	if (task.id in dueDraft.value) {
+		return dueDraft.value[task.id] ?? null
+	}
+	return parseDateOrNull(task.due_date)
 }
 
 async function saveDue(task: TaskResponse) {
@@ -561,6 +580,13 @@ const assigneesOpen = ref(false)
 const assigneeTaskId = ref<number | null>(null)
 const assigneeAnchor = ref<HTMLElement | null>(null)
 const assigneeTask = computed(() => tasks.value.find(x => x.id === assigneeTaskId.value))
+// The task left the page (paging, filter): close, so the popup doesn't reopen on a detached anchor.
+watch(assigneeTask, task => {
+	if (!task) {
+		assigneesOpen.value = false
+		assigneeAnchor.value = null
+	}
+})
 
 function openAssignees(task: TaskResponse, event: MouseEvent) {
 	assigneeTaskId.value = task.id

@@ -1,8 +1,22 @@
+import type {Page} from '@playwright/test'
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
 import {createDefaultViews, createProjects} from './prepareProjects'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
+
+// Priority is hidden by default.
+async function showPriorityColumn(page: Page) {
+	const columns = page.getByRole('button', {
+		name: 'Columns',
+		exact: true,
+	})
+	await columns.click()
+	await page.locator('.columns-filter').getByText('Priority', {
+		exact: true,
+	}).click()
+	await columns.click()
+}
 
 test.describe('Project View Table', () => {
 	test('Should show a table with tasks', async ({authenticatedPage: page}) => {
@@ -58,9 +72,7 @@ test.describe('Project View Table', () => {
 			done: (i: number) => i > priorities.length,
 		})
 		await page.goto('/projects/1/3')
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
-		await page.locator('.columns-filter').getByText('Priority', {exact: true}).click()
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		await showPriorityColumn(page)
 
 		for (const task of tasks) {
 			const row = page.locator('.project-table tbody tr').filter({
@@ -72,16 +84,18 @@ test.describe('Project View Table', () => {
 		}
 	})
 
-	test('Should edit priority and done inline and persist them', async ({authenticatedPage: page, apiContext, userToken}) => {
+	test('Should edit priority and done inline and persist them', async ({
+		authenticatedPage: page,
+		apiContext,
+		userToken,
+	}) => {
 		await createProjects(1)
 		const [task] = await TaskFactory.create(1, {
 			project_id: 1,
 			priority: 0,
 		})
 		await page.goto('/projects/1/3')
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
-		await page.locator('.columns-filter').getByText('Priority', {exact: true}).click()
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		await showPriorityColumn(page)
 		const row = page.locator('.project-table tbody tr').filter({
 			has: page.getByRole('link', {name: task.title, exact: true}),
 		})
@@ -120,9 +134,7 @@ test.describe('Project View Table', () => {
 			priority: 3,
 		})
 		await page.goto('/projects/1/3')
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
-		await page.locator('.columns-filter').getByText('Priority', {exact: true}).click()
-		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		await showPriorityColumn(page)
 		const row = page.locator('.project-table tbody tr').filter({
 			has: page.getByRole('link', {name: task.title, exact: true}),
 		})
