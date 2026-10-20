@@ -7,6 +7,8 @@ import {createPinia} from 'pinia'
 import type {Task} from '@/client/generated'
 import {removeToken} from '@/helpers/auth'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
+import EditLabels from '@/components/tasks/partials/EditLabels.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 
 const sdk = vi.hoisted(() => ({
 	patchTasksRead: vi.fn(),
@@ -84,6 +86,7 @@ async function mountTable() {
 			mocks: {$t: (key: string) => key},
 			stubs: {
 				ProjectWrapper: {template: '<div><slot name="default"/></div>'},
+				Popup: {template: '<div><slot name="content" :is-open="true"/></div>'},
 			},
 		},
 	})
@@ -135,6 +138,34 @@ describe('ProjectTable inline saves', () => {
 		resolveSecond()
 		await flushPromises()
 		expect(wrapper.findComponent(PrioritySelect).props('modelValue')).toBe(3)
+	})
+
+	it('keeps the label picker of the first task on that task after another row opens it', async () => {
+		localStorage.setItem('tableViewColumns', JSON.stringify({labels: true}))
+		sdk.projectViewTasksList.mockImplementation(async () => ({data: {
+			items: [
+				serverTask,
+				{
+					...serverTask,
+					id: 2,
+					title: 'Task 2',
+				},
+			],
+			page: 1,
+			total_pages: 1,
+		}}))
+		const wrapper = await mountTable()
+		const [firstRow, secondRow] = wrapper.findAllComponents(BaseButton)
+
+		firstRow!.vm.$emit('click', {currentTarget: firstRow!.element})
+		await flushPromises()
+		const firstPicker = wrapper.findComponent(EditLabels)
+		secondRow!.vm.$emit('click', {currentTarget: secondRow!.element})
+		await flushPromises()
+
+		// A label still being created in the first picker must not be added to task 2.
+		expect(firstPicker.props('taskId')).toBe(1)
+		expect(wrapper.findComponent(EditLabels).props('taskId')).toBe(2)
 	})
 
 	it('drops a queued save once the user logged out', async () => {

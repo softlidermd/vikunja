@@ -11,6 +11,7 @@
 		label="name"
 		:select-placeholder="$t('task.assignee.selectPlaceholder')"
 		:autocomplete-enabled="false"
+		:inline="inline"
 		@search="findUser"
 		@select="addAssignee"
 		@focusin="preloadUsers"
@@ -54,8 +55,10 @@ const props = withDefaults(defineProps<{
 	taskId: number,
 	projectId: number,
 	disabled?: boolean,
+	inline?: boolean,
 }>(), {
 	disabled: false,
+	inline: false,
 })
 
 const emit = defineEmits<{

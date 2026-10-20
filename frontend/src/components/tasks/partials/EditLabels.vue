@@ -13,6 +13,7 @@
 		show-empty
 		:close-after-select="false"
 		:disabled="disabled"
+		:inline="inline"
 		@search="findLabel"
 		@select="addLabel"
 		@create="createAndAddLabel"
@@ -72,12 +73,14 @@ const props = withDefaults(defineProps<{
 	disabled?: boolean
 	creatable?: boolean
 	creationDisabledMessage?: string
+	inline?: boolean
 }>(), {
 	taskId: 0,
 	projectId: 0,
 	disabled: false,
 	creatable: true,
 	creationDisabledMessage: '',
+	inline: false,
 })
 
 const emit = defineEmits<{

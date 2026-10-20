@@ -424,8 +424,10 @@
 								class="table-picker"
 								:padding="false"
 							>
+								<!-- Keyed per task: an edit still in flight stays with the task its picker was opened for. -->
 								<EditAssignees
 									v-if="picker?.field === 'assignees'"
+									:key="pickerTask.id"
 									:model-value="pickerTask.assignees"
 									:task-id="pickerTask.id"
 									:project-id="pickerTask.project_id"
@@ -433,11 +435,14 @@
 								/>
 								<EditLabels
 									v-else
+									:key="pickerTask.id"
 									:model-value="pickerTask.labels"
 									:task-id="pickerTask.id"
 									:project-id="pickerTask.project_id"
 									:creatable="!authStore.isLinkShareAuth"
-									:creation-disabled-message="authStore.isLinkShareAuth ? $t('task.label.linkShareCannotCreate') : ''"
+									:creation-disabled-message="authStore.isLinkShareAuth
+										? $t('task.label.linkShareCannotCreate')
+										: ''"
 									inline
 								/>
 							</Card>
