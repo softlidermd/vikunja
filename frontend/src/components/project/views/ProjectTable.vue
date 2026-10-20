@@ -324,10 +324,14 @@
 										/>
 									</td>
 									<template v-if="activeColumns.dueDate">
-										<td v-if="canWrite">
+										<td
+											v-if="canWrite"
+											class="due-date-cell"
+										>
 											<Datepicker
 												:model-value="dueValue(t)"
 												:choose-date-label="$t('task.detail.chooseDueDate')"
+												empty-label="-"
 												@update:modelValue="d => dueDraft[t.id] = d"
 												@closeOnChange="saveDue(t)"
 											/>
@@ -619,6 +623,11 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 	overflow-y: hidden;
 
 	th {
+		white-space: nowrap;
+	}
+
+	// The relative date ("через 19 часов") would otherwise wrap into a tall row.
+	.due-date-cell {
 		white-space: nowrap;
 	}
 

@@ -12,6 +12,7 @@
 					ref="triggerButton"
 					v-tooltip="date ? formatDateLong(date) : undefined"
 					class="show"
+					:aria-label="date === null && emptyLabel !== '' ? chooseDateLabel : undefined"
 					:disabled="disabled || undefined"
 					@click.stop="toggle()"
 				>
