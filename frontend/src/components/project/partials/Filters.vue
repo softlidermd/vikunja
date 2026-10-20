@@ -6,6 +6,11 @@
 		:show-close="showClose"
 		@close="$emit('close')"
 	>
+		<FilterBuilder
+			v-model="filterQuery"
+			:project-id="projectId"
+			@update:modelValue="() => change('modelValue')"
+		/>
 		<FilterInput
 			ref="filterInputRef"
 			v-model="filterQuery"
@@ -68,6 +73,7 @@ import {
 } from '@/helpers/filters'
 import FilterInputDocs from '@/components/input/filter/FilterInputDocs.vue'
 import FilterInput from '@/components/input/filter/FilterInput.vue'
+import FilterBuilder from '@/components/input/filter/FilterBuilder.vue'
 
 const props = withDefaults(defineProps<{
 	modelValue: T,

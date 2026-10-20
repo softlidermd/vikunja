@@ -17,6 +17,7 @@ import XButton from '@/components/input/Button.vue'
 import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
 import FilterInputDocs from '@/components/input/filter/FilterInputDocs.vue'
 import FilterInput from '@/components/input/filter/FilterInput.vue'
+import FilterBuilder from '@/components/input/filter/FilterBuilder.vue'
 import FormField from '@/components/input/FormField.vue'
 
 const props = withDefaults(defineProps<{
@@ -247,6 +248,10 @@ function handleBubbleSave(event: FocusEvent) {
 		>
 			{{ $t('project.views.filter') }}
 		</label>
+		<FilterBuilder
+			v-model="view.filter.filter"
+			:project-id="view.project_id"
+		/>
 		<FilterInput
 			id="filter"
 			v-model="view.filter.filter"
@@ -328,6 +333,10 @@ function handleBubbleSave(event: FocusEvent) {
 							:placeholder="$t('project.share.links.namePlaceholder')"
 						/>
 
+						<FilterBuilder
+							v-model="view.bucket_configuration[index].filter.filter"
+							:project-id="view.project_id"
+						/>
 						<FilterInput
 							v-model="view.bucket_configuration[index].filter.filter"
 							:project-id="view.project_id"
