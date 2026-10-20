@@ -982,7 +982,7 @@
                 },
                 {
                     "key": "discoverable_by_name",
-                    "default_value": "false",
+                    "default_value": "true",
                     "comment": "If set to true will allow other users to find this user when searching for parts of their name."
                 },
                 {

@@ -520,6 +520,8 @@ func initDefaultConfig() {
 	DefaultSettingsAvatarProvider.setDefault("initials")
 	DefaultSettingsOverdueTaskRemindersEnabled.setDefault(true)
 	DefaultSettingsOverdueTaskRemindersTime.setDefault("9:00")
+	// This fork serves one small company: colleagues should find each other in user pickers.
+	DefaultSettingsDiscoverableByName.setDefault(true)
 	// Webhook
 	WebhooksEnabled.setDefault(true)
 	WebhooksTimeoutSeconds.setDefault(30)
