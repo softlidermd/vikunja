@@ -151,8 +151,12 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 
 			conds = append(conds,
 				usernameCond,
+				// Fork: part of the username also finds discoverable users, since most accounts here have no display name.
 				builder.And(
-					db.ILIKE("name", queryPart),
+					builder.Or(
+						db.ILIKE("name", queryPart),
+						db.ILIKE("username", queryPart),
+					),
 					builder.Eq{"discoverable_by_name": true},
 				),
 				// External team bypass: match by name or email without discoverability check

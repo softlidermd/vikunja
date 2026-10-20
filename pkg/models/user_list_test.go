@@ -167,17 +167,28 @@ func TestListUsers(t *testing.T) {
 			"username": "user7",
 		}, false)
 	})
-	t.Run("not discoverable by partial username", func(t *testing.T) {
+	t.Run("partial username finds only users discoverable by name", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 		s := db.NewSession()
 		defer s.Close()
 
 		all, err := user.ListUsers(s, "user", user1, nil)
 		require.NoError(t, err)
-		assert.Empty(t, all)
+		require.Len(t, all, 1)
+		assert.Equal(t, "user12", all[0].Username)
 		db.AssertExists(t, "users", map[string]interface{}{
 			"username": "user7",
 		}, false)
+	})
+	t.Run("discoverable by partial username, case insensitive", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		all, err := user.ListUsers(s, "SER12", user1, nil)
+		require.NoError(t, err)
+		require.Len(t, all, 1)
+		assert.Equal(t, "user12", all[0].Username)
 	})
 	t.Run("discoverable by partial username, email and name when matching fuzzily", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
