@@ -1,4 +1,6 @@
+import {snakeCase} from 'change-case'
 import {DATE_RANGES} from '@/components/date/dateRanges'
+import {AVAILABLE_FILTER_FIELDS, FILTER_OPERATORS_REGEX} from '@/helpers/filters'
 
 // A view over the API-form filter string: a flat AND of the conditions below, anything else parses to null.
 
@@ -23,7 +25,15 @@ export type PriorityCondition = {field: 'priority', value: number | null, exact:
 export type DoneCondition = {field: 'done', value: boolean | null}
 export type Condition = MultiCondition | DueCondition | PriorityCondition | DoneCondition
 
-export const BUILDER_FIELDS: BuilderField[] = ['assignees', 'labels', 'due_date', 'priority', 'done', 'project', 'created_by']
+export const BUILDER_FIELDS: BuilderField[] = [
+	'assignees',
+	'labels',
+	'due_date',
+	'priority',
+	'done',
+	'project',
+	'created_by',
+]
 const MULTI_FIELDS = new Set<BuilderField>(['assignees', 'labels', 'project', 'created_by'])
 
 export function isMultiCondition(condition: Condition): condition is MultiCondition {
@@ -77,6 +87,19 @@ type Token = {type: 'word' | 'string' | 'op' | 'comma', value: string}
 // Longest first, so ">=" is never read as ">" followed by "=".
 const OPERATORS = ['&&', '||', '>=', '<=', '!=', '?=', '=', '>', '<', '(', ')']
 const WORD_BREAK = /[\s,"'&|()=!<>?]/
+
+// Values the backend splits or cuts at (spaces, commas, &, |, brackets) can't be written into a list.
+export function isPlainValue(value: string): boolean {
+	return !WORD_BREAK.test(value)
+}
+
+const FIELD_NAMES = AVAILABLE_FILTER_FIELDS.flatMap(field => [field, snakeCase(field)])
+const FIELD_CLAUSE = new RegExp('\\b(' + FIELD_NAMES.join('|') + ')\\s*' + FILTER_OPERATORS_REGEX, 'i')
+
+// Unlike hasFilterQuery, a search such as "planning" or "in progress" is not mistaken for a filter.
+export function looksLikeFilter(filter: string): boolean {
+	return FIELD_CLAUSE.test(filter)
+}
 
 function tokenize(input: string): Token[] | null {
 	const tokens: Token[] = []
@@ -236,7 +259,7 @@ export function parseFilter(filter: string): Condition[] | null {
 		}
 
 		// The backend splits list values on commas and keeps quotes literally, so only plain words round-trip.
-		if (values.some(value => WORD_BREAK.test(value))) {
+		if (!values.every(isPlainValue)) {
 			return null
 		}
 		if (operator === 'in' || operator === '?=' || (operator === '=' && values.length === 1)) {

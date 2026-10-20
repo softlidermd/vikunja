@@ -280,12 +280,14 @@ import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
 import {camelCase} from 'change-case'
 import {PRIORITIES} from '@/constants/priorities'
-import {hasFilterQuery, transformFilterStringForApi} from '@/helpers/filters'
+import {transformFilterStringForApi} from '@/helpers/filters'
 import {
 	BUILDER_FIELDS,
 	DUE_PRESETS,
 	emptyCondition,
 	isMultiCondition,
+	isPlainValue,
+	looksLikeFilter,
 	parseFilter,
 	serializeCondition,
 	serializeFilter,
@@ -324,11 +326,13 @@ const {labels, getLabelById, getLabelByExactTitle} = useLabels()
 const projectList = useProjects()
 
 // View settings hold titles and camelCase fields, FilterInput emits ids and snake_case: parse both as the latter.
+// A number is already an id; resolving it as a title would pick a label or project named "4" instead.
 function toApiForm(filter: string): string {
+	const isId = (value: string) => /^\d+$/.test(value)
 	return transformFilterStringForApi(
 		filter,
-		title => getLabelByExactTitle(title)?.id || null,
-		title => projectList.findProjectByExactname(title)?.id || null,
+		title => isId(title) ? null : getLabelByExactTitle(title)?.id || null,
+		title => isId(title) ? null : projectList.findProjectByExactname(title)?.id || null,
 	)
 }
 
@@ -338,7 +342,7 @@ watch(
 	() => toApiForm(props.modelValue ?? ''),
 	value => {
 		// Plain text without filter syntax is a title search: no chips, but nothing to warn about either.
-		const parsed = hasFilterQuery(value) ? parseFilter(value) : []
+		const parsed = looksLikeFilter(value) ? parseFilter(value) : []
 		if (parsed !== null && serializeFilter(parsed) === serializeFilter(conditions.value) && !isCustom.value) {
 			return
 		}
@@ -488,7 +492,7 @@ function optionsFor(condition: MultiCondition): Option[] {
 	} else {
 		// The server already filtered users by the search text.
 		options = userResults.value
-			.filter(user => user.username)
+			.filter(user => user.username && isPlainValue(user.username))
 			.map(user => ({
 				value: user.username!,
 				title: user.name || user.username!,

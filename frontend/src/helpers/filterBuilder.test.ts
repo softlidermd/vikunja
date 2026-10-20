@@ -1,7 +1,24 @@
 import {describe, expect, it} from 'vitest'
-import {parseFilter, serializeFilter, type Condition} from './filterBuilder'
+import {isPlainValue, looksLikeFilter, parseFilter, serializeFilter, type Condition} from './filterBuilder'
 
 describe('filter builder', () => {
+	it('tells a title search from a filter', () => {
+		for (const search of ['planning', 'in progress', 'meeting notes', 'like a boss']) {
+			expect(looksLikeFilter(search), search).toBe(false)
+		}
+		const filters = ['labels in 1', 'due_date < now', 'dueDate<now', 'done = false', 'priority >= 3 || done = true']
+		for (const filter of filters) {
+			expect(looksLikeFilter(filter), filter).toBe(true)
+		}
+	})
+
+	it('only accepts list values the backend does not split', () => {
+		expect(isPlainValue('alice')).toBe(true)
+		for (const value of ['a&b', 'a|b', 'a(b)', 'bob smith', 'a,b']) {
+			expect(isPlainValue(value), value).toBe(false)
+		}
+	})
+
 	it('parses a flat AND of supported conditions', () => {
 		expect(parseFilter('assignees in alice, bob && labels not in 3 && done = false && priority >= 3')).toEqual([
 			{field: 'assignees', negate: false, values: ['alice', 'bob']},
