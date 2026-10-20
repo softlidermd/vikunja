@@ -116,11 +116,9 @@ mage test:e2e ""
 
 ## Translations
 
-Only edit the English source file (`en.json`):
-- Frontend: `frontend/src/i18n/lang/en.json`
-- Backend: `pkg/i18n/lang/en.json`
+This fork maintains English and Russian directly. Add every new string to both:
+- Frontend: `frontend/src/i18n/lang/en.json` and `frontend/src/i18n/lang/ru-RU.json`
+- Backend: `pkg/i18n/lang/en.json` and `pkg/i18n/lang/ru-RU.json`
 
-Actual translations happen through our translation platform, not via PRs.
-
-To learn more about translations, see https://vikunja.io/docs/translations/
+Other languages come from upstream Vikunja releases (https://vikunja.io/docs/translations/).
 
