@@ -6,12 +6,6 @@
 		>
 			<Icon icon="circle-info" />
 			<span>{{ $t('filters.builder.custom') }}</span>
-			<BaseButton
-				class="has-text-primary"
-				@click="startOver"
-			>
-				{{ $t('filters.builder.startOver') }}
-			</BaseButton>
 		</p>
 
 		<div
@@ -23,10 +17,10 @@
 				:key="condition.field"
 				placement="bottom-start"
 				:anchor="chipEls[condition.field]"
-				:open="openIndex === index"
+				:open="openField === condition.field"
 				sheet-on-mobile
 				:sheet-title="fieldLabel(condition.field)"
-				@update:open="open => setOpen(index, open)"
+				@update:open="open => setOpen(condition.field, open)"
 			>
 				<template #trigger="{toggle, isOpen}">
 					<span
@@ -145,7 +139,7 @@
 								class="filter-builder__range"
 							>
 								<label>
-									{{ $t('filters.builder.from') }}
+									{{ $t('input.datepickerRange.from') }}
 									<input
 										class="input"
 										type="date"
@@ -154,7 +148,7 @@
 									>
 								</label>
 								<label>
-									{{ $t('filters.builder.to') }}
+									{{ $t('input.datepickerRange.to') }}
 									<input
 										class="input"
 										type="date"
@@ -262,6 +256,7 @@
 				class="filter-builder__me"
 				:class="{'is-selected': isAssignedToMe}"
 				:aria-pressed="isAssignedToMe"
+				:disabled="isAssigneeNegated"
 				@click="toggleAssignedToMe"
 			>
 				<Icon icon="user" />
@@ -283,6 +278,9 @@ import {searchProjectUsers, searchUsers} from '@/client/queries/userSearch'
 import {useLabels} from '@/composables/useLabels'
 import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
+import {camelCase} from 'change-case'
+import {PRIORITIES} from '@/constants/priorities'
+import {hasFilterQuery, transformFilterStringForApi} from '@/helpers/filters'
 import {
 	BUILDER_FIELDS,
 	DUE_PRESETS,
@@ -313,27 +311,40 @@ const emit = defineEmits<{
 const {t} = useI18n({useScope: 'global'})
 const uid = useId()
 
-const PRIORITY_LEVELS = [1, 2, 3, 4, 5] as const
-const PRIORITY_KEYS = ['unset', 'low', 'medium', 'high', 'urgent', 'doNow'] as const
+const PRIORITY_NAMES = Object.fromEntries(Object.entries(PRIORITIES).map(([name, level]) => [level, camelCase(name)]))
+const PRIORITY_LEVELS = Object.values(PRIORITIES).filter(level => level > PRIORITIES.UNSET)
 const DONE_STATES = [null, false, true] as const
 
 const conditions = ref<Condition[]>([])
 const isCustom = ref(false)
-const openIndex = ref<number | null>(null)
+const openField = ref<BuilderField | null>(null)
 const search = ref('')
+
+const {labels, getLabelById, getLabelByExactTitle} = useLabels()
+const projectList = useProjects()
+
+// View settings hold titles and camelCase fields, FilterInput emits ids and snake_case: parse both as the latter.
+function toApiForm(filter: string): string {
+	return transformFilterStringForApi(
+		filter,
+		title => getLabelByExactTitle(title)?.id || null,
+		title => projectList.findProjectByExactname(title)?.id || null,
+	)
+}
 
 // Only rebuild the chips when the query changes in meaning; an echo of our own emit (or a reformatted copy of it)
 // must not reset the chip that is being edited.
 watch(
-	() => props.modelValue,
+	() => toApiForm(props.modelValue ?? ''),
 	value => {
-		const parsed = parseFilter(value ?? '')
+		// Plain text without filter syntax is a title search: no chips, but nothing to warn about either.
+		const parsed = hasFilterQuery(value) ? parseFilter(value) : []
 		if (parsed !== null && serializeFilter(parsed) === serializeFilter(conditions.value) && !isCustom.value) {
 			return
 		}
 		isCustom.value = parsed === null
 		conditions.value = parsed ?? []
-		openIndex.value = null
+		openField.value = null
 	},
 	{immediate: true},
 )
@@ -357,7 +368,7 @@ function toggleValue(index: number, value: string) {
 
 function remove(index: number) {
 	conditions.value.splice(index, 1)
-	openIndex.value = null
+	openField.value = null
 	commit()
 }
 
@@ -365,28 +376,22 @@ function pruneEmpty() {
 	conditions.value = conditions.value.filter(condition => serializeCondition(condition) !== '')
 }
 
-function setOpen(index: number, open: boolean) {
+function setOpen(field: BuilderField, open: boolean) {
 	if (open) {
-		openIndex.value = index
+		openField.value = field
 		search.value = ''
 		return
 	}
-	if (openIndex.value === index) {
-		openIndex.value = null
+	if (openField.value === field) {
+		openField.value = null
 		pruneEmpty()
 	}
 }
 
 function addField(field: BuilderField) {
 	conditions.value.push(emptyCondition(field))
-	openIndex.value = conditions.value.length - 1
+	openField.value = field
 	search.value = ''
-	commit()
-}
-
-function startOver() {
-	conditions.value = []
-	isCustom.value = false
 	commit()
 }
 
@@ -398,7 +403,11 @@ const chipEls = reactive<Partial<Record<BuilderField, HTMLElement | null>>>({})
 
 const authStore = useAuthStore()
 const currentUsername = computed(() => authStore.info?.username ?? '')
-const isAssignedToMe = computed(() => conditions.value.some(c => c.field === 'assignees' && !c.negate && c.values.includes(currentUsername.value)))
+// Toggling "me" on a negated assignee chip would silently drop the exclusion.
+const isAssigneeNegated = computed(() => conditions.value.some(c => c.field === 'assignees' && c.negate))
+const isAssignedToMe = computed(() => conditions.value.some(c =>
+	c.field === 'assignees' && !c.negate && c.values.includes(currentUsername.value),
+))
 
 function toggleAssignedToMe() {
 	const index = conditions.value.findIndex(c => c.field === 'assignees')
@@ -417,15 +426,11 @@ function toggleAssignedToMe() {
 		update(index, {values})
 		return
 	}
-	update(index, {negate: false, values: condition.negate ? [currentUsername.value] : [...condition.values, currentUsername.value]})
+	update(index, {values: [...condition.values, currentUsername.value]})
 }
-
-const {labels, getLabelById} = useLabels()
-const projectList = useProjects()
 
 const userResults = ref<User[]>([])
 const userNames = reactive<Record<string, string>>({})
-const openField = computed(() => openIndex.value === null ? null : conditions.value[openIndex.value]?.field ?? null)
 
 watchDebounced(
 	[search, openField],
@@ -434,9 +439,13 @@ watchDebounced(
 			return
 		}
 		try {
-			const found = props.projectId
+			// Saved filters route with a negative pseudo project id, which has no members to search.
+			const found = props.projectId && props.projectId > 0
 				? await searchProjectUsers(props.projectId, query)
 				: await searchUsers(query)
+			if (query !== search.value || field !== openField.value) {
+				return
+			}
 			userResults.value = found
 			found.forEach(user => {
 				if (user.username) {
@@ -466,7 +475,11 @@ function optionsFor(condition: MultiCondition): Option[] {
 	const query = search.value.toLowerCase()
 	let options: Option[]
 	if (condition.field === 'labels') {
-		options = labels.value.map(label => ({value: String(label.id), title: label.title ?? '', color: label.hex_color ? '#' + label.hex_color.replace('#', '') : undefined}))
+		options = labels.value.map(label => ({
+			value: String(label.id),
+			title: label.title ?? '',
+			color: label.hex_color ? '#' + label.hex_color.replace('#', '') : undefined,
+		}))
 	} else if (condition.field === 'project') {
 		// Negative ids are pseudo projects (saved filters, favorites).
 		options = projectList.projectsArray
@@ -476,7 +489,11 @@ function optionsFor(condition: MultiCondition): Option[] {
 		// The server already filtered users by the search text.
 		options = userResults.value
 			.filter(user => user.username)
-			.map(user => ({value: user.username!, title: user.name || user.username!, subtitle: user.name ? '@' + user.username : undefined}))
+			.map(user => ({
+				value: user.username!,
+				title: user.name || user.username!,
+				subtitle: user.name ? '@' + user.username : undefined,
+			}))
 	}
 	if (condition.field === 'labels' || condition.field === 'project') {
 		options = options.filter(option => option.title.toLowerCase().includes(query))
@@ -488,12 +505,17 @@ function optionsFor(condition: MultiCondition): Option[] {
 	return [...missing, ...options]
 }
 
+const SHARED_FIELD_LABELS: Partial<Record<BuilderField, string>> = {
+	priority: 'task.attributes.priority',
+	project: 'task.attributes.project',
+}
+
 function fieldLabel(field: BuilderField): string {
-	return t(`filters.builder.fields.${field}`)
+	return t(SHARED_FIELD_LABELS[field] ?? `filters.builder.fields.${field}`)
 }
 
 function priorityLabel(level: number): string {
-	return t(`task.priority.${PRIORITY_KEYS[level]}`)
+	return t(`task.priority.${PRIORITY_NAMES[level]}`)
 }
 
 function presetLabel(preset: DuePreset | 'custom'): string {
@@ -504,7 +526,7 @@ function presetLabel(preset: DuePreset | 'custom'): string {
 
 function doneLabel(value: boolean | null): string {
 	if (value === null) return t('filters.builder.statusAny')
-	return value ? t('filters.builder.statusDone') : t('filters.builder.statusNotDone')
+	return value ? t('task.attributes.done') : t('filters.builder.statusNotDone')
 }
 
 function isLevelSelected(condition: PriorityCondition, level: number): boolean {
@@ -525,7 +547,8 @@ function summary(condition: Condition): string {
 			return t('filters.builder.summary', {field, value: t('filters.builder.any')})
 		}
 		const names = condition.values.map(value => displayValue(condition.field, value))
-		const value = names.slice(0, 2).join(', ') + (names.length > 2 ? ' ' + t('filters.builder.more', {count: names.length - 2}) : '')
+		const more = names.length > 2 ? ' ' + t('filters.builder.more', {count: names.length - 2}) : ''
+		const value = names.slice(0, 2).join(', ') + more
 		return t(condition.negate ? 'filters.builder.summaryNot' : 'filters.builder.summary', {field, value})
 	}
 	if (condition.field === 'due_date') {

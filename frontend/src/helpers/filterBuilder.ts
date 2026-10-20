@@ -1,13 +1,20 @@
 import {DATE_RANGES} from '@/components/date/dateRanges'
 
-// The builder is a view over the API-form filter string (snake_case fields, label/project ids), the same
-// string FilterInput emits. It only understands a flat AND of the conditions below; anything else parses to
-// null and the caller leaves the string untouched.
+// A view over the API-form filter string: a flat AND of the conditions below, anything else parses to null.
 
 export type MultiField = 'assignees' | 'labels' | 'project' | 'created_by'
 export type BuilderField = MultiField | 'due_date' | 'priority' | 'done'
 
-export const DUE_PRESETS = ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'next7Days', 'thisMonth', 'next30Days'] as const
+export const DUE_PRESETS = [
+	'overdue',
+	'today',
+	'tomorrow',
+	'thisWeek',
+	'nextWeek',
+	'next7Days',
+	'thisMonth',
+	'next30Days',
+] as const
 export type DuePreset = typeof DUE_PRESETS[number]
 
 export type MultiCondition = {field: MultiField, negate: boolean, values: string[]}
@@ -17,9 +24,10 @@ export type DoneCondition = {field: 'done', value: boolean | null}
 export type Condition = MultiCondition | DueCondition | PriorityCondition | DoneCondition
 
 export const BUILDER_FIELDS: BuilderField[] = ['assignees', 'labels', 'due_date', 'priority', 'done', 'project', 'created_by']
+const MULTI_FIELDS = new Set<BuilderField>(['assignees', 'labels', 'project', 'created_by'])
 
 export function isMultiCondition(condition: Condition): condition is MultiCondition {
-	return condition.field === 'assignees' || condition.field === 'labels' || condition.field === 'project' || condition.field === 'created_by'
+	return MULTI_FIELDS.has(condition.field)
 }
 
 export function emptyCondition(field: BuilderField): Condition {
@@ -53,7 +61,10 @@ function dueClauses(preset: DuePreset): Clause[] {
 	return [['>=', from], ['<', to]]
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+function isIsoDate(value: string): boolean {
+	const date = new Date(value + 'T00:00:00Z')
+	return /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(date.getTime()) && date.toISOString().startsWith(value)
+}
 
 function addDays(date: string, days: number): string {
 	const d = new Date(date + 'T00:00:00Z')
@@ -208,7 +219,8 @@ export function parseFilter(filter: string): Condition[] | null {
 
 		if (field === 'priority') {
 			const value = Number(values[0])
-			if (values.length !== 1 || !(operator === '>=' || operator === '=') || !Number.isInteger(value) || value < 1 || value > 5) {
+			const validLevel = Number.isInteger(value) && value >= 1 && value <= 5
+			if (values.length !== 1 || !(operator === '>=' || operator === '=') || !validLevel) {
 				return null
 			}
 			conditions.push({field, value, exact: operator === '='})
@@ -223,8 +235,8 @@ export function parseFilter(filter: string): Condition[] | null {
 			continue
 		}
 
-		// The backend splits list values on every comma, so a value containing one can't round-trip.
-		if (values.some(value => value.includes(','))) {
+		// The backend splits list values on commas and keeps quotes literally, so only plain words round-trip.
+		if (values.some(value => WORD_BREAK.test(value))) {
 			return null
 		}
 		if (operator === 'in' || operator === '?=' || (operator === '=' && values.length === 1)) {
@@ -248,7 +260,7 @@ export function parseFilter(filter: string): Condition[] | null {
 		} else {
 			condition.preset = 'custom'
 			for (const [operator, value] of due) {
-				if (!ISO_DATE.test(value)) {
+				if (!isIsoDate(value)) {
 					return null
 				}
 				if (operator === '>=' && condition.from === '') {
@@ -264,10 +276,6 @@ export function parseFilter(filter: string): Condition[] | null {
 	}
 
 	return conditions
-}
-
-function quoteValue(value: string): string {
-	return WORD_BREAK.test(value) ? '"' + value.replaceAll('\\', '\\\\').replaceAll('"', '\\"') + '"' : value
 }
 
 export function serializeCondition(condition: Condition): string {
@@ -289,7 +297,7 @@ export function serializeCondition(condition: Condition): string {
 		default:
 			return condition.values.length === 0
 				? ''
-				: `${condition.field} ${condition.negate ? 'not in' : 'in'} ${condition.values.map(quoteValue).join(', ')}`
+				: `${condition.field} ${condition.negate ? 'not in' : 'in'} ${condition.values.join(', ')}`
 	}
 }
 

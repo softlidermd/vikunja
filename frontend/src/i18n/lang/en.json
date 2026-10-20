@@ -664,8 +664,7 @@
     "builder": {
       "addFilter": "Add filter",
       "assignedToMe": "Assigned to me",
-      "custom": "This query can't be shown as filter chips (it uses OR, brackets, other operators or plain search text). Edit it below, or start over.",
-      "startOver": "Start over",
+      "custom": "This query uses OR, brackets or other operators that can't be shown as filter chips. Clear or simplify it below to use the chips again.",
       "remove": "Remove {field} filter",
       "done": "Done",
       "any": "any",
@@ -680,21 +679,16 @@
       "orAbove": "{priority} or above",
       "overdue": "Overdue",
       "customRange": "Custom range",
-      "from": "From",
-      "to": "To",
       "statusAny": "Any",
       "statusNotDone": "Not done",
-      "statusDone": "Done",
       "summary": "{field}: {value}",
       "summaryNot": "{field} is not: {value}",
       "more": "+{count}",
       "fields": {
         "assignees": "Assignee",
         "labels": "Label",
-        "project": "Project",
         "created_by": "Created by",
         "due_date": "Due date",
-        "priority": "Priority",
         "done": "Status"
       }
     },

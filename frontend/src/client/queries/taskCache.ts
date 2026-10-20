@@ -35,12 +35,15 @@ export function mapTaskEverywhere(
 	})
 }
 
-// Top-level tasks currently held in list and board caches; reads only, never fetches.
+// Never fetches.
 export function cachedListTasks(client: QueryClient): TaskResponse[] {
+	const lists = client.getQueriesData<TaskResponse[]>({queryKey: taskKeys.allLists})
+	const pages = client.getQueriesData<PaginatedTaskResponse>({queryKey: taskKeys.lists})
+	const boards = client.getQueriesData<BoardData>({queryKey: kanbanKeys.all})
 	return [
-		...client.getQueriesData<TaskResponse[]>({queryKey: taskKeys.allLists}).flatMap(([, data]) => data ?? []),
-		...client.getQueriesData<PaginatedTaskResponse>({queryKey: taskKeys.lists}).flatMap(([, data]) => data?.items ?? []),
-		...client.getQueriesData<BoardData>({queryKey: kanbanKeys.all}).flatMap(([, data]) => data?.buckets.flatMap(bucket => bucket.tasks) ?? []),
+		...lists.flatMap(([, data]) => data ?? []),
+		...pages.flatMap(([, data]) => data?.items ?? []),
+		...boards.flatMap(([, data]) => data?.buckets.flatMap(bucket => bucket.tasks) ?? []),
 	]
 }
 

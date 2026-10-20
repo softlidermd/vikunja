@@ -10,7 +10,7 @@
 		:creation-disabled-message="creationDisabledMessage"
 		:create-placeholder="$t('task.label.createPlaceholder')"
 		:search-delay="10"
-		:show-empty="true"
+		show-empty
 		:close-after-select="false"
 		:disabled="disabled"
 		@search="findLabel"

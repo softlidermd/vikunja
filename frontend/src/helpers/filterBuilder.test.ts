@@ -21,7 +21,9 @@ describe('filter builder', () => {
 
 	it('recognises date presets in either clause order, and absolute ranges', () => {
 		expect(parseFilter('due_date < now')).toEqual([{field: 'due_date', preset: 'overdue', from: '', to: ''}])
-		expect(parseFilter('due_date < now/w+1w && due_date >= now/w')).toEqual([{field: 'due_date', preset: 'thisWeek', from: '', to: ''}])
+		expect(parseFilter('due_date < now/w+1w && due_date >= now/w')).toEqual([
+			{field: 'due_date', preset: 'thisWeek', from: '', to: ''},
+		])
 		expect(parseFilter('due_date >= 2026-10-01 && due_date < 2026-11-01')).toEqual([
 			{field: 'due_date', preset: 'custom', from: '2026-10-01', to: '2026-10-31'},
 		])
@@ -37,7 +39,10 @@ describe('filter builder', () => {
 			'priority > 2',
 			'due_date > now',
 			'due_date >= now/d && due_date >= now/w',
+			'due_date < 2026-13-01',
+			'due_date >= 2026-02-30',
 			'labels in "a,b"',
+			'assignees in "bob smith"',
 			'just some search text',
 			'assignees in "unclosed',
 			'labels in 1,',
@@ -48,13 +53,15 @@ describe('filter builder', () => {
 
 	it('serializes back to a query that parses to the same conditions', () => {
 		const conditions: Condition[] = [
-			{field: 'assignees', negate: false, values: ['alice', 'bob smith']},
+			{field: 'assignees', negate: false, values: ['alice', 'bob']},
 			{field: 'due_date', preset: 'custom', from: '2026-10-01', to: '2026-10-31'},
 			{field: 'priority', value: 4, exact: true},
 			{field: 'done', value: true},
 		]
 		const query = serializeFilter(conditions)
-		expect(query).toBe('assignees in alice, "bob smith" && due_date >= 2026-10-01 && due_date < 2026-11-01 && priority = 4 && done = true')
+		expect(query).toBe(
+			'assignees in alice, bob && due_date >= 2026-10-01 && due_date < 2026-11-01 && priority = 4 && done = true',
+		)
 		expect(parseFilter(query)).toEqual(conditions)
 	})
 
