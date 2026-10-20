@@ -506,18 +506,19 @@ func buildParentSearchCondition(search string) builder.Cond {
 	return cond
 }
 
-var searchTermRegex = regexp.MustCompile(`"([^"]+)"|\S+`)
+// Unicode spaces (\p{Z}, e.g. NBSP from pasted text) split terms like ASCII whitespace.
+var searchTermRegex = regexp.MustCompile(`"([^"]+)"|[^\s\p{Z}]+`)
 
 // splitSearchTerms splits a search on whitespace, keeping a "quoted phrase" as one term.
 // shortcut: quotes cannot be escaped and there is no NOT or OR syntax; add them only if users ask.
 func splitSearchTerms(search string) []string {
 	terms := []string{}
 	for _, m := range searchTermRegex.FindAllStringSubmatch(search, -1) {
-		term := m[1]
-		if term == "" {
-			term = strings.Trim(m[0], `"`)
+		term := strings.Trim(m[0], `"`)
+		if m[1] != "" {
+			term = m[1]
 		}
-		if term != "" {
+		if term = strings.TrimSpace(term); term != "" {
 			terms = append(terms, term)
 		}
 	}
@@ -527,7 +528,10 @@ func splitSearchTerms(search string) []string {
 // taskTextSearchCond matches tasks containing every search term in their title or
 // description. ParadeDB keeps its own per-token matching and ranking of the raw string.
 func taskTextSearchCond(search, alias string, boosts []float64) builder.Cond {
-	fields := []string{"title", "description"}
+	fields := []string{
+		"title",
+		"description",
+	}
 	if db.ParadeDBAvailable() {
 		return db.MultiFieldSearchWithBoosts(fields, boosts, search, alias)
 	}

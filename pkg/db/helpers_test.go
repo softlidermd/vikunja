@@ -17,7 +17,6 @@
 package db
 
 import (
-	"database/sql"
 	"errors"
 	"testing"
 
@@ -248,18 +247,18 @@ func TestIsUniqueConstraintError(t *testing.T) {
 	}
 }
 
-func TestUnicodeLowerFunc(t *testing.T) {
+func TestUnicodeLower(t *testing.T) {
+	assert.Equal(t, "привет", unicodeLower("ПРИВЕТ"))
+	assert.Nil(t, unicodeLower([]byte(nil)), "SQL NULL arrives as []byte(nil)")
+	assert.Nil(t, unicodeLower(int64(42)))
+}
+
+func TestUnicodeLowerILIKE(t *testing.T) {
 	_, err := CreateTestEngine()
 	require.NoError(t, err)
 	if Type() != schemas.SQLITE {
-		t.Skip("vikunja_lower is only registered on SQLite")
+		t.Skip("vikunja_lower is only used on SQLite")
 	}
-
-	var lower, null sql.NullString
-	err = x.DB().QueryRow("SELECT vikunja_lower('ПРИВЕТ'), vikunja_lower(NULL)").Scan(&lower, &null)
-	require.NoError(t, err)
-	assert.Equal(t, sql.NullString{String: "привет", Valid: true}, lower)
-	assert.False(t, null.Valid)
 
 	w := builder.NewWriter()
 	require.NoError(t, ILIKE("title", "landing").WriteTo(w))

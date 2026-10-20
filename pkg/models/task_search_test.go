@@ -364,13 +364,58 @@ func TestSplitSearchTerms(t *testing.T) {
 		search string
 		want   []string
 	}{
-		{"a  b", []string{"a", "b"}},
-		{`"a b" c`, []string{"a b", "c"}},
-		{`"a`, []string{"a"}},
-		{"#12 x", []string{"#12", "x"}},
-		{"", []string{}},
-		{`""`, []string{}},
-		{"   ", []string{}},
+		{
+			search: "a  b",
+			want: []string{
+				"a",
+				"b",
+			},
+		},
+		{
+			search: `"a b" c`,
+			want: []string{
+				"a b",
+				"c",
+			},
+		},
+		{
+			search: `"a`,
+			want:   []string{"a"},
+		},
+		{
+			search: "#12 x",
+			want: []string{
+				"#12",
+				"x",
+			},
+		},
+		{
+			search: "поставщик номенклатура",
+			want: []string{
+				"поставщик",
+				"номенклатура",
+			},
+		},
+		{
+			search: `" поставщик "`,
+			want:   []string{"поставщик"},
+		},
+		{
+			search: `" "`,
+			want:   []string{},
+		},
+		{
+			search: "",
+			want:   []string{},
+		},
+		{
+			search: `""`,
+			want:   []string{},
+		},
+		{
+			search: "   ",
+			want:   []string{},
+		},
 	}
 	for _, tt := range tests {
 		assert.Equal(t, tt.want, splitSearchTerms(tt.search), "search %q", tt.search)
@@ -403,11 +448,20 @@ func TestTaskSearchCaseInsensitiveCyrillic(t *testing.T) {
 	defer s.Close()
 
 	usr := &user.User{ID: 1}
-	order := &Task{Title: "Заказ ПОСТАВЩИКУ", Description: "Номенклатура товаров", ProjectID: 1}
+	order := &Task{
+		Title:       "Заказ ПОСТАВЩИКУ",
+		Description: "Номенклатура товаров",
+		ProjectID:   1,
+	}
 	require.NoError(t, order.Create(s, usr))
 	created := []*Task{order}
 
-	for _, search := range []string{"поставщику", "ПОСТАВЩИКУ", "Поставщику", "номенклатура"} {
+	for _, search := range []string{
+		"поставщику",
+		"ПОСТАВЩИКУ",
+		"Поставщику",
+		"номенклатура",
+	} {
 		pos := searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, search)
 		assertSearchMatches(t, pos, search, created, order)
 	}
@@ -429,7 +483,11 @@ func TestTaskSearchMultipleTerms(t *testing.T) {
 
 	usr := &user.User{ID: 1}
 	newTask := func(title, description string) *Task {
-		tsk := &Task{Title: title, Description: description, ProjectID: 1}
+		tsk := &Task{
+			Title:       title,
+			Description: description,
+			ProjectID:   1,
+		}
 		require.NoError(t, tsk.Create(s, usr))
 		return tsk
 	}
@@ -438,21 +496,56 @@ func TestTaskSearchMultipleTerms(t *testing.T) {
 	b := newTask("поставщик бета", "")
 	c := newTask("номенклатура", "")
 	refB := newTask(fmt.Sprintf("см. #%d", b.Index), "")
-	created := []*Task{a, b, c, refB}
+	created := []*Task{
+		a,
+		b,
+		c,
+		refB,
+	}
 
 	tests := []struct {
 		search string
 		want   []*Task
 	}{
-		{"поставщик номенклатура", []*Task{a}},
-		{"номенклатура поставщик", []*Task{a}},
-		{"поставщик", []*Task{a, b}},
-		{`"поставщик альфа"`, []*Task{a}},
-		{`"альфа поставщик"`, nil},
-		{`"поставщик альфа" номенклатура`, []*Task{a}},
+		{
+			search: "поставщик номенклатура",
+			want:   []*Task{a},
+		},
+		{
+			search: "номенклатура поставщик",
+			want:   []*Task{a},
+		},
+		{
+			search: "поставщик",
+			want: []*Task{
+				a,
+				b,
+			},
+		},
+		{
+			search: `"поставщик альфа"`,
+			want:   []*Task{a},
+		},
+		{
+			search: `"альфа поставщик"`,
+			want:   nil,
+		},
+		{
+			search: `"поставщик альфа" номенклатура`,
+			want:   []*Task{a},
+		},
 		// #N is both a text term and an index match.
-		{fmt.Sprintf("#%d", b.Index), []*Task{b, refB}},
-		{fmt.Sprintf("#%d номенклатура", b.Index), []*Task{b}},
+		{
+			search: fmt.Sprintf("#%d", b.Index),
+			want: []*Task{
+				b,
+				refB,
+			},
+		},
+		{
+			search: fmt.Sprintf("#%d номенклатура", b.Index),
+			want:   []*Task{b},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.search, func(t *testing.T) {
@@ -466,12 +559,37 @@ func TestTaskSearchMultipleTerms(t *testing.T) {
 			searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, ""),
 			searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, "   "))
 	})
+}
 
-	t.Run("expanded subtasks use the same terms", func(t *testing.T) {
-		pos := searchTaskPositions(t, s, usr, &TaskCollection{
-			ProjectID: 1,
-			Expand:    []TaskCollectionExpandable{TaskCollectionExpandSubtasks},
-		}, "поставщик номенклатура")
-		assertSearchMatches(t, pos, "поставщик номенклатура", created, a)
+// The parent matches the terms only across title and description, never as one substring,
+// so a parent mirror using the raw string would promote the child to a second root.
+func TestTaskSearchMultipleTermsSubtaskParentMirror(t *testing.T) {
+	if db.ParadeDBAvailable() {
+		t.Skip("ParadeDB keeps its own per-token matching")
+	}
+
+	u := &user.User{ID: 1}
+	project, parent, sub := setupSubtaskExpansionFixture(t, u, "multi-term-parent", func(parent, sub *Task) {
+		parent.Title = "поставщик альфа"
+		parent.Description = "номенклатура"
+		sub.Title = "поставщик номенклатура детали"
 	})
+
+	s := db.NewSession()
+	defer s.Close()
+
+	tasks, _, total, err := getRawTasksForProjects(s, []*Project{project}, u, &taskSearchOptions{
+		expand: []TaskCollectionExpandable{TaskCollectionExpandSubtasks},
+		search: "поставщик номенклатура",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(1), total, "only the parent is a root")
+	ids := map[int64]int{}
+	for _, tsk := range tasks {
+		ids[tsk.ID]++
+	}
+	assert.Equal(t, 1, ids[parent.ID], "parent present exactly once as the root")
+	assert.Equal(t, 1, ids[sub.ID], "child rides along nested, not as a second root")
+	assert.Len(t, tasks, 2)
 }

@@ -407,7 +407,7 @@ func getAllCommentsForTasksWithoutPermissionCheck(s *xorm.Session, taskIDs []int
 
 	var totalItemsQuery = s.In("task_id", taskIDs)
 	if search != "" {
-		totalItemsQuery = totalItemsQuery.And("comment like ?", "%"+search+"%")
+		totalItemsQuery = totalItemsQuery.And(db.ILIKE("comment", search))
 	}
 	numberOfTotalItems, err = totalItemsQuery.Count(&TaskCommentWithAuthor{})
 	return comments, len(comments), numberOfTotalItems, err
