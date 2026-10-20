@@ -291,7 +291,7 @@ func getFilterCond(f *taskFilter, includeNulls bool) (cond builder.Cond, err err
 		if !is {
 			return nil, ErrInvalidTaskFilterValue{Field: field, Value: f.value}
 		}
-		cond = &builder.Like{field, "%" + val + "%"}
+		cond = db.ILIKE(field, val)
 	case taskFilterComparatorIn:
 		cond = builder.In(field, f.value)
 	case taskFilterComparatorNotIn:

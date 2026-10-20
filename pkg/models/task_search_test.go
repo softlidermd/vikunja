@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"xorm.io/xorm"
+	"xorm.io/xorm/schemas"
 )
 
 func TestKanbanViewBucketFiltering(t *testing.T) {
@@ -355,4 +356,45 @@ func TestDBTaskSearcher_NoScopeReturnsNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, tasks)
 	assert.Zero(t, count)
+}
+
+// assertSearchMatches asserts which of the created tasks a search returns; fixture matches are ignored.
+func assertSearchMatches(t *testing.T, pos map[int64]int, search string, created []*Task, want ...*Task) {
+	t.Helper()
+	wanted := map[int64]bool{}
+	for _, tsk := range want {
+		wanted[tsk.ID] = true
+	}
+	for _, tsk := range created {
+		if wanted[tsk.ID] {
+			assert.Contains(t, pos, tsk.ID, "search %q should match task %q", search, tsk.Title)
+		} else {
+			assert.NotContains(t, pos, tsk.ID, "search %q should not match task %q", search, tsk.Title)
+		}
+	}
+}
+
+func TestTaskSearchCaseInsensitiveCyrillic(t *testing.T) {
+	if db.Type() == schemas.POSTGRES {
+		t.Skip("ILIKE folding of non-ASCII text depends on the Postgres locale")
+	}
+
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	usr := &user.User{ID: 1}
+	order := &Task{Title: "Заказ ПОСТАВЩИКУ", Description: "Номенклатура товаров", ProjectID: 1}
+	require.NoError(t, order.Create(s, usr))
+	created := []*Task{order}
+
+	for _, search := range []string{"поставщику", "ПОСТАВЩИКУ", "Поставщику", "номенклатура"} {
+		pos := searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, search)
+		assertSearchMatches(t, pos, search, created, order)
+	}
+	pos := searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, "xylophone")
+	assertSearchMatches(t, pos, "xylophone", created)
+
+	pos = searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1, Filter: "title like поставщику"}, "")
+	assertSearchMatches(t, pos, "filter title like поставщику", created, order)
 }

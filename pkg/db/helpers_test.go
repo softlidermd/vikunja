@@ -17,12 +17,14 @@
 package db
 
 import (
+	"database/sql"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"xorm.io/builder"
+	"xorm.io/xorm/schemas"
 )
 
 // isParadeDB returns true when the test engine is running with ParadeDB.
@@ -244,4 +246,28 @@ func TestIsUniqueConstraintError(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestUnicodeLowerFunc(t *testing.T) {
+	_, err := CreateTestEngine()
+	require.NoError(t, err)
+	if Type() != schemas.SQLITE {
+		t.Skip("vikunja_lower is only registered on SQLite")
+	}
+
+	var lower, null sql.NullString
+	err = x.DB().QueryRow("SELECT vikunja_lower('ПРИВЕТ'), vikunja_lower(NULL)").Scan(&lower, &null)
+	require.NoError(t, err)
+	assert.Equal(t, sql.NullString{String: "привет", Valid: true}, lower)
+	assert.False(t, null.Valid)
+
+	w := builder.NewWriter()
+	require.NoError(t, ILIKE("title", "landing").WriteTo(w))
+	assert.Equal(t, "title LIKE ?", w.String(), "an ASCII search keeps the native LIKE")
+	assert.Equal(t, []any{"%landing%"}, w.Args())
+
+	w = builder.NewWriter()
+	require.NoError(t, ILIKE("title", "Поставщик").WriteTo(w))
+	assert.Equal(t, "vikunja_lower(title) LIKE ?", w.String())
+	assert.Equal(t, []any{"%поставщик%"}, w.Args())
 }

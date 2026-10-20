@@ -19,10 +19,12 @@ package models
 import (
 	"strings"
 
+	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/events"
 	"code.vikunja.io/api/pkg/user"
 	"code.vikunja.io/api/pkg/web"
 
+	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
@@ -66,7 +68,7 @@ func (b *BotUser) ReadAll(s *xorm.Session, a web.Auth, search string, page int, 
 	var bots []*BotUser
 	q := s.Where("bot_owner_id = ?", a.GetID())
 	if search != "" {
-		q = q.And("(username LIKE ? OR name LIKE ?)", "%"+search+"%", "%"+search+"%")
+		q = q.And(builder.Or(db.ILIKE("username", search), db.ILIKE("name", search)))
 	}
 	q = q.OrderBy("id ASC")
 	if limit > 0 {

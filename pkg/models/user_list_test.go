@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"xorm.io/builder"
+	"xorm.io/xorm/schemas"
 )
 
 func TestListUsers(t *testing.T) {
@@ -50,6 +51,22 @@ func TestListUsers(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, all)
 		assert.Equal(t, "user1", all[0].Username)
+	})
+	t.Run("case insensitive cyrillic username", func(t *testing.T) {
+		if db.Type() == schemas.POSTGRES {
+			t.Skip("ILIKE folding of non-ASCII text depends on the Postgres locale")
+		}
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		_, err := s.ID(1).Cols("username").Update(&user.User{Username: "петр"})
+		require.NoError(t, err)
+
+		all, err := user.ListUsers(s, "ПЕТР", user1, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, all)
+		assert.Equal(t, "петр", all[0].Username)
 	})
 	t.Run("all users", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)

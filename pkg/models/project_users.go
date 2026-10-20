@@ -229,7 +229,7 @@ func (lu *ProjectUser) ReadAll(s *xorm.Session, a web.Auth, search string, page 
 	numberOfTotalItems, err = s.
 		Join("INNER", "users_projects", "user_id = users.id").
 		Where("users_projects.project_id = ?", lu.ProjectID).
-		Where("users.username LIKE ?", "%"+search+"%").
+		Where(db.ILIKE("users.username", search)).
 		Count(&UserWithPermission{})
 
 	return all, len(all), numberOfTotalItems, err

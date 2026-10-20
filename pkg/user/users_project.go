@@ -93,7 +93,8 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 				usernameCond = builder.Expr("username ILIKE ?", queryPart)
 			}
 			if db.Type() == schemas.SQLITE {
-				usernameCond = builder.Expr("username = ? COLLATE NOCASE", queryPart)
+				// COLLATE NOCASE folds ASCII only.
+				usernameCond = builder.Expr(db.UnicodeLowerFunc+"(username) = ?", strings.ToLower(queryPart))
 			}
 
 			conds = append(conds,

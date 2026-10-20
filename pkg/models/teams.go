@@ -317,7 +317,7 @@ func (t *Team) ReadAll(s *xorm.Session, a web.Auth, search string, page int, per
 		Table("teams").
 		Join("INNER", "team_members", "team_members.team_id = teams.id").
 		Where("team_members.user_id = ?", a.GetID()).
-		Where("teams.name LIKE ?", "%"+search+"%").
+		Where(db.ILIKE("teams.name", search)).
 		Count(&Team{})
 	return all, len(all), numberOfTotalItems, err
 }

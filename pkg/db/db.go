@@ -17,6 +17,7 @@
 package db
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -35,13 +36,35 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"xorm.io/builder"
 	"xorm.io/xorm"
+	"xorm.io/xorm/dialects"
 	"xorm.io/xorm/names"
 	"xorm.io/xorm/schemas"
 
 	_ "github.com/go-sql-driver/mysql" // Because.
 	_ "github.com/jackc/pgx/v5/stdlib" // Because.
-	_ "github.com/mattn/go-sqlite3"    // Because.
+	"github.com/mattn/go-sqlite3"
 )
+
+// sqliteDriverName is the sqlite3 driver with Vikunja's SQL functions registered on every connection.
+const sqliteDriverName = "sqlite3_vikunja"
+
+// UnicodeLowerFunc lowercases all of Unicode in SQLite; SQLite's own LIKE and lower() fold ASCII only.
+const UnicodeLowerFunc = "vikunja_lower"
+
+func init() {
+	sql.Register(sqliteDriverName, &sqlite3.SQLiteDriver{ConnectHook: func(c *sqlite3.SQLiteConn) error {
+		return c.RegisterFunc(UnicodeLowerFunc, unicodeLower, true)
+	}})
+	dialects.RegisterDriver(sqliteDriverName, dialects.QueryDriver("sqlite3"))
+}
+
+// unicodeLower returns NULL for anything but text (NULL arrives as []byte(nil), BLOBs are not text).
+func unicodeLower(v any) any {
+	if s, is := v.(string); is {
+		return strings.ToLower(s)
+	}
+	return nil
+}
 
 var (
 	// We only want one instance of the engine, so we can create it once and reuse it
@@ -400,7 +423,7 @@ func initSqliteEngine() (engine *xorm.Engine, err error) {
 			return nil, fmt.Errorf("could not create temp directory for ephemeral database: %w", mkErr)
 		}
 		dbPath := filepath.Join(tmpDir, "vikunja.db")
-		engine, err = xorm.NewEngine("sqlite3", dbPath+"?_busy_timeout=5000&_journal_mode=WAL")
+		engine, err = xorm.NewEngine(sqliteDriverName, dbPath+"?_busy_timeout=5000&_journal_mode=WAL")
 		if err != nil {
 			return
 		}
@@ -434,7 +457,7 @@ func initSqliteEngine() (engine *xorm.Engine, err error) {
 	// WAL mode allows concurrent readers alongside a single writer without
 	// blocking each other. busy_timeout makes concurrent writers wait (up to
 	// 5 s) instead of failing immediately with SQLITE_BUSY.
-	engine, err = xorm.NewEngine("sqlite3", path+"?_busy_timeout=5000&_journal_mode=WAL")
+	engine, err = xorm.NewEngine(sqliteDriverName, path+"?_busy_timeout=5000&_journal_mode=WAL")
 	return
 }
 

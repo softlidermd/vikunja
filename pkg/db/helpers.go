@@ -19,22 +19,38 @@ package db
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"xorm.io/builder"
 	"xorm.io/xorm/schemas"
 )
 
-// ILIKE returns an ILIKE query on postgres and a LIKE query on all other platforms.
-// Postgres' is case-sensitive by default.
-// To work around this, we're using ILIKE as opposed to normal LIKE statements.
-// ILIKE is preferred over LOWER(text) LIKE for performance reasons.
+// ILIKE returns a case-insensitive substring match: ILIKE on postgres, LIKE elsewhere.
+// Postgres' LIKE is case-sensitive by default, so it uses ILIKE, which is
+// preferred over LOWER(text) LIKE for performance reasons.
 // See https://stackoverflow.com/q/7005302/10924593
+// SQLite's LIKE folds ASCII only, so a non-ASCII search on SQLite compares
+// both sides lowercased by UnicodeLowerFunc instead.
 func ILIKE(column, search string) builder.Cond {
 	if Type() == schemas.POSTGRES {
 		return builder.Expr(column+" ILIKE ?", "%"+search+"%")
 	}
 
+	// An ASCII pattern folds the same under SQLite's ASCII-only LIKE, so it keeps the fast native path.
+	if Type() == schemas.SQLITE && !isASCII(search) {
+		return builder.Expr(UnicodeLowerFunc+"("+column+") LIKE ?", "%"+strings.ToLower(search)+"%")
+	}
+
 	return &builder.Like{column, "%" + search + "%"}
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 // SearchRelevanceOrder returns an ORDER BY expression and its args ranking rows

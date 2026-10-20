@@ -46,7 +46,7 @@ func CreateTestEngine() (engine *xorm.Engine, err error) {
 			return nil, err
 		}
 	} else {
-		engine, err = xorm.NewEngine("sqlite3", "file::memory:?cache=shared")
+		engine, err = xorm.NewEngine(sqliteDriverName, "file::memory:?cache=shared")
 		if err != nil {
 			return nil, err
 		}
