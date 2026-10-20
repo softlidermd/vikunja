@@ -118,9 +118,12 @@
 									</th>
 									<th
 										v-if="activeColumns.done"
+										v-tooltip="$t('task.attributes.done')"
 										:aria-sort="ariaSort('done')"
 									>
-										{{ $t('task.attributes.done') }}
+										<!-- An icon instead of the word: the column only holds a checkbox. -->
+										<Icon icon="check" />
+										<span class="is-sr-only">{{ $t('task.attributes.done') }}</span>
 										<Sort
 											:order="sortBy.done"
 											:label="$t('task.attributes.done')"
@@ -303,25 +306,35 @@
 											:aria-label="$t('task.attributes.assignees')"
 											@click="openAssignees(t, $event)"
 										>
-											<AssigneeList
+											<span
 												v-if="t.assignees.length > 0"
-												:assignees="t.assignees"
-												:avatar-size="28"
-												class="mis-1"
-												:inline="true"
-											/>
+												class="table-assignees"
+											>
+												<User
+													v-for="a in t.assignees"
+													:key="a.id"
+													:user="a"
+													:avatar-size="20"
+													is-inline
+												/>
+											</span>
 											<Icon
 												v-else
 												icon="plus"
 											/>
 										</BaseButton>
-										<AssigneeList
+										<span
 											v-else-if="t.assignees.length > 0"
-											:assignees="t.assignees"
-											:avatar-size="28"
-											class="mis-1"
-											:inline="true"
-										/>
+											class="table-assignees"
+										>
+											<User
+												v-for="a in t.assignees"
+												:key="a.id"
+												:user="a"
+												:avatar-size="20"
+												is-inline
+											/>
+										</span>
 									</td>
 									<template v-if="activeColumns.dueDate">
 										<td
@@ -439,7 +452,6 @@ import {useTaskList} from '@/composables/useTaskList'
 import type {TaskResponse} from '@/client/queries/tasks'
 import {useTableSort} from '@/composables/useTableSort'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
-import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
 import AddTask from '@/components/tasks/AddTask.vue'
 import {useCurrentProject} from '@/composables/useCurrentProject'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
@@ -633,6 +645,16 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 
 	.user {
 		margin: 0;
+	}
+
+	// One assignee per line, avatar plus name, so it is clear who it is without hovering.
+	.table-assignees {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: .25rem;
+		white-space: nowrap;
+		color: var(--text);
 	}
 }
 
