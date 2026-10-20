@@ -29,6 +29,7 @@ import {contextMutationOptions} from './contextMutation'
 import {normalizeTask, taskKeys, type PaginatedTaskResponse, type TaskResponse} from './tasks'
 import {bucketKeys, kanbanKeys, normalizeBucket, type BoardData} from './kanban'
 import {
+	cachedListTasks,
 	invalidateTaskMembership,
 	mapTaskEverywhere,
 	removeTaskEverywhere,
@@ -108,7 +109,7 @@ function reconcileDoneBuckets(client: QueryClient, task: TaskResponse) {
 	reconcileDoneBucketsWithoutBoard(client, task, handled)
 }
 
-// Without a board holding the card, the detail's own buckets array is the only record of where it sits.
+// Without a board holding the card, the cached task's own buckets array is the only record of where it sits.
 function reconcileDoneBucketsWithoutBoard(client: QueryClient, task: TaskResponse, handled: Set<number>) {
 	for (const view of getCachedProject(task.project_id, client)?.views ?? []) {
 		if (view.id === undefined || handled.has(view.id) || !view.done_bucket_id) continue
@@ -130,9 +131,11 @@ function reconcileDoneBucketsWithoutBoard(client: QueryClient, task: TaskRespons
 }
 
 function cachedTaskBucketId(client: QueryClient, task: number, view: number): number | undefined {
-	for (const [, detail] of client.getQueriesData<TaskResponse>({queryKey: taskKeys.details})) {
-		if (detail?.id !== task) continue
-		const bucket = detail.buckets?.find(item => item.project_view_id === view)
+	const details = client.getQueriesData<TaskResponse>({queryKey: taskKeys.details}).map(([, detail]) => detail)
+	// The table and list views carry buckets too, and the update response does not.
+	for (const cached of [...details, ...cachedListTasks(client)]) {
+		if (cached?.id !== task) continue
+		const bucket = cached.buckets?.find(item => item.project_view_id === view)
 		if (bucket?.id !== undefined) return bucket.id
 	}
 	return undefined

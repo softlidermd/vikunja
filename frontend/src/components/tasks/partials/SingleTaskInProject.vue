@@ -247,6 +247,7 @@ import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
 import {TASK_REPEAT_MODES} from '@/types/IRepeatMode'
 import {useGlobalNow} from '@/composables/useGlobalNow'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
+import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 
 const props = withDefaults(defineProps<{
 	theTask: ITask,
@@ -289,6 +290,7 @@ const isRepeating = computed(() => (task.value.repeat_after ?? 0) > 0
 
 const projectList = useProjects()
 const updateTask = useUpdateTaskMutation(true)
+const {queueTaskSave} = useTaskSaveQueue()
 const favoriteTask = useFavoriteTaskMutation()
 const isLoading = useDelayedLoading(() => updateTask.isPending.value || favoriteTask.isPending.value)
 
@@ -337,14 +339,15 @@ let oldTask: ITask
 async function markAsDone(checked: boolean, wasReverted: boolean = false) {
 	if (!wasReverted) oldTask = {...task.value}
 
-	// Fire the request immediately and with the intended done value snapshotted, so a re-render or
+	// Queue the request now, with the intended done value snapshotted, so a re-render or
 	// teardown during the animation delay can neither drop the save nor make it send a stale state.
 	const source = wasReverted && isRepeating.value ? oldTask : task.value
-	const updatePromise = updateTask.mutateAsync({
+	const update = {
 		...source,
 		id: source.id!,
 		done: checked,
-	}).catch(() => undefined)
+	}
+	const updatePromise = queueTaskSave(update.id, () => updateTask.mutateAsync(update)).catch(() => undefined)
 
 	const finish = async () => {
 		const newTask = await updatePromise
@@ -400,7 +403,9 @@ function hasTextSelected() {
 
 function openTaskDetail(event: MouseEvent | KeyboardEvent) {
 	if (event.target instanceof HTMLElement) {
-		const isInteractiveElement = event.target.closest('a, button, label, input[type="checkbox"], select, .favorite, [role="button"]')
+		const isInteractiveElement = event.target.closest(
+			'a, button, label, input[type="checkbox"], select, .favorite, [role="button"]',
+		)
 		if (isInteractiveElement || hasTextSelected()) {
 			return
 		}

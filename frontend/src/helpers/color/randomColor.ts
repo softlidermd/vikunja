@@ -1,5 +1,5 @@
 // Pale pastels, so auto-created labels look like the hand-picked ones and keep dark, readable text.
-const COLORS = [
+export const COLORS = [
 	'#fecaca',
 	'#fed7aa',
 	'#fde68a',
@@ -17,5 +17,3 @@ const COLORS = [
 export function getRandomColorHex(): string {
 	return COLORS[Math.floor(Math.random() * COLORS.length)]
 }
-
-export const RANDOM_COLORS: readonly string[] = COLORS

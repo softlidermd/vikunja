@@ -11,7 +11,6 @@
 			<select
 				v-model="selected"
 				:aria-label="$t('task.detail.bucketSelectLabel', {bucket: currentBucket.title})"
-				:aria-disabled="moveMutation.isPending.value || undefined"
 				@click.stop
 				@change="changeBucket"
 			>
@@ -41,7 +40,9 @@ import {useQuery} from '@tanstack/vue-query'
 import type {Task} from '@/client/generated'
 import {bucketsQuery} from '@/client/queries/kanban'
 import {useMoveTaskMutation} from '@/client/queries/taskMutations'
+import {isRequestContextAbort} from '@/client/requestContext'
 import {useProjects} from '@/composables/useProjects'
+import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getStatusKanbanView} from '@/helpers/projectView'
 import {useBaseStore} from '@/stores/base'
 
@@ -53,16 +54,20 @@ const props = defineProps<{
 const projectList = useProjects()
 const baseStore = useBaseStore()
 const moveMutation = useMoveTaskMutation()
+const {queueTaskSave} = useTaskSaveQueue()
 
 const kanbanView = computed(() => getStatusKanbanView(
 	projectList.projects[props.task.project_id ?? 0]?.views,
 	baseStore.currentProjectViewId,
 ))
 
-const bucketsResult = useQuery(computed(() => ({
-	...bucketsQuery(props.task.project_id ?? 0, kanbanView.value?.id ?? 0),
-	enabled: props.canWrite && (props.task.project_id ?? 0) > 0 && !!kanbanView.value?.id,
-})))
+const bucketsResult = useQuery(computed(() => {
+	const options = bucketsQuery(props.task.project_id ?? 0, kanbanView.value?.id ?? 0)
+	return {
+		...options,
+		enabled: props.canWrite && options.enabled,
+	}
+}))
 
 const currentBucket = computed(() => props.task.buckets?.find(b => b.project_view_id === kanbanView.value?.id))
 // Until the buckets load, the select still has to show the current one.
@@ -76,25 +81,32 @@ watch(() => currentBucket.value?.id, id => {
 }, {immediate: true})
 
 async function changeBucket() {
-	const view = kanbanView.value
+	const view = kanbanView.value?.id
 	const bucket = selected.value
-	// A second move while one is in flight could land first and be overwritten by the older response.
-	if (moveMutation.isPending.value || !view?.id || bucket === undefined || bucket === currentBucket.value?.id) {
-		selected.value = currentBucket.value?.id
+	const task = props.task
+	if (view === undefined || bucket === undefined || task.id === undefined) {
 		return
 	}
+	let placed: number | undefined
 	try {
-		await moveMutation.mutateAsync({
-			project: props.task.project_id!,
-			view: view.id,
+		// Queued with the task's other saves: the response is the whole task and would overwrite a newer edit.
+		const result = await queueTaskSave(task.id, () => moveMutation.mutateAsync({
+			project: task.project_id!,
+			view,
 			bucket,
-			task: props.task,
-		})
-	} catch {
-		// The error toast is done by contextMutationOptions; put the select back unless the user picked again.
-		if (selected.value === bucket) {
-			selected.value = currentBucket.value?.id
+			task,
+		}))
+		// A repeating task moved to done is reopened in its old bucket, so the watched bucket id does not change.
+		placed = result?.bucket_id
+	} catch (e) {
+		if (isRequestContextAbort(e)) {
+			return
 		}
+		// The error toast is done by contextMutationOptions.
+	}
+	// Show where the task really is, unless the user already picked again.
+	if (selected.value === bucket) {
+		selected.value = placed ?? currentBucket.value?.id
 	}
 }
 </script>
@@ -148,11 +160,6 @@ async function changeBucket() {
 		&:focus-visible {
 			outline: 2px solid hsla(var(--primary-hsl), .5);
 			outline-offset: 1px;
-		}
-
-		&[aria-disabled] {
-			cursor: progress;
-			opacity: .6;
 		}
 	}
 

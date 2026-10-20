@@ -289,7 +289,7 @@
 										<TaskGlanceTooltip :task="t">
 											<RouterLink
 												:to="taskDetailRoutes[t.id]"
-												:class="{'is-done-title': t.done}"
+												:class="{'is-strikethrough has-text-grey': t.done}"
 											>
 												{{ t.title }}
 											</RouterLink>
@@ -439,7 +439,8 @@
 								class="table-picker"
 								:padding="false"
 							>
-								<!-- Keyed per task: an edit still in flight stays with the task its picker was opened for. -->
+								<!-- Keyed per task: an edit still in flight stays with the task
+									its picker was opened for. -->
 								<EditAssignees
 									v-if="picker?.field === 'assignees'"
 									:key="pickerTask.id"
@@ -514,7 +515,7 @@ import {useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import type {Task} from '@/client/generated'
 import {parseDateOrNull} from '@/helpers/parseDateOrNull'
 import {useAuthStore} from '@/stores/auth'
-import {captureClientRequestContext, isClientRequestContextCurrent} from '@/client/requestContext'
+import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getDisplayName} from '@/helpers/user'
 import {getStatusKanbanView} from '@/helpers/projectView'
 
@@ -563,7 +564,12 @@ const SORT_BY_DEFAULT: SortBy = {
 }
 
 // mergeDefaults: columns added later are on for users who already saved their column choice.
-const activeColumns = useStorage('tableViewColumns', {...ACTIVE_COLUMNS_DEFAULT}, undefined, {mergeDefaults: true})
+const activeColumns = useStorage(
+	'tableViewColumns',
+	{...ACTIVE_COLUMNS_DEFAULT},
+	undefined,
+	{mergeDefaults: true},
+)
 const sortBy = useStorage<SortBy>('tableViewSortBy', {...SORT_BY_DEFAULT})
 
 const taskList = useTaskList(
@@ -574,7 +580,8 @@ const taskList = useTaskList(
 )
 
 // Saved filters span projects and some projects have no kanban board, so there is no status to show.
-const hasStatus = computed(() => props.projectId > 0 && getStatusKanbanView(project.value?.views, props.viewId) !== null)
+const hasStatus = computed(() => props.projectId > 0
+	&& getStatusKanbanView(project.value?.views, props.viewId) !== null)
 const showStatus = computed(() => hasStatus.value && activeColumns.value.status)
 
 const {
@@ -604,35 +611,16 @@ function setActiveColumnsSortParam() {
 }
 
 const updateTask = useUpdateTaskMutation(true)
-
-// Saves of one task run one after another: each response carries the whole task,
-// so a late response to an earlier edit would put the old value of a newer edit back.
-const pendingSaves = new Map<number, Promise<void>>()
+const {queueTaskSave} = useTaskSaveQueue()
 
 // Partial patch, so concurrent edits to other fields are not overwritten.
 function saveTask(task: TaskResponse, patch: Partial<Task>) {
-	// The mutation captures its context only when it starts, so fence a queued save to the session that made the edit.
-	const request = captureClientRequestContext()
-	const save = (pendingSaves.get(task.id) ?? Promise.resolve()).then(async () => {
-		if (!isClientRequestContextCurrent(request)) {
-			return
-		}
-		try {
-			await updateTask.mutateAsync({
-				id: task.id,
-				...patch,
-			})
-		} catch {
-			// rollback and error toast are done by contextMutationOptions
-		}
-	})
-	pendingSaves.set(task.id, save)
-	save.then(() => {
-		if (pendingSaves.get(task.id) === save) {
-			pendingSaves.delete(task.id)
-		}
-	})
-	return save
+	const save = queueTaskSave(task.id, () => updateTask.mutateAsync({
+		id: task.id,
+		...patch,
+	}))
+	// rollback and error toast are done by contextMutationOptions
+	return save.catch(() => undefined)
 }
 
 const dueDraft = ref<Record<number, Date | null>>({})
@@ -720,12 +708,6 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 
 	th {
 		white-space: nowrap;
-	}
-
-	// Same look as a done task in the list view.
-	.is-done-title {
-		text-decoration: line-through;
-		color: var(--grey-500);
 	}
 
 	// The relative date ("через 19 часов") would otherwise wrap into a tall row.

@@ -6,6 +6,7 @@ import {createRouter, createMemoryHistory} from 'vue-router'
 
 import type {Bucket, Task} from '@/client/generated'
 import {bucketKeys} from '@/client/queries/kanban'
+import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 
 const sdk = vi.hoisted(() => ({
 	taskBucketUpdate: vi.fn(),
@@ -138,6 +139,67 @@ describe('TaskStatusSelect', () => {
 		await flushPromises()
 
 		await wrapper.get('select').setValue('11')
+		await flushPromises()
+
+		expect(sdk.taskBucketUpdate).toHaveBeenCalledOnce()
+		expect(wrapper.get('select').element.value).toBe('10')
+	})
+
+	it('queues a second choice made while the first one is saving', async () => {
+		let resolveFirst!: () => void
+		sdk.taskBucketUpdate
+			.mockImplementationOnce(() => new Promise(resolve => {
+				resolveFirst = () => resolve({data: {bucket_id: 11}})
+			}))
+			.mockResolvedValueOnce({data: {bucket_id: 12}})
+		const wrapper = mountSelect()
+		await flushPromises()
+
+		await wrapper.get('select').setValue('11')
+		await wrapper.get('select').setValue('12')
+		await flushPromises()
+		expect(sdk.taskBucketUpdate).toHaveBeenCalledOnce()
+
+		resolveFirst()
+		await flushPromises()
+		expect(sdk.taskBucketUpdate).toHaveBeenCalledTimes(2)
+		expect(sdk.taskBucketUpdate.mock.calls[1][0]).toMatchObject({path: {bucket: 12}})
+		expect(wrapper.get('select').element.value).toBe('12')
+	})
+
+	it('waits for another save of the same task before moving it', async () => {
+		let resolveSave!: () => void
+		const {queueTaskSave} = useTaskSaveQueue()
+		void queueTaskSave(task.id!, () => new Promise<void>(resolve => {
+			resolveSave = resolve
+		}))
+		sdk.taskBucketUpdate.mockResolvedValue({data: {bucket_id: 11}})
+		const wrapper = mountSelect()
+		await flushPromises()
+
+		await wrapper.get('select').setValue('11')
+		await flushPromises()
+		expect(sdk.taskBucketUpdate).not.toHaveBeenCalled()
+
+		resolveSave()
+		await flushPromises()
+		expect(sdk.taskBucketUpdate).toHaveBeenCalledOnce()
+	})
+
+	it('goes back to the bucket a repeating task was reopened in', async () => {
+		sdk.taskBucketUpdate.mockResolvedValue({
+			data: {
+				bucket_id: 10,
+				task: {
+					...task,
+					repeat_after: 86400,
+				},
+			},
+		})
+		const wrapper = mountSelect()
+		await flushPromises()
+
+		await wrapper.get('select').setValue('12')
 		await flushPromises()
 
 		expect(sdk.taskBucketUpdate).toHaveBeenCalledOnce()

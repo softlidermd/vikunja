@@ -550,4 +550,49 @@ describe('task mutations', () => {
 		expect(sdk.bucketsList).not.toHaveBeenCalled()
 		unsubscribe()
 	})
+
+	it('moves the status of a listed task into and out of the done bucket without a detail or board', async () => {
+		const {projectKeys} = await import('./projects')
+		const client = new QueryClient()
+		const list = taskKeys.list({
+			project: 1,
+			view: 7,
+		})
+		client.setQueryData(projectKeys.detail(1), {
+			id: 1,
+			views: [{
+				id: 2,
+				default_bucket_id: 3,
+				done_bucket_id: 4,
+			}],
+		})
+		client.setQueryData(bucketKeys.list(1, 2), [
+			{id: 3, project_view_id: 2, title: 'To-Do'},
+			{id: 4, project_view_id: 2, title: 'Done'},
+		])
+		client.setQueryData<PaginatedTask>(list, {
+			items: [{
+				id: 1,
+				project_id: 1,
+				done: false,
+				buckets: [{id: 3, project_view_id: 2, title: 'To-Do'}],
+			}],
+			page: 1,
+			total: 1,
+			total_pages: 1,
+		})
+		const listedBuckets = () => client.getQueryData<PaginatedTask>(list)?.items?.[0]?.buckets
+
+		sdk.patchTasksRead.mockResolvedValue({data: {id: 1, project_id: 1, done: true}})
+		await client.getMutationCache()
+			.build(client, updateTaskMutationOptions(true))
+			.execute({id: 1, done: true})
+		expect(listedBuckets()).toMatchObject([{id: 4, title: 'Done'}])
+
+		sdk.patchTasksRead.mockResolvedValue({data: {id: 1, project_id: 1, done: false}})
+		await client.getMutationCache()
+			.build(client, updateTaskMutationOptions(true))
+			.execute({id: 1, done: false})
+		expect(listedBuckets()).toMatchObject([{id: 3, title: 'To-Do'}])
+	})
 })
