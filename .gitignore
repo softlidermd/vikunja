@@ -55,3 +55,6 @@ PLAN.md
 plans/
 /.crush/
 /.playwright-mcp
+
+# Windows release build output (deploy/windows/build.sh)
+deploy/windows/out/
