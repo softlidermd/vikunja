@@ -53,7 +53,10 @@ const UnicodeLowerFunc = "vikunja_lower"
 
 func init() {
 	sql.Register(sqliteDriverName, &sqlite3.SQLiteDriver{ConnectHook: func(c *sqlite3.SQLiteConn) error {
-		return c.RegisterFunc(UnicodeLowerFunc, unicodeLower, true)
+		if err := c.RegisterFunc(UnicodeLowerFunc, unicodeLower, true); err != nil {
+			return fmt.Errorf("registering %s: %w", UnicodeLowerFunc, err)
+		}
+		return nil
 	}})
 	dialects.RegisterDriver(sqliteDriverName, dialects.QueryDriver("sqlite3"))
 }

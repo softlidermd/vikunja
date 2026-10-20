@@ -506,8 +506,8 @@ func buildParentSearchCondition(search string) builder.Cond {
 	return cond
 }
 
-// Unicode spaces (\p{Z}, e.g. NBSP from pasted text) split terms like ASCII whitespace.
-var searchTermRegex = regexp.MustCompile(`"([^"]+)"|[^\s\p{Z}]+`)
+// Unicode spaces (\p{Z}, e.g. NBSP from pasted text, and U+0085) split terms like ASCII whitespace.
+var searchTermRegex = regexp.MustCompile(`"([^"]+)"|[^\s\p{Z}\x{85}]+`)
 
 // splitSearchTerms splits a search on whitespace, keeping a "quoted phrase" as one term.
 // shortcut: quotes cannot be escaped and there is no NOT or OR syntax; add them only if users ask.

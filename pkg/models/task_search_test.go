@@ -397,6 +397,13 @@ func TestSplitSearchTerms(t *testing.T) {
 			},
 		},
 		{
+			search: "поставщик\u0085номенклатура",
+			want: []string{
+				"поставщик",
+				"номенклатура",
+			},
+		},
+		{
 			search: `" поставщик "`,
 			want:   []string{"поставщик"},
 		},
@@ -468,7 +475,10 @@ func TestTaskSearchCaseInsensitiveCyrillic(t *testing.T) {
 	pos := searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, "xylophone")
 	assertSearchMatches(t, pos, "xylophone", created)
 
-	pos = searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1, Filter: "title like поставщику"}, "")
+	pos = searchTaskPositions(t, s, usr, &TaskCollection{
+		ProjectID: 1,
+		Filter:    "title like поставщику",
+	}, "")
 	assertSearchMatches(t, pos, "filter title like поставщику", created, order)
 }
 
