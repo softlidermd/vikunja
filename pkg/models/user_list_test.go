@@ -215,7 +215,10 @@ func TestListUsers(t *testing.T) {
 		_, err := s.ID(17).Cols("discoverable_by_name").Update(&user.User{DiscoverableByName: true})
 		require.NoError(t, err)
 
-		for _, search := range []string{"user17", "er17"} {
+		for _, search := range []string{
+			"user17",
+			"er17",
+		} {
 			all, err := user.ListUsers(s, search, user1, nil)
 			require.NoError(t, err)
 			assert.Empty(t, all, search)

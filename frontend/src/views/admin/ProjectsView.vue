@@ -23,7 +23,6 @@
 					:show-empty="true"
 					@search="searchUsers"
 					@focusin="preloadUsers"
-					@focusout="stopUserSearch"
 				>
 					<template #searchResult="{option}">
 						<User
@@ -162,7 +161,6 @@
 							:show-empty="true"
 							@search="searchUsers"
 							@focusin="preloadUsers"
-							@focusout="stopUserSearch"
 						>
 							<template #searchResult="{option}">
 								<User
@@ -267,12 +265,9 @@ function openReassign(p: AdminProject) {
 	userSearch.value = ''
 }
 function closeReassign() { if (!reassigning.value) reassignTarget.value = null }
+// Not off on focusout, which can come mid-click and empty the picker; queries never refetch on window focus.
 watch(reassignTarget, target => { if (!target) userSearchEnabled.value = false })
 function preloadUsers() { userSearchEnabled.value = true }
-// Off again once focus leaves the picker, so the query does not refetch in the background.
-function stopUserSearch(e: FocusEvent) {
-	if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) userSearchEnabled.value = false
-}
 // No enabling here: the search can fire after a debounce, when focus has already left the picker.
 function searchUsers(query: string) { userSearch.value = query }
 async function doReassign() {

@@ -1774,7 +1774,8 @@ func (s *MarkTaskUnreadOnComment) Handle(msg *message.Message) (err error) {
 		return err
 	}
 
-	users, err := ListUsersFromProject(sess, project, event.Doer, "")
+	// Locked and unconfirmed members still find the comment unread once they are back.
+	users, err := listUsersFromProject(sess, project, event.Doer, "", true)
 	if err != nil {
 		_ = sess.Rollback()
 		return err

@@ -33,6 +33,8 @@ type ProjectUserOpts struct {
 	AdditionalCond              builder.Cond
 	ReturnAllIfNoSearchProvided bool
 	MatchFuzzily                bool
+	// IncludeInactive also returns disabled, locked and unconfirmed users. Never set it for a user-facing search.
+	IncludeInactive bool
 }
 
 // SearchUsers performs the global user search shared by both API versions:
@@ -100,7 +102,7 @@ func notSomeoneElsesBotCond(currentUser *User) builder.Cond {
 	)
 }
 
-// ListUsers returns active users, filtered by an optional search string
+// ListUsers returns active users (all users with opts.IncludeInactive), filtered by an optional search string
 func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectUserOpts) (users []*User, err error) {
 	if opts == nil {
 		opts = &ProjectUserOpts{}
@@ -238,14 +240,16 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 		)
 	}
 
+	where := builder.Or(
+		builder.And(cond, notSomeoneElsesBotCond(currentUser)),
+		ownBotCond,
+	)
+	if !opts.IncludeInactive {
+		where = builder.And(where, builder.Eq{"status": StatusActive})
+	}
+
 	err = s.
-		Where(builder.And(
-			builder.Or(
-				builder.And(cond, notSomeoneElsesBotCond(currentUser)),
-				ownBotCond,
-			),
-			builder.Eq{"status": StatusActive},
-		)).
+		Where(where).
 		OrderBy("id").
 		Find(&users)
 

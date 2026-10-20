@@ -130,6 +130,34 @@ func TestTaskComment_Create(t *testing.T) {
 			"user_id": u.ID,
 		})
 	})
+	t.Run("should mark task unread for project members whose account is not active", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		_, err := s.ID(2).Cols("status").Update(&user.User{Status: user.StatusAccountLocked})
+		require.NoError(t, err)
+		task, err := GetTaskByIDSimple(s, 32)
+		require.NoError(t, err)
+		tc := &TaskComment{
+			Comment: "test comment",
+			TaskID:  32,
+		}
+		err = tc.Create(s, u)
+		require.NoError(t, err)
+		require.NoError(t, s.Commit())
+
+		events.TestListener(t, &TaskCommentCreatedEvent{
+			Task:    &task,
+			Doer:    u,
+			Comment: tc,
+		}, &MarkTaskUnreadOnComment{})
+
+		db.AssertExists(t, "task_unread_statuses", map[string]interface{}{
+			"task_id": task.ID,
+			"user_id": 2,
+		}, false)
+	})
 }
 
 func TestTaskComment_Delete(t *testing.T) {

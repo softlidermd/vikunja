@@ -194,8 +194,18 @@ func getProjectAccessForTasks(s *xorm.Session, tasks []*Task) (accessByProject m
 	return accessByProject, userIDs, nil
 }
 
-// ListUsersFromProject returns a list with all users who have access to a project, regardless of the method which gave them access
+// ListUsersFromProject returns the active users who have access to a project, regardless of the method which gave them access
 func ListUsersFromProject(s *xorm.Session, l *Project, currentUser *user.User, search string) (users []*user.User, err error) {
+	return listUsersFromProject(s, l, currentUser, search, false)
+}
+
+func listUsersFromProject(
+	s *xorm.Session,
+	l *Project,
+	currentUser *user.User,
+	search string,
+	includeInactive bool,
+) (users []*user.User, err error) {
 	isAdmin, err := (&Project{ID: l.ID}).IsAdmin(s, currentUser)
 	if err != nil {
 		return nil, err
@@ -222,6 +232,7 @@ func ListUsersFromProject(s *xorm.Session, l *Project, currentUser *user.User, s
 		AdditionalCond:              builder.In("id", uids),
 		ReturnAllIfNoSearchProvided: true,
 		MatchFuzzily:                true,
+		IncludeInactive:             includeInactive,
 	})
 	return
 }
