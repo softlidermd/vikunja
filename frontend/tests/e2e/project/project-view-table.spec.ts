@@ -1,6 +1,7 @@
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
-import {createProjects} from './prepareProjects'
+import {ProjectFactory} from '../../factories/project'
+import {createDefaultViews, createProjects} from './prepareProjects'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
 
 test.describe('Project View Table', () => {
@@ -66,8 +67,71 @@ test.describe('Project View Table', () => {
 				has: page.getByRole('link', {name: task.title, exact: true}),
 			})
 			await expect(row).toBeVisible()
-			await expect(row.locator('.priority-label')).toHaveText(priorities[task.priority])
+			// Writers get an inline priority select instead of the label.
+			await expect(row.getByRole('combobox', {name: 'Priority'})).toHaveValue(String(task.priority))
 		}
+	})
+
+	test('Should edit priority and done inline and persist them', async ({authenticatedPage: page, apiContext, userToken}) => {
+		await createProjects(1)
+		const [task] = await TaskFactory.create(1, {
+			project_id: 1,
+			priority: 0,
+		})
+		await page.goto('/projects/1/3')
+		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		await page.locator('.columns-filter').getByText('Priority', {exact: true}).click()
+		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		const row = page.locator('.project-table tbody tr').filter({
+			has: page.getByRole('link', {name: task.title, exact: true}),
+		})
+		const patched = () => page.waitForResponse(response =>
+			response.request().method() === 'PATCH' && response.url().includes(`/tasks/${task.id}`),
+		)
+
+		let saved = patched()
+		await row.getByRole('combobox', {name: 'Priority'}).selectOption('3')
+		expect((await saved).ok()).toBeTruthy()
+
+		saved = patched()
+		await row.locator('.fancy-checkbox').click()
+		expect((await saved).ok()).toBeTruthy()
+
+		await page.reload()
+		await expect(row.getByRole('combobox', {name: 'Priority'})).toHaveValue('3')
+		await expect(row.getByRole('checkbox', {name: `Mark '${task.title}' as done`})).toBeChecked()
+
+		const stored = await apiContext.get(`tasks/${task.id}`, {headers: {Authorization: `Bearer ${userToken}`}})
+		expect(stored.ok()).toBeTruthy()
+		expect(await stored.json()).toEqual(expect.objectContaining({
+			done: true,
+			priority: 3,
+		}))
+	})
+
+	test('Should not show inline editors in an archived project', async ({authenticatedPage: page}) => {
+		await ProjectFactory.create(1, {
+			id: 1,
+			is_archived: true,
+		})
+		await createDefaultViews(1)
+		const [task] = await TaskFactory.create(1, {
+			project_id: 1,
+			priority: 3,
+		})
+		await page.goto('/projects/1/3')
+		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		await page.locator('.columns-filter').getByText('Priority', {exact: true}).click()
+		await page.getByRole('button', {name: 'Columns', exact: true}).click()
+		const row = page.locator('.project-table tbody tr').filter({
+			has: page.getByRole('link', {name: task.title, exact: true}),
+		})
+
+		await expect(row.locator('.priority-label')).toHaveText('High')
+		await expect(row.getByRole('checkbox')).toHaveCount(0)
+		await expect(row.getByRole('combobox')).toHaveCount(0)
+		await expect(row.locator('.datepicker')).toHaveCount(0)
+		await expect(row.getByRole('button', {name: 'Assignees'})).toHaveCount(0)
 	})
 
 	test('Should navigate to the task when the title is clicked', async ({authenticatedPage: page}) => {

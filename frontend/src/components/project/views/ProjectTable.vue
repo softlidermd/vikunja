@@ -254,7 +254,14 @@
 										</RouterLink>
 									</td>
 									<td v-if="activeColumns.done">
+										<FancyCheckbox
+											v-if="canWrite"
+											:model-value="t.done"
+											:aria-label="$t('task.detail.markAsDone', {task: t.title})"
+											@update:modelValue="v => saveTask(t, {done: v})"
+										/>
 										<Done
+											v-else
 											:is-done="t.done"
 											variant="small"
 										/>
@@ -275,7 +282,14 @@
 										</TaskGlanceTooltip>
 									</td>
 									<td v-if="activeColumns.priority">
+										<PrioritySelect
+											v-if="canWrite"
+											class="is-small"
+											:model-value="t.priority"
+											@update:modelValue="p => saveTask(t, {priority: p})"
+										/>
 										<PriorityLabel
+											v-else
 											:priority="t.priority"
 											:show-all="true"
 										/>
@@ -284,18 +298,45 @@
 										<Labels :labels="t.labels" />
 									</td>
 									<td v-if="activeColumns.assignees">
+										<BaseButton
+											v-if="canEditAssignees"
+											:aria-label="$t('task.attributes.assignees')"
+											@click="openAssignees(t, $event)"
+										>
+											<AssigneeList
+												v-if="t.assignees.length > 0"
+												:assignees="t.assignees"
+												:avatar-size="28"
+												class="mis-1"
+												:inline="true"
+											/>
+											<Icon
+												v-else
+												icon="plus"
+											/>
+										</BaseButton>
 										<AssigneeList
-											v-if="t.assignees.length > 0"
+											v-else-if="t.assignees.length > 0"
 											:assignees="t.assignees"
 											:avatar-size="28"
 											class="mis-1"
 											:inline="true"
 										/>
 									</td>
-									<DateTableCell
-										v-if="activeColumns.dueDate"
-										:date="t.due_date"
-									/>
+									<template v-if="activeColumns.dueDate">
+										<td v-if="canWrite">
+											<Datepicker
+												:model-value="t.id in dueDraft ? dueDraft[t.id] : parseDateOrNull(t.due_date)"
+												:choose-date-label="$t('task.detail.chooseDueDate')"
+												@update:modelValue="d => dueDraft[t.id] = d"
+												@closeOnChange="saveDue(t)"
+											/>
+										</td>
+										<DateTableCell
+											v-else
+											:date="t.due_date"
+										/>
+									</template>
 									<td v-if="activeColumns.commentCount">
 										<CommentCount :task="t" />
 									</td>
@@ -333,6 +374,28 @@
 							</tbody>
 						</table>
 					</div>
+					<div
+						v-if="assigneeTask"
+						class="table-assignees-popup"
+					>
+						<Popup
+							v-model:open="assigneesOpen"
+							:anchor="assigneeAnchor"
+							placement="bottom-start"
+							sheet-on-mobile
+							:sheet-title="$t('task.attributes.assignees')"
+						>
+							<template #content>
+								<Card class="table-assignees-card">
+									<EditAssignees
+										:model-value="assigneeTask.assignees"
+										:task-id="assigneeTask.id"
+										:project-id="assigneeTask.project_id"
+									/>
+								</Card>
+							</template>
+						</Popup>
+					</div>
 
 					<Pagination
 						:total-pages="totalPages"
@@ -362,6 +425,10 @@ import Sort from '@/components/tasks/partials/Sort.vue'
 import FilterPopup from '@/components/project/partials/FilterPopup.vue'
 import Pagination from '@/components/misc/Pagination.vue'
 import Popup from '@/components/misc/Popup.vue'
+import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
+import EditAssignees from '@/components/tasks/partials/EditAssignees.vue'
+import Datepicker from '@/components/input/Datepicker.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 
 import type {SortBy} from '@/composables/useTaskList'
 import {useTaskList} from '@/composables/useTaskList'
@@ -376,6 +443,10 @@ import {getTaskIdentifier} from '@/helpers/task'
 import { camelCase } from 'change-case'
 import {isSavedFilterProject} from '@/client/queries/projects'
 import {useProjects} from '@/composables/useProjects'
+import {useUpdateTaskMutation} from '@/client/queries/taskMutations'
+import type {Task} from '@/client/generated'
+import {parseDateOrNull} from '@/helpers/parseDateOrNull'
+import {useAuthStore} from '@/stores/auth'
 
 const props = defineProps<{
 	isLoadingProject: boolean,
@@ -390,6 +461,9 @@ const canWrite = computed(() => !project.value?.is_archived &&
 	typeof project.value?.max_permission === 'number' &&
 	project.value.max_permission > Permissions.READ &&
 	project.value.id > 0)
+const authStore = useAuthStore()
+// Link shares may not search users, so they cannot pick assignees.
+const canEditAssignees = computed(() => canWrite.value && !authStore.isLinkShareAuth)
 
 const columnsTrigger = ref<ComponentPublicInstance | null>(null)
 const columnsTriggerEl = computed<HTMLElement | null>(() => (columnsTrigger.value?.$el as HTMLElement) ?? null)
@@ -453,6 +527,40 @@ function setActiveColumnsSortParam() {
 		}, {})
 }
 
+const updateTask = useUpdateTaskMutation(true)
+
+// Partial patch, so concurrent edits to other fields are not overwritten.
+async function saveTask(task: TaskResponse, patch: Partial<Task>) {
+	try {
+		await updateTask.mutateAsync({id: task.id, ...patch})
+	} catch {
+		// rollback and error toast are done by contextMutationOptions
+	}
+}
+
+const dueDraft = ref<Record<number, Date | null>>({})
+
+function saveDue(task: TaskResponse) {
+	if (!(task.id in dueDraft.value)) {
+		return
+	}
+	// '' clears the date (taskWriteBody maps it to the api's zero date).
+	const due = dueDraft.value[task.id]?.toISOString() ?? ''
+	delete dueDraft.value[task.id]
+	saveTask(task, {due_date: due})
+}
+
+const assigneesOpen = ref(false)
+const assigneeTaskId = ref<number | null>(null)
+const assigneeAnchor = ref<HTMLElement | null>(null)
+const assigneeTask = computed(() => tasks.value.find(x => x.id === assigneeTaskId.value))
+
+function openAssignees(task: TaskResponse, event: MouseEvent) {
+	assigneeTaskId.value = task.id
+	assigneeAnchor.value = event.currentTarget as HTMLElement
+	assigneesOpen.value = true
+}
+
 // TODO: re-enable opening task detail in modal
 // const router = useRouter()
 const taskDetailRoutes = computed(() => Object.fromEntries(
@@ -494,6 +602,25 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		flex-direction: column;
 	}
 
+}
+
+// Popup scrolls (overflow-y: auto), which would clip the absolutely positioned assignee search results.
+.table-assignees-popup {
+	:deep(.popup) {
+		overflow: visible;
+	}
+
+	// The popover shrinks to its content, which would squeeze the search input.
+	.card {
+		inline-size: 20rem;
+		max-inline-size: calc(100vw - 2rem);
+		margin: 0;
+	}
+}
+
+// The mobile sheet sits at the screen bottom and sizes to its content, so absolute results would hang off-screen.
+.bottom-sheet .table-assignees-card :deep(.search-results) {
+	position: static;
 }
 
 .link-share-view .card {
