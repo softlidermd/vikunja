@@ -20,13 +20,14 @@ import (
 	"fmt"
 
 	"src.techknowlogick.com/xormigrate"
+	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
 // Accounts made before this fork defaulted discoverable_by_name to true were created hidden,
 // so the user pickers that list colleagues on click came up empty for them.
 func makeUsersDiscoverable20261020150000(tx *xorm.Engine) error {
-	if _, err := tx.Table("users").Where("1 = 1").Update(map[string]any{"discoverable_by_name": true}); err != nil {
+	if _, err := tx.Table("users").Where(builder.Eq{"discoverable_by_name": false}).Update(map[string]any{"discoverable_by_name": true}); err != nil {
 		return fmt.Errorf("could not make users discoverable by name: %w", err)
 	}
 	return nil

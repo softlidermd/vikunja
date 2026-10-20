@@ -200,7 +200,26 @@ func TestListUsers(t *testing.T) {
 		})
 		require.NoError(t, err)
 		// Bot fixtures are excluded regardless of name match: they're not owned by user1.
-		assert.Len(t, all, 22)
+		// Neither are the inactive user4, user5, user17 and user18.
+		assert.Len(t, all, 18)
+	})
+	t.Run("disabled discoverable user is not found", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		db.AssertExists(t, "users", map[string]interface{}{
+			"id":     17,
+			"status": user.StatusDisabled,
+		}, false)
+		_, err := s.ID(17).Cols("discoverable_by_name").Update(&user.User{DiscoverableByName: true})
+		require.NoError(t, err)
+
+		for _, search := range []string{"user17", "er17"} {
+			all, err := user.ListUsers(s, search, user1, nil)
+			require.NoError(t, err)
+			assert.Empty(t, all, search)
+		}
 	})
 
 	// External team discoverability bypass tests

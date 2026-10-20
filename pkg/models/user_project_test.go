@@ -61,30 +61,6 @@ func TestListUsersFromProject(t *testing.T) {
 		Created:                      testCreatedTime,
 		Updated:                      testUpdatedTime,
 	}
-	testuser4 := &user.User{
-		ID:                           4,
-		Username:                     "user4",
-		Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-		Status:                       user.StatusEmailConfirmationRequired,
-		Issuer:                       "local",
-		EmailRemindersEnabled:        true,
-		OverdueTasksRemindersEnabled: true,
-		OverdueTasksRemindersTime:    "09:00",
-		Created:                      testCreatedTime,
-		Updated:                      testUpdatedTime,
-	}
-	testuser5 := &user.User{
-		ID:                           5,
-		Username:                     "user5",
-		Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-		Status:                       user.StatusEmailConfirmationRequired,
-		Issuer:                       "local",
-		EmailRemindersEnabled:        true,
-		OverdueTasksRemindersEnabled: true,
-		OverdueTasksRemindersTime:    "09:00",
-		Created:                      testCreatedTime,
-		Updated:                      testUpdatedTime,
-	}
 	testuser6 := &user.User{
 		ID:                           6,
 		Username:                     "user6",
@@ -202,8 +178,7 @@ func TestListUsersFromProject(t *testing.T) {
 				testuser2, // Shared Via Team write
 				testuser3, // Shared Via Team admin
 
-				testuser4, // Shared Via User readonly
-				testuser5, // Shared Via User write
+				// user4 and user5 (Shared Via User readonly and write) are unconfirmed, so not listed.
 				testuser6, // Shared Via User admin
 
 				testuser7, // Owner

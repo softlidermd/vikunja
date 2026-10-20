@@ -68,7 +68,10 @@ describe('useUserSearch', () => {
 	})
 
 	it('keeps previous results while typing and lists the empty-search users again when cleared', async () => {
-		const sam = {id: 1, username: 'sam'}
+		const sam = {
+			id: 1,
+			username: 'sam',
+		}
 		const alex = {
 			id: 2,
 			username: 'alex',

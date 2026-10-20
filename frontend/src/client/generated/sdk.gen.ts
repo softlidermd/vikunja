@@ -1831,7 +1831,7 @@ export const projectUsersCreate = <ThrowOnError extends boolean = true>(options:
 /**
  * Search users with access to a project
  *
- * Returns the users who can access the project — through ownership, a direct share or a team — optionally filtered by a search string. Intended for share autocomplete. Requires read access to the project.
+ * Returns the active users who can access the project — through ownership, a direct share or a team — optionally filtered by a search string. Intended for share autocomplete. Requires read access to the project.
  */
 export const projectsUsersSearch = <ThrowOnError extends boolean = true>(options: Options<ProjectsUsersSearchData, ThrowOnError>): RequestResult<ProjectsUsersSearchResponses, ProjectsUsersSearchErrors, ThrowOnError> => (options.client ?? client).get<ProjectsUsersSearchResponses, ProjectsUsersSearchErrors, ThrowOnError>({
     security: [{
@@ -4291,7 +4291,7 @@ export const authRefreshToken = <ThrowOnError extends boolean = true>(options?: 
 /**
  * Search users
  *
- * Searches users by username, name or full email. Matching by name or email requires the target user to have made themselves discoverable, unless both users share an external (OIDC/LDAP) team. An empty query lists up to 50 users who are discoverable by name or share a team with the caller. Email addresses are never returned.
+ * Searches active users by username, name or full email. An exact username always matches; part of a name or username matches only users discoverable by name, and a full email only users discoverable by email, unless both users share an external (OIDC/LDAP) team. An empty query lists up to 50 users who are discoverable by name or share a team with the caller. Disabled, locked and unconfirmed accounts are never listed, and email addresses are never returned.
  */
 export const usersSearch = <ThrowOnError extends boolean = true>(options?: Options<UsersSearchData, ThrowOnError>): RequestResult<UsersSearchResponses, UsersSearchErrors, ThrowOnError> => (options?.client ?? client).get<UsersSearchResponses, UsersSearchErrors, ThrowOnError>({
     security: [{

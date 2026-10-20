@@ -100,7 +100,7 @@ func notSomeoneElsesBotCond(currentUser *User) builder.Cond {
 	)
 }
 
-// ListUsers returns a list with all users, filtered by an optional search string
+// ListUsers returns active users, filtered by an optional search string
 func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectUserOpts) (users []*User, err error) {
 	if opts == nil {
 		opts = &ProjectUserOpts{}
@@ -239,9 +239,12 @@ func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectU
 	}
 
 	err = s.
-		Where(builder.Or(
-			builder.And(cond, notSomeoneElsesBotCond(currentUser)),
-			ownBotCond,
+		Where(builder.And(
+			builder.Or(
+				builder.And(cond, notSomeoneElsesBotCond(currentUser)),
+				ownBotCond,
+			),
+			builder.Eq{"status": StatusActive},
 		)).
 		OrderBy("id").
 		Find(&users)
