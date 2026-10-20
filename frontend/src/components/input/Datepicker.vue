@@ -10,7 +10,7 @@
 			<template #trigger="{toggle}">
 				<SimpleButton
 					ref="triggerButton"
-					v-tooltip="date ? formatDateLong(date) : undefined"
+					v-tooltip="date ? formatDateLong(date) : (emptyLabel !== '' ? chooseDateLabel : undefined)"
 					class="show"
 					:aria-label="date === null && emptyLabel !== '' ? chooseDateLabel : undefined"
 					:disabled="disabled || undefined"

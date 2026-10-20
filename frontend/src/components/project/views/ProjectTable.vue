@@ -263,11 +263,10 @@
 											:aria-label="$t('task.detail.markAsDone', {task: t.title})"
 											@update:modelValue="v => saveTask(t, {done: v})"
 										/>
-										<Done
-											v-else
-											:is-done="t.done"
-											variant="small"
-										/>
+										<template v-else-if="t.done">
+											<Icon icon="check" />
+											<span class="is-sr-only">{{ $t('task.attributes.done') }}</span>
+										</template>
 									</td>
 									<td v-if="activeColumns.project">
 										<RouterLink
@@ -303,7 +302,7 @@
 									<td v-if="activeColumns.assignees">
 										<BaseButton
 											v-if="canEditAssignees"
-											:aria-label="$t('task.attributes.assignees')"
+											:aria-label="assigneesLabel($t('task.attributes.assignees'), t.assignees)"
 											@click="openAssignees(t, $event)"
 										>
 											<span
@@ -430,7 +429,6 @@ import {computed, ref, type ComponentPublicInstance, type Ref, watch} from 'vue'
 import {useStorage} from '@vueuse/core'
 
 import ProjectWrapper from '@/components/project/ProjectWrapper.vue'
-import Done from '@/components/misc/Done.vue'
 import User from '@/components/misc/User.vue'
 import PriorityLabel from '@/components/tasks/partials/PriorityLabel.vue'
 import Labels from '@/components/tasks/partials/Labels.vue'
@@ -463,6 +461,8 @@ import {useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import type {Task} from '@/client/generated'
 import {parseDateOrNull} from '@/helpers/parseDateOrNull'
 import {useAuthStore} from '@/stores/auth'
+import {captureClientRequestContext, isClientRequestContextCurrent} from '@/client/requestContext'
+import {getDisplayName} from '@/helpers/user'
 
 const props = defineProps<{
 	isLoadingProject: boolean,
@@ -551,7 +551,12 @@ const pendingSaves = new Map<number, Promise<void>>()
 
 // Partial patch, so concurrent edits to other fields are not overwritten.
 function saveTask(task: TaskResponse, patch: Partial<Task>) {
+	// The mutation captures its context only when it starts, so fence a queued save to the session that made the edit.
+	const request = captureClientRequestContext()
 	const save = (pendingSaves.get(task.id) ?? Promise.resolve()).then(async () => {
+		if (!isClientRequestContextCurrent(request)) {
+			return
+		}
 		try {
 			await updateTask.mutateAsync({
 				id: task.id,
@@ -604,6 +609,13 @@ watch(assigneeTask, task => {
 	}
 })
 
+// The aria-label replaces the button content, so it has to name the people too.
+function assigneesLabel(label: string, assignees: TaskResponse['assignees']) {
+	return assignees.length > 0
+		? `${label}: ${assignees.map(getDisplayName).join(', ')}`
+		: label
+}
+
 function openAssignees(task: TaskResponse, event: MouseEvent) {
 	assigneeTaskId.value = task.id
 	assigneeAnchor.value = event.currentTarget as HTMLElement
@@ -626,7 +638,7 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 
 <style lang="scss" scoped>
 .table-view__add-task {
-	padding: 1rem 1rem 0;
+	padding: 1rem;
 }
 
 .table {
