@@ -17,6 +17,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"code.vikunja.io/api/pkg/db"
@@ -358,6 +359,24 @@ func TestDBTaskSearcher_NoScopeReturnsNothing(t *testing.T) {
 	assert.Zero(t, count)
 }
 
+func TestSplitSearchTerms(t *testing.T) {
+	tests := []struct {
+		search string
+		want   []string
+	}{
+		{"a  b", []string{"a", "b"}},
+		{`"a b" c`, []string{"a b", "c"}},
+		{`"a`, []string{"a"}},
+		{"#12 x", []string{"#12", "x"}},
+		{"", []string{}},
+		{`""`, []string{}},
+		{"   ", []string{}},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, splitSearchTerms(tt.search), "search %q", tt.search)
+	}
+}
+
 // assertSearchMatches asserts which of the created tasks a search returns; fixture matches are ignored.
 func assertSearchMatches(t *testing.T, pos map[int64]int, search string, created []*Task, want ...*Task) {
 	t.Helper()
@@ -397,4 +416,62 @@ func TestTaskSearchCaseInsensitiveCyrillic(t *testing.T) {
 
 	pos = searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1, Filter: "title like поставщику"}, "")
 	assertSearchMatches(t, pos, "filter title like поставщику", created, order)
+}
+
+func TestTaskSearchMultipleTerms(t *testing.T) {
+	if db.ParadeDBAvailable() {
+		t.Skip("ParadeDB keeps its own per-token matching")
+	}
+
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	usr := &user.User{ID: 1}
+	newTask := func(title, description string) *Task {
+		tsk := &Task{Title: title, Description: description, ProjectID: 1}
+		require.NoError(t, tsk.Create(s, usr))
+		return tsk
+	}
+
+	a := newTask("поставщик альфа", "номенклатура обновлена")
+	b := newTask("поставщик бета", "")
+	c := newTask("номенклатура", "")
+	refB := newTask(fmt.Sprintf("см. #%d", b.Index), "")
+	created := []*Task{a, b, c, refB}
+
+	tests := []struct {
+		search string
+		want   []*Task
+	}{
+		{"поставщик номенклатура", []*Task{a}},
+		{"номенклатура поставщик", []*Task{a}},
+		{"поставщик", []*Task{a, b}},
+		{`"поставщик альфа"`, []*Task{a}},
+		{`"альфа поставщик"`, nil},
+		{`"поставщик альфа" номенклатура`, []*Task{a}},
+		// #N is both a text term and an index match.
+		{fmt.Sprintf("#%d", b.Index), []*Task{b, refB}},
+		{fmt.Sprintf("#%d номенклатура", b.Index), []*Task{b}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.search, func(t *testing.T) {
+			pos := searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, tt.search)
+			assertSearchMatches(t, pos, tt.search, created, tt.want...)
+		})
+	}
+
+	t.Run("blank search is an empty search", func(t *testing.T) {
+		assert.Equal(t,
+			searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, ""),
+			searchTaskPositions(t, s, usr, &TaskCollection{ProjectID: 1}, "   "))
+	})
+
+	t.Run("expanded subtasks use the same terms", func(t *testing.T) {
+		pos := searchTaskPositions(t, s, usr, &TaskCollection{
+			ProjectID: 1,
+			Expand:    []TaskCollectionExpandable{TaskCollectionExpandSubtasks},
+		}, "поставщик номенклатура")
+		assertSearchMatches(t, pos, "поставщик номенклатура", created, a)
+	})
 }

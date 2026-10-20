@@ -18,6 +18,7 @@ package models
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -498,11 +499,47 @@ func buildParentSearchCondition(search string) builder.Cond {
 	if search == "" {
 		return nil
 	}
-	cond := db.MultiFieldSearchWithTableAlias([]string{"title", "description"}, search, "parent_tasks")
+	cond := taskTextSearchCond(search, "parent_tasks", nil)
 	if searchIndex := getTaskIndexFromSearchString(search); searchIndex > 0 {
 		cond = builder.Or(cond, builder.Eq{"parent_tasks.`index`": searchIndex})
 	}
 	return cond
+}
+
+var searchTermRegex = regexp.MustCompile(`"([^"]+)"|\S+`)
+
+// splitSearchTerms splits a search on whitespace, keeping a "quoted phrase" as one term.
+// shortcut: quotes cannot be escaped and there is no NOT or OR syntax; add them only if users ask.
+func splitSearchTerms(search string) []string {
+	terms := []string{}
+	for _, m := range searchTermRegex.FindAllStringSubmatch(search, -1) {
+		term := m[1]
+		if term == "" {
+			term = strings.Trim(m[0], `"`)
+		}
+		if term != "" {
+			terms = append(terms, term)
+		}
+	}
+	return terms
+}
+
+// taskTextSearchCond matches tasks containing every search term in their title or
+// description. ParadeDB keeps its own per-token matching and ranking of the raw string.
+func taskTextSearchCond(search, alias string, boosts []float64) builder.Cond {
+	fields := []string{"title", "description"}
+	if db.ParadeDBAvailable() {
+		return db.MultiFieldSearchWithBoosts(fields, boosts, search, alias)
+	}
+	terms := splitSearchTerms(search)
+	if len(terms) == 0 {
+		return nil
+	}
+	conds := make([]builder.Cond, 0, len(terms))
+	for _, term := range terms {
+		conds = append(conds, db.MultiFieldSearchWithBoosts(fields, boosts, term, alias))
+	}
+	return builder.And(conds...)
 }
 
 //nolint:gocyclo
@@ -544,7 +581,7 @@ func (d *dbTaskSearcher) Search(opts *taskSearchOptions) (tasks []*Task, totalCo
 		// times the field's boost. Boosting titles 1.5x keeps "more matched words
 		// wins": two description words (2.0) still beat a single title word (1.5),
 		// the boost only decides between tasks matching the same number of words.
-		where = db.MultiFieldSearchWithBoosts([]string{"title", "description"}, []float64{1.5, 1}, opts.search, "tasks")
+		where = taskTextSearchCond(opts.search, "tasks", []float64{1.5, 1})
 
 		if searchIndex > 0 {
 			where = builder.Or(where, builder.Eq{"tasks.`index`": searchIndex})
