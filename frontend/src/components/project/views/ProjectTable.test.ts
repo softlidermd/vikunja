@@ -141,7 +141,11 @@ describe('ProjectTable inline saves', () => {
 	})
 
 	it('keeps the label picker of the first task on that task after another row opens it', async () => {
-		localStorage.setItem('tableViewColumns', JSON.stringify({labels: true}))
+		// Saved columns are merged over the defaults, so the assignee buttons must be switched off explicitly.
+		localStorage.setItem('tableViewColumns', JSON.stringify({
+			labels: true,
+			assignees: false,
+		}))
 		sdk.projectViewTasksList.mockImplementation(async () => ({data: {
 			items: [
 				serverTask,

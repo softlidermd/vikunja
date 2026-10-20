@@ -1219,7 +1219,8 @@
       "startDate": "Start Date",
       "title": "Title",
       "updated": "Updated",
-      "doneAt": "Done At"
+      "doneAt": "Done At",
+      "status": "Status"
     },
     "subscription": {
       "subscribedTaskThroughProject": "You are subscribed to this task through its project. Unsubscribing here only stops notifications for this task.",

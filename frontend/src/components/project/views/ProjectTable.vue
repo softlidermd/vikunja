@@ -39,6 +39,12 @@
 							<FancyCheckbox v-model="activeColumns.title">
 								{{ $t('task.attributes.title') }}
 							</FancyCheckbox>
+							<FancyCheckbox
+								v-if="hasStatus"
+								v-model="activeColumns.status"
+							>
+								{{ $t('task.attributes.status') }}
+							</FancyCheckbox>
 							<FancyCheckbox v-model="activeColumns.priority">
 								{{ $t('task.attributes.priority') }}
 							</FancyCheckbox>
@@ -143,6 +149,9 @@
 											:label="$t('task.attributes.title')"
 											@click="sort('title', $event)"
 										/>
+									</th>
+									<th v-if="showStatus">
+										{{ $t('task.attributes.status') }}
 									</th>
 									<th
 										v-if="activeColumns.priority"
@@ -285,6 +294,12 @@
 												{{ t.title }}
 											</RouterLink>
 										</TaskGlanceTooltip>
+									</td>
+									<td v-if="showStatus">
+										<TaskStatusSelect
+											:task="t"
+											:can-write="canWrite"
+										/>
 									</td>
 									<td v-if="activeColumns.priority">
 										<PrioritySelect
@@ -481,6 +496,7 @@ import EditAssignees from '@/components/tasks/partials/EditAssignees.vue'
 import EditLabels from '@/components/tasks/partials/EditLabels.vue'
 import Datepicker from '@/components/input/Datepicker.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import TaskStatusSelect from '@/components/tasks/partials/TaskStatusSelect.vue'
 
 import type {SortBy} from '@/composables/useTaskList'
 import {useTaskList} from '@/composables/useTaskList'
@@ -500,6 +516,7 @@ import {parseDateOrNull} from '@/helpers/parseDateOrNull'
 import {useAuthStore} from '@/stores/auth'
 import {captureClientRequestContext, isClientRequestContextCurrent} from '@/client/requestContext'
 import {getDisplayName} from '@/helpers/user'
+import {getStatusKanbanView} from '@/helpers/projectView'
 
 const props = defineProps<{
 	isLoadingProject: boolean,
@@ -526,6 +543,7 @@ const ACTIVE_COLUMNS_DEFAULT = {
 	done: true,
 	project: false,
 	title: true,
+	status: true,
 	priority: false,
 	labels: true,
 	assignees: true,
@@ -544,15 +562,20 @@ const SORT_BY_DEFAULT: SortBy = {
 	index: 'desc',
 }
 
-const activeColumns = useStorage('tableViewColumns', {...ACTIVE_COLUMNS_DEFAULT})
+// mergeDefaults: columns added later are on for users who already saved their column choice.
+const activeColumns = useStorage('tableViewColumns', {...ACTIVE_COLUMNS_DEFAULT}, undefined, {mergeDefaults: true})
 const sortBy = useStorage<SortBy>('tableViewSortBy', {...SORT_BY_DEFAULT})
 
 const taskList = useTaskList(
 	() => props.projectId, 
 	() => props.viewId, 
 	sortBy.value,
-	() => ['comment_count', 'is_unread'],
+	() => ['comment_count', 'is_unread', 'buckets'],
 )
+
+// Saved filters span projects and some projects have no kanban board, so there is no status to show.
+const hasStatus = computed(() => props.projectId > 0 && getStatusKanbanView(project.value?.views, props.viewId) !== null)
+const showStatus = computed(() => hasStatus.value && activeColumns.value.status)
 
 const {
 	params,

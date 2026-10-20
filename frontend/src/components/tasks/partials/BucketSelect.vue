@@ -50,7 +50,7 @@ import {useI18n} from 'vue-i18n'
 import type {Task as ITask} from '@/client/generated'
 import type {Bucket as IBucket} from '@/client/generated'
 
-import {PROJECT_VIEW_KINDS} from '@/constants/projectView'
+import {getStatusKanbanView} from '@/helpers/projectView'
 
 import {useProjects} from '@/composables/useProjects'
 import {useBaseStore} from '@/stores/base'
@@ -76,29 +76,7 @@ const baseStore = useBaseStore()
 
 const project = computed(() => projectList.projects[props.task.project_id ?? 0])
 
-// If the project has exactly one manual kanban view, always use it.
-// If there are multiple, only show the selector when the active view is one of them.
-const kanbanView = computed(() => {
-	if (!project.value?.views) {
-		return null
-	}
-
-	const manualKanbanViews = project.value.views.filter(
-		view => view.view_kind === PROJECT_VIEW_KINDS.KANBAN
-			&& view.bucket_configuration_mode === 'manual',
-	)
-
-	if (manualKanbanViews.length === 1) {
-		return manualKanbanViews[0]
-	}
-
-	if (manualKanbanViews.length > 1) {
-		const activeViewId = baseStore.currentProjectViewId
-		return manualKanbanViews.find(v => v.id === activeViewId) || null
-	}
-
-	return null
-})
+const kanbanView = computed(() => getStatusKanbanView(project.value?.views, baseStore.currentProjectViewId))
 
 const bucketsQueryResult = useQuery(computed(() => bucketsQuery(props.task.project_id ?? 0, kanbanView.value?.id ?? 0)))
 const buckets = computed(() => bucketsQueryResult.data.value ?? [])

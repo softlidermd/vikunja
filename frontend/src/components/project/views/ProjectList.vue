@@ -74,6 +74,8 @@
 								:ref="(el) => setTaskRef(el as InstanceType<typeof SingleTaskInProject> | null, index)"
 								:show-list-color="false"
 								:can-mark-as-done="canWrite || isPseudoProject"
+								:show-status="!isPseudoProject"
+								:can-edit-status="canWrite && !project?.is_archived"
 								:the-task="t"
 								:all-tasks="allTasks"
 								@taskUpdated="updateTasks"
@@ -157,7 +159,7 @@ const {
 	{position: 'asc'},
 	() => projectId.value === -1
 		? ['comment_count', 'is_unread']
-		: ['subtasks', 'comment_count', 'is_unread'],
+		: ['subtasks', 'comment_count', 'is_unread', 'buckets'],
 )
 const showLoading = useDelayedLoading(loading)
 

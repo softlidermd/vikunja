@@ -151,6 +151,13 @@
 				is-small
 			/>
 
+			<TaskStatusSelect
+				v-if="showStatus"
+				:task="task"
+				:can-write="canEditStatus"
+				class="mis-2"
+			/>
+
 			<ColorBubble
 				v-if="showProjectSeparately && projectColor !== '' && currentProject?.id !== task.project_id"
 				:color="projectColor"
@@ -194,6 +201,8 @@
 						:the-task="getTaskById(subtask.id)!"
 						:disabled="disabled"
 						:can-mark-as-done="canMarkAsDone"
+						:show-status="showStatus"
+						:can-edit-status="canEditStatus"
 						:all-tasks="allTasks"
 						class="subtask-nested"
 					/>
@@ -216,6 +225,7 @@ import TaskGlanceTooltip from '@/components/tasks/partials/TaskGlanceTooltip.vue
 import DeferTask from '@/components/tasks/partials/DeferTask.vue'
 import ChecklistSummary from '@/components/tasks/partials/ChecklistSummary.vue'
 import CommentCount from '@/components/tasks/partials/CommentCount.vue'
+import TaskStatusSelect from '@/components/tasks/partials/TaskStatusSelect.vue'
 
 import ProgressBar from '@/components/misc/ProgressBar.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -244,12 +254,16 @@ const props = withDefaults(defineProps<{
 	showProject?: boolean,
 	disabled?: boolean,
 	canMarkAsDone?: boolean,
+	showStatus?: boolean,
+	canEditStatus?: boolean,
 	allTasks?: ITask[],
 }>(), {
 	isArchived: false,
 	showProject: false,
 	disabled: false,
 	canMarkAsDone: true,
+	showStatus: false,
+	canEditStatus: false,
 	allTasks: () => [],
 })
 
@@ -386,7 +400,7 @@ function hasTextSelected() {
 
 function openTaskDetail(event: MouseEvent | KeyboardEvent) {
 	if (event.target instanceof HTMLElement) {
-		const isInteractiveElement = event.target.closest('a, button, label, input[type="checkbox"], .favorite, [role="button"]')
+		const isInteractiveElement = event.target.closest('a, button, label, input[type="checkbox"], select, .favorite, [role="button"]')
 		if (isInteractiveElement || hasTextSelected()) {
 			return
 		}
