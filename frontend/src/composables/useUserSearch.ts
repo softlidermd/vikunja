@@ -3,14 +3,13 @@ import {keepPreviousData, useQuery, type Query} from '@tanstack/vue-query'
 import {projectUserSearchQuery, userSearchKeys, userSearchQuery} from '@/client/queries/userSearch'
 import type {User} from '@/client/generated'
 
+// An empty search lists the users the server shows before typing, so pickers open with options.
 export function useUserSearch(search: MaybeRefOrGetter<string>) {
-	const enabled = computed(() => toValue(search) !== '')
 	const query = useQuery(computed(() => ({
 		...userSearchQuery(toValue(search)),
-		enabled: enabled.value,
 		placeholderData: keepPreviousData,
 	})))
-	return {...query, users: computed(() => enabled.value ? query.data.value ?? [] : [])}
+	return {...query, users: computed(() => query.data.value ?? [])}
 }
 
 export function useProjectUserSearch(projectId: MaybeRefOrGetter<number>, search: MaybeRefOrGetter<string>, enabled: MaybeRefOrGetter<boolean>) {

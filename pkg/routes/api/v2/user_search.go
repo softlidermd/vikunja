@@ -19,6 +19,7 @@ package apiv2
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/models"
@@ -37,7 +38,7 @@ func RegisterUserSearchRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "users-search",
 		Summary:     "Search users",
-		Description: "Searches users by username, name or full email. Matching by name or email requires the target user to have made themselves discoverable, unless both users share an external (OIDC/LDAP) team. Email addresses are never returned.",
+		Description: "Searches users by username, name or full email. Matching by name or email requires the target user to have made themselves discoverable, unless both users share an external (OIDC/LDAP) team. An empty query lists up to 50 users who are discoverable by name or share a team with the caller. Email addresses are never returned.",
 		Method:      http.MethodGet,
 		Path:        "/users",
 		Tags:        []string{"user"},
@@ -72,7 +73,12 @@ func usersSearch(ctx context.Context, in *struct {
 		return nil, translateDomainError(err)
 	}
 
-	users, err := user.SearchUsers(s, in.Q, currentUser)
+	var users []*user.User
+	if strings.TrimSpace(in.Q) == "" {
+		users, err = user.ListUsersForEmptySearch(s, currentUser)
+	} else {
+		users, err = user.SearchUsers(s, in.Q, currentUser)
+	}
 	if err != nil {
 		_ = s.Rollback()
 		return nil, translateDomainError(err)

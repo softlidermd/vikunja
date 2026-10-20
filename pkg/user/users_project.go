@@ -48,6 +48,43 @@ func SearchUsers(s *xorm.Session, search string, currentUser *User) (users []*Us
 	return users, nil
 }
 
+// ListUsersForEmptySearch lists what a picker shows before anything is typed: users discoverable by
+// name and users sharing a team with currentUser (the team page already shows them), plus own bots.
+// Emails are cleared.
+func ListUsersForEmptySearch(s *xorm.Session, currentUser *User) (users []*User, err error) {
+	sharesTeam := builder.In("id", builder.Select("user_id").
+		From("team_members").
+		Where(builder.In("team_id",
+			builder.Select("team_id").
+				From("team_members").
+				Where(builder.Eq{"team_members.user_id": currentUser.ID}),
+		)),
+	)
+	cond := builder.Or(builder.Eq{"discoverable_by_name": true}, sharesTeam)
+	if config.ServiceEnableOpenIDTeamUserOnlySearch.GetBool() {
+		cond = sharesTeam
+	}
+	notSomeoneElsesBot := builder.Or(
+		builder.IsNull{"bot_owner_id"},
+		builder.Eq{"bot_owner_id": 0},
+		builder.Eq{"bot_owner_id": currentUser.ID},
+	)
+
+	// shortcut: the first 50 by id with no paging; fine for small instances, typing narrows larger ones.
+	err = s.
+		Where(builder.Or(
+			builder.And(cond, notSomeoneElsesBot),
+			builder.Eq{"bot_owner_id": currentUser.ID},
+		)).
+		OrderBy("id").
+		Limit(50).
+		Find(&users)
+	for _, u := range users {
+		u.Email = ""
+	}
+	return
+}
+
 // ListUsers returns a list with all users, filtered by an optional search string
 func ListUsers(s *xorm.Session, search string, currentUser *User, opts *ProjectUserOpts) (users []*User, err error) {
 	if opts == nil {

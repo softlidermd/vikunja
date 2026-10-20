@@ -31,6 +31,7 @@
 							:placeholder="$t('team.edit.search')"
 							:search-results="foundUsers"
 							label="username"
+							show-empty
 							@search="findUser"
 						>
 							<template #searchResult="{option: user}">

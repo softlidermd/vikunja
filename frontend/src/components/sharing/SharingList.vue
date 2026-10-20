@@ -16,6 +16,7 @@
 						:aria-label="$t('project.share.userTeam.search', {type: typeName})"
 						:search-results="unsharedCandidates"
 						:label="searchLabel"
+						show-empty
 						@search="search = $event"
 					>
 						<template #searchResult="{option}">

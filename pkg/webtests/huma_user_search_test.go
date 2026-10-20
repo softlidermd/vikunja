@@ -41,6 +41,19 @@ func TestHumaUserSearch(t *testing.T) {
 			assert.Empty(t, em, "user search must never return email addresses")
 		}
 	})
+	t.Run("Empty query lists discoverable users and team mates", func(t *testing.T) {
+		rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=", "", token, "")
+		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+		usernames, emails := usersFromSearch(t, rec.Body.Bytes())
+		assert.Contains(t, usernames, "user2", "shares team 1 with user1")
+		assert.Contains(t, usernames, "user12", "discoverable by name")
+		assert.NotContains(t, usernames, "user3", "neither discoverable nor a team mate")
+		assert.NotContains(t, usernames, "bot-owner-a-assistant", "someone else's bot")
+		for _, em := range emails {
+			assert.Empty(t, em, "user search must never return email addresses")
+		}
+	})
 	t.Run("Unauthenticated", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodGet, "/api/v2/users?q=user2", "", "", "")
 		assert.Equal(t, http.StatusUnauthorized, rec.Code, "body: %s", rec.Body.String())

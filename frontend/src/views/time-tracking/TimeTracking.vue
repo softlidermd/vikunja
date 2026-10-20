@@ -108,6 +108,7 @@
 						:loading="usersLoading"
 						:search-results="foundUsers"
 						label="username"
+						show-empty
 						@search="findUsers"
 					>
 						<template #searchResult="{option}">
