@@ -10,6 +10,7 @@
 		:creation-disabled-message="creationDisabledMessage"
 		:create-placeholder="$t('task.label.createPlaceholder')"
 		:search-delay="10"
+		:show-empty="true"
 		:close-after-select="false"
 		:disabled="disabled"
 		@search="findLabel"
@@ -61,15 +62,19 @@ import {useAddTaskLabelMutation, useRemoveTaskLabelMutation} from '@/client/quer
 import {getRandomColorHex} from '@/helpers/color/randomColor'
 import {useLabelStyles} from '@/composables/useLabelStyles'
 import {useLabels} from '@/composables/useLabels'
+import {useQueryClient} from '@tanstack/vue-query'
+import {cachedListTasks} from '@/client/queries/taskCache'
 
 const props = withDefaults(defineProps<{
 	modelValue: Label[] | undefined
 	taskId?: number
+	projectId?: number
 	disabled?: boolean
 	creatable?: boolean
 	creationDisabledMessage?: string
 }>(), {
 	taskId: 0,
+	projectId: 0,
 	disabled: false,
 	creatable: true,
 	creationDisabledMessage: '',
@@ -97,11 +102,27 @@ watch(
 
 const addLabelMutation = useAddTaskLabelMutation()
 const removeLabelMutation = useRemoveTaskLabelMutation()
-const {filterLabelsByQuery, isPending} = useLabels()
+const {labels: allLabels, filterLabelsByQuery, isPending} = useLabels()
 const createLabelMutation = useCreateLabelMutation()
 const {getLabelStyles} = useLabelStyles()
 
-const foundLabels = computed(() => filterLabelsByQuery(labels.value, query.value))
+const queryClient = useQueryClient()
+
+// shortcut: ranks by the project's tasks already loaded in list/table/kanban caches, not the whole project;
+// add a backend "labels used in project" query if that proves too thin.
+function rankProjectLabelsFirst(found: Label[]): Label[] {
+	if (!props.projectId) return found
+	const usedIds = new Set(cachedListTasks(queryClient)
+		.filter(task => task.project_id === props.projectId)
+		.flatMap(task => (task.labels ?? []).map(label => label.id)))
+	// sort is stable, so each group keeps its alphabetical order
+	return [...found].sort((a, b) => Number(usedIds.has(b.id)) - Number(usedIds.has(a.id)))
+}
+
+// An empty query lists every label not yet on the task, so the picker shows options as soon as it is focused.
+const foundLabels = computed(() => rankProjectLabelsFirst(query.value === ''
+	? allLabels.value.filter(label => !labels.value.some(l => l.id === label.id))
+	: filterLabelsByQuery(labels.value, query.value)))
 const loading = computed(() => isPending.value
 	|| createLabelMutation.isPending.value
 	|| addLabelMutation.isPending.value

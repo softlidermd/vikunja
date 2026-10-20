@@ -35,6 +35,15 @@ export function mapTaskEverywhere(
 	})
 }
 
+// Top-level tasks currently held in list and board caches; reads only, never fetches.
+export function cachedListTasks(client: QueryClient): TaskResponse[] {
+	return [
+		...client.getQueriesData<TaskResponse[]>({queryKey: taskKeys.allLists}).flatMap(([, data]) => data ?? []),
+		...client.getQueriesData<PaginatedTaskResponse>({queryKey: taskKeys.lists}).flatMap(([, data]) => data?.items ?? []),
+		...client.getQueriesData<BoardData>({queryKey: kanbanKeys.all}).flatMap(([, data]) => data?.buckets.flatMap(bucket => bucket.tasks) ?? []),
+	]
+}
+
 // undefined: task absent, entry stays untouched
 type TaskRemoval = (tasks: readonly TaskResponse[], id: number) => TaskResponse[] | undefined
 

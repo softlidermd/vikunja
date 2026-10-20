@@ -10,6 +10,7 @@ import {
 } from './tasks'
 import {kanbanKeys, kanbanQuery, normalizeBucket, type BoardData} from './kanban'
 import {
+	cachedListTasks,
 	invalidateTaskMembership,
 	mapTaskEverywhere,
 	replaceTaskEverywhere,
@@ -29,6 +30,16 @@ vi.mock('@/client/generated', () => sdk)
 
 describe('task cache reconciliation', () => {
 	beforeEach(() => vi.resetAllMocks())
+	it('collects tasks from unpaginated lists, paginated lists and boards', () => {
+		const client = new QueryClient()
+		const a = normalizeTask({id: 1, title: 'a', project_id: 1})
+		const b = normalizeTask({id: 2, title: 'b', project_id: 1})
+		const c = normalizeTask({id: 3, title: 'c', project_id: 2})
+		client.setQueryData(taskKeys.allList({project: 1}), [a])
+		client.setQueryData(taskKeys.list({project: 1}), {items: [b], total: 1, page: 1, per_page: 25, total_pages: 1})
+		client.setQueryData(kanbanKeys.board(2, 8), {buckets: [normalizeBucket({id: 5, count: 1, tasks: [c]})], pages: {5: 1}})
+		expect(cachedListTasks(client).map(task => task.id).sort()).toEqual([1, 2, 3])
+	})
 	it('decrements the list total and the bucket count of a deleted task', () => {
 		const client = new QueryClient()
 		const task = normalizeTask({id: 3, title: 'task', project_id: 1, bucket_id: 5})

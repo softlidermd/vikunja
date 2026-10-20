@@ -332,6 +332,7 @@
 						<EditLabels
 							:ref="e => setFieldRef('labels', e)"
 							v-model="task.labels"
+							:project-id="task.project_id"
 							:disabled="!canWrite"
 							:task-id="taskId"
 							:creatable="!authStore.isLinkShareAuth"
