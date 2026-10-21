@@ -340,6 +340,7 @@ func init() {
 		"ProjectExpandableRights":                          reflect.ValueOf(constant.MakeFromLiteral("\"permissions\"", token.STRING, 0)),
 		"ProjectViewKindGantt":                             reflect.ValueOf(models.ProjectViewKindGantt),
 		"ProjectViewKindKanban":                            reflect.ValueOf(models.ProjectViewKindKanban),
+		"ProjectViewKindLabels":                            reflect.ValueOf(models.ProjectViewKindLabels),
 		"ProjectViewKindList":                              reflect.ValueOf(models.ProjectViewKindList),
 		"ProjectViewKindTable":                             reflect.ValueOf(models.ProjectViewKindTable),
 		"ReactionKindComment":                              reflect.ValueOf(constant.MakeFromLiteral("1", token.INT, 0)),

@@ -73,6 +73,12 @@ func TestProject_CreateOrUpdate(t *testing.T) {
 				"view_kind":                 ProjectViewKindKanban,
 				"bucket_configuration_mode": BucketConfigurationModeManual,
 			}, false)
+			db.AssertExists(t, "project_views", map[string]interface{}{
+				"project_id": project.ID,
+				"view_kind":  ProjectViewKindLabels,
+				"title":      "Labels",
+				"position":   500,
+			}, false)
 
 			kanbanView := &ProjectView{}
 			_, err = s.Where("project_id = ? AND view_kind = ?", project.ID, ProjectViewKindKanban).Get(kanbanView)

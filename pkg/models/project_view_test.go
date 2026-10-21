@@ -17,6 +17,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 
 	"code.vikunja.io/api/pkg/db"
@@ -611,4 +612,15 @@ func TestProjectView_Create(t *testing.T) {
 			"done_bucket_id":    0,
 		}, false)
 	})
+}
+
+func TestProjectViewKind_LabelsJSON(t *testing.T) {
+	kind := ProjectViewKindLabels
+	out, err := json.Marshal(&kind)
+	require.NoError(t, err)
+	assert.JSONEq(t, `"labels"`, string(out))
+
+	var back ProjectViewKind
+	require.NoError(t, json.Unmarshal([]byte(`"labels"`), &back))
+	assert.Equal(t, ProjectViewKind(100), back)
 }

@@ -325,7 +325,7 @@ func TestInsertFromStructure(t *testing.T) {
 			Where("tasks.project_id = ?", project.ID).
 			OrderBy("task_positions.project_view_id, tasks.id").
 			Find(&positions))
-		require.Len(t, positions, taskCount*4, "every task needs a position in all four default views")
+		require.Len(t, positions, taskCount*5, "every task needs a position in all five default views")
 
 		// Halving the lowest position for every task collapses positions towards zero and
 		// reverses the import order, and recalculates the whole view on the way (#3297).
@@ -418,7 +418,7 @@ func TestInsertFromStructure(t *testing.T) {
 
 			count, err := s.Where("task_id = ? AND position = ?", task.ID, position).Count(&models.TaskPosition{})
 			require.NoError(t, err)
-			assert.Equal(t, int64(4), count, "task %q must keep position %v in all views", title, position)
+			assert.Equal(t, int64(5), count, "task %q must keep position %v in all views", title, position)
 		}
 	})
 	t.Run("preserves generated view rows for related-only tasks", func(t *testing.T) {
