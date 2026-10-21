@@ -12,7 +12,7 @@ import {ensureProjects, findProjectByExactTitle} from '@/client/queries/projects
 import {searchProjectUsers} from '@/client/queries/userSearch'
 import {useAuthStore} from '@/stores/auth'
 import {useConfigStore} from '@/stores/config'
-import {parseTaskText, PREFIXES} from '@/modules/quickAddMagic'
+import {parseTaskText, PREFIXES, ME_ALIASES} from '@/modules/quickAddMagic'
 import {buildQuickAddTask} from '@/helpers/task'
 import {getRandomColorHex} from '@/helpers/color/randomColor'
 import {runWrites} from '@/helpers/runWrites'
@@ -98,12 +98,18 @@ export function useQuickAddTask() {
 		})
 		assertClientRequestContext(context)
 		const matches = magicOnly ? [] : await Promise.all(parsed.assignees.map(async match => {
-			const users = await searchProjectUsers(project_id, match)
 			const query = match.toLowerCase()
-			const user = users.find(user => [user.username, user.name, user.email].some(value => users.length === 1
-				? value?.toLowerCase().includes(query)
-				: value?.toLowerCase() === query))
-			return user ? {...user, match} : undefined
+			const isAlias = ME_ALIASES.includes(query)
+			// An alias must still assign when the member search fails.
+			const users = await searchProjectUsers(project_id, match).catch(e => {
+				if (isAlias) return []
+				throw e
+			})
+			const exact = users.find(user => [user.username, user.name, user.email].some(value => value?.toLowerCase() === query))
+			if (exact) return {...exact, match}
+			if (isAlias) return auth.info && !auth.isLinkShareAuth ? {...auth.info, match} : undefined
+			const single = users.length === 1 && [users[0].username, users[0].name, users[0].email].some(value => value?.toLowerCase().includes(query))
+			return single ? {...users[0], match} : undefined
 		}))
 		assertClientRequestContext(context)
 		const defaults = taskRemindersFromSettings(auth.settings.frontend_settings.quick_add_default_reminders)

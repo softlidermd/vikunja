@@ -25,3 +25,5 @@ export const PREFIXES = {
 	[PrefixMode.Default]: VIKUNJA_PREFIXES,
 	[PrefixMode.Todoist]: TODOIST_PREFIXES,
 }
+
+export const ME_ALIASES = ['me', 'мне', 'я']

@@ -26,6 +26,10 @@ vi.mock('vue-router', async importOriginal => ({
 }))
 
 import {error} from '@/message'
+import {queryClient} from '@/client/queryClient'
+import {accountKeys} from '@/client/queries/account'
+import {useAuthStore} from '@/stores/auth'
+import {AUTH_TYPES} from '@/constants/auth'
 import {useQuickAddTask} from './useQuickAddTask'
 
 function quickAdd() {
@@ -48,6 +52,8 @@ describe('useQuickAddTask', () => {
 		sdk.projectsUsersSearch.mockResolvedValue({data: {items: []}})
 		sdk.projectsList.mockResolvedValue({data: {items: [], total_pages: 1}})
 		sdk.taskAssigneesCreate.mockResolvedValue({data: {}})
+		queryClient.clear()
+		queryClient.setQueryData(accountKeys.user(0), {id: 1, username: 'kat'})
 	})
 
 	it('strips a matched assignee from the created title', async () => {
@@ -135,5 +141,66 @@ describe('useQuickAddTask', () => {
 		expect(result.tasks[0]).toMatchObject({id: 7, title: 'Buy milk'})
 		expect(sdk.labelsCreate).not.toHaveBeenCalled()
 		expect(error).toHaveBeenCalledTimes(1)
+	})
+
+	describe('self-assign aliases', () => {
+		const assigned = () => sdk.taskAssigneesCreate.mock.calls.map(([options]) => options.body.user_id)
+
+		beforeEach(() => {
+			sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Buy milk', project_id: 1}})
+		})
+
+		it.each(['@me', '@МНЕ', '@я'])('assigns the current user for %s and strips it from the title', async token => {
+			await quickAdd().createNewTask({title: `Buy milk ${token}`, project_id: 1})
+
+			expect(assigned()).toEqual([1])
+			expect(sdk.tasksCreate).toHaveBeenCalledWith(expect.objectContaining({
+				body: expect.objectContaining({title: 'Buy milk'}),
+			}))
+		})
+
+		it('prefers a member named me', async () => {
+			sdk.projectsUsersSearch.mockResolvedValue({data: {items: [{id: 5, username: 'me'}, {id: 6, username: 'mesha'}]}})
+
+			await quickAdd().createNewTask({title: 'Buy milk @me', project_id: 1})
+
+			expect(assigned()).toEqual([5])
+		})
+
+		it('does not let a single partial hit steal the alias', async () => {
+			sdk.projectsUsersSearch.mockResolvedValue({data: {items: [{id: 6, username: 'mesha'}]}})
+
+			await quickAdd().createNewTask({title: 'Buy milk @me', project_id: 1})
+
+			expect(assigned()).toEqual([1])
+		})
+
+		it('still assigns the alias when the member search fails', async () => {
+			sdk.projectsUsersSearch.mockRejectedValue({status: 500})
+
+			await quickAdd().createNewTask({title: 'Buy milk @me', project_id: 1})
+
+			expect(assigned()).toEqual([1])
+		})
+
+		it('applies the alias to +me in Todoist mode and keeps @me a label', async () => {
+			queryClient.setQueryData(accountKeys.user(0), {id: 1, username: 'kat', settings: {frontend_settings: {quick_add_magic_mode: 'todoist'}}})
+			sdk.labelsCreate.mockResolvedValue({data: {id: 9, title: 'me'}})
+			sdk.taskLabelsCreate.mockResolvedValue({data: {}})
+
+			await quickAdd().createNewTask({title: 'Buy milk +me @me', project_id: 1})
+
+			expect(assigned()).toEqual([1])
+			expect(sdk.labelsCreate).toHaveBeenCalledWith(expect.objectContaining({body: expect.objectContaining({title: 'me'})}))
+		})
+
+		it('skips the alias for a link share', async () => {
+			const actions = quickAdd()
+			useAuthStore().setSession({id: 5, type: AUTH_TYPES.LINK_SHARE, exp: 0, username: 'share'})
+
+			await actions.createNewTask({title: 'Buy milk @me', project_id: 1})
+
+			expect(sdk.taskAssigneesCreate).not.toHaveBeenCalled()
+		})
 	})
 })
