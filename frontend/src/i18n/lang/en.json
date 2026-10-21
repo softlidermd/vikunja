@@ -611,6 +611,10 @@
       "bucketLimitReached": "You have reached the bucket limit. Remove tasks or increase the limit to add new tasks.",
       "bucketOptions": "Bucket options"
     },
+    "labels": {
+      "title": "By label",
+      "noLabel": "No label"
+    },
     "pseudo": {
       "favorites": {
         "title": "Favorites"

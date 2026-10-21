@@ -145,7 +145,8 @@ const isFullWidth = computed(() => {
 		: undefined
 
 	return view?.view_kind === PROJECT_VIEW_KINDS.KANBAN ||
-		view?.view_kind === PROJECT_VIEW_KINDS.GANTT
+		view?.view_kind === PROJECT_VIEW_KINDS.GANTT ||
+		view?.view_kind === PROJECT_VIEW_KINDS.LABELS
 })
 </script>
 

@@ -71,9 +71,9 @@
 				</span>
 
 				<Labels
-					v-if="(task.labels?.length ?? 0) > 0"
+					v-if="labels.length > 0"
 					class="labels mis-2 mie-1"
-					:labels="task.labels ?? []"
+					:labels="labels"
 				/>
 
 				<AssigneeList
@@ -258,6 +258,8 @@ const props = withDefaults(defineProps<{
 	showStatus?: boolean,
 	canEditStatus?: boolean,
 	allTasks?: ITask[],
+	// A view that groups by label hides the label it groups by.
+	hiddenLabelId?: number,
 }>(), {
 	isArchived: false,
 	showProject: false,
@@ -266,6 +268,7 @@ const props = withDefaults(defineProps<{
 	showStatus: false,
 	canEditStatus: false,
 	allTasks: () => [],
+	hiddenLabelId: undefined,
 })
 
 const emit = defineEmits<{
@@ -283,6 +286,7 @@ function getTaskById(taskId: number | undefined): ITask | undefined {
 const {t} = useI18n({useScope: 'global'})
 
 const task = computed(() => props.theTask)
+const labels = computed(() => (task.value.labels ?? []).filter(label => label.id !== props.hiddenLabelId))
 
 const isRepeating = computed(() => (task.value.repeat_after ?? 0) > 0
 	|| ((task.value.repeat_after ?? 0) === 0

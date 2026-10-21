@@ -2,6 +2,7 @@ import type {Page} from '@playwright/test'
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
+import {LabelFactory} from '../../factories/labels'
 import {createDefaultViews, createProjects} from './prepareProjects'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
 
@@ -193,5 +194,19 @@ test.describe('Project View Table', () => {
 
 		// Verify only one task row is shown (the search result)
 		await expect(page.locator('.project-table table.table tbody tr')).toHaveCount(1)
+	})
+
+	test('Should focus the picker search and show its list after +', async ({authenticatedPage: page}) => {
+		await createProjects(1)
+		await TaskFactory.create(1, {project_id: 1})
+		const [label] = await LabelFactory.create(1)
+		await page.goto('/projects/1/3')
+
+		await page.locator('.project-table tbody tr').first().getByRole('button', {name: 'Labels', exact: true}).click()
+
+		const picker = page.locator('.table-picker')
+		await expect(picker.getByRole('combobox')).toBeFocused()
+		await expect(picker.getByRole('listbox')).toBeVisible()
+		await expect(picker.getByRole('option').filter({hasText: label.title})).toBeVisible()
 	})
 })
