@@ -633,7 +633,8 @@ function onNewTaskKeydown(e: KeyboardEvent, bucketId: number) {
 		e.preventDefault()
 		addTaskToBucket(bucketId)
 	} else if (e.key === 'Escape') {
-		// Blurring closes the input through focusout; toggling here too would reopen it when the removal fires focusout.
+		// Blurring closes the input through focusout; toggling here too would reopen it
+		// when the removal fires focusout.
 		(e.target as HTMLInputElement).blur()
 	}
 }

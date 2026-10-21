@@ -1,5 +1,7 @@
 import type {Directive} from 'vue'
 
+import {BULMA_MOBILE_BREAKPOINT} from '@/composables/useIsMobile'
+
 const FOCUSABLE_TAGS = ['INPUT', 'SELECT', 'TEXTAREA']
 
 function isFocusable(el: HTMLElement): boolean {
@@ -14,8 +16,8 @@ function getFocusableElement(el: HTMLElement): HTMLElement | null {
 	return el.querySelector<HTMLElement>('input, select, textarea, [contenteditable="true"]')
 }
 
-// Auto focusing on mobile pops up the keyboard over half the screen. Same breakpoint as useIsMobile.
-export const canAutoFocus = () => window.innerWidth > 768
+// Auto focusing on mobile pops up the keyboard over half the screen.
+export const canAutoFocus = () => window.innerWidth > BULMA_MOBILE_BREAKPOINT
 
 const focus = <Directive<HTMLElement, string>>{
 	// When the bound element is inserted into the DOM...

@@ -105,10 +105,12 @@ export function useQuickAddTask() {
 				if (isAlias) return []
 				throw e
 			})
-			const exact = users.find(user => [user.username, user.name, user.email].some(value => value?.toLowerCase() === query))
+			const exact = users.find(user => [user.username, user.name, user.email]
+				.some(value => value?.toLowerCase() === query))
 			if (exact) return {...exact, match}
 			if (isAlias) return auth.info && !auth.isLinkShareAuth ? {...auth.info, match} : undefined
-			const single = users.length === 1 && [users[0].username, users[0].name, users[0].email].some(value => value?.toLowerCase().includes(query))
+			const single = users.length === 1 && [users[0].username, users[0].name, users[0].email]
+				.some(value => value?.toLowerCase().includes(query))
 			return single ? {...users[0], match} : undefined
 		}))
 		assertClientRequestContext(context)

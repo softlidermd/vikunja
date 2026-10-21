@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, it} from 'vitest'
 import {createPinia, setActivePinia} from 'pinia'
 
-import {getActiveToken, insertToken, parseTaskText, PREFIXES, PrefixMode} from '.'
+import {getActiveToken, insertToken, parseTaskText, PREFIXES, PrefixMode, rankByTitle} from '.'
 
 const vikunja = PREFIXES[PrefixMode.Default]
 const todoist = PREFIXES[PrefixMode.Todoist]
@@ -46,6 +46,11 @@ describe('getActiveToken', () => {
 		expect(tokenAt('a@b|')).toBeNull()
 	})
 
+	it('treats a tab like the parser does: not a boundary', () => {
+		expect(tokenAt('Task\t*urg|')).toBeNull()
+		expect(tokenAt('Task *ur|g\tent rest')).toMatchObject({end: 13})
+	})
+
 	it('finds a prefix after a line break', () => {
 		expect(tokenAt('first\n*urg|')).toMatchObject({kind: 'label', start: 6, query: 'urg'})
 	})
@@ -58,8 +63,11 @@ describe('getActiveToken', () => {
 		expect(tokenAt('Task *"Hello Wo|')).toMatchObject({query: 'Hello Wo', start: 5, end: 15})
 	})
 
-	it('ends an unclosed quote at the end of the line', () => {
-		expect(tokenAt('*"Hello Wo|\nnext')).toMatchObject({end: 10})
+	it('ends an unclosed quote at the caret, keeping the words after it', () => {
+		const text = 'Купить *"Распо| молоко завтра'
+		expect(tokenAt(text)).toMatchObject({start: 7, end: 14, query: 'Распо'})
+		expect(pick(text, 'Распознавание и сопоставление').text)
+			.toBe('Купить *"Распознавание и сопоставление" молоко завтра')
 	})
 
 	it('runs end through the closing quote with the caret inside', () => {
@@ -73,6 +81,19 @@ describe('getActiveToken', () => {
 
 	it('runs an unquoted end to the next whitespace', () => {
 		expect(tokenAt('Task *ur|gent rest')).toMatchObject({start: 5, end: 12, query: 'ur'})
+	})
+})
+
+describe('rankByTitle', () => {
+	const rank = (titles: string[], query: string) => rankByTitle(titles, query, title => title)
+
+	it('puts an exact match first, then prefixes, then the rest', () => {
+		expect(rank(['non-urgent', 'Urgently', 'urgent', 'other'], 'URGENT'))
+			.toEqual(['urgent', 'Urgently', 'non-urgent'])
+	})
+
+	it('keeps the original order within a rank', () => {
+		expect(rank(['b-x', 'a-x', 'x'], '')).toEqual(['b-x', 'a-x', 'x'])
 	})
 })
 
@@ -110,7 +131,8 @@ describe('round trips through parseTaskText', () => {
 	})
 
 	it('keeps a label with spaces in Vikunja mode', () => {
-		const parsed = parseTaskText(pick('Task *Расп|', 'Распознавание и сопоставление').text, PrefixMode.Default)
+		const text = pick('Task *Расп|', 'Распознавание и сопоставление').text
+		const parsed = parseTaskText(text, PrefixMode.Default)
 		expect(parsed.labels).toEqual(['Распознавание и сопоставление'])
 		expect(parsed.text).toBe('Task')
 	})

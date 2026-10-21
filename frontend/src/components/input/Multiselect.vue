@@ -443,7 +443,10 @@ function handleFocus() {
 	// We need the timeout to avoid the hideSearchResultsHandler hiding the search results right after the input
 	// is focused. That would lead to flickering pre-loaded search results and hiding them right after showing.
 	setTimeout(() => {
-		showSearchResults.value = true
+		// A focus undone right away (the mobile picker sheet blurs its initial focus) must not open the list.
+		if (document.activeElement === searchInput.value) {
+			showSearchResults.value = true
+		}
 	}, 10)
 }
 

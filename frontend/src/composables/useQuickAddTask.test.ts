@@ -160,7 +160,10 @@ describe('useQuickAddTask', () => {
 		})
 
 		it('prefers a member named me', async () => {
-			sdk.projectsUsersSearch.mockResolvedValue({data: {items: [{id: 5, username: 'me'}, {id: 6, username: 'mesha'}]}})
+			sdk.projectsUsersSearch.mockResolvedValue({data: {items: [
+				{id: 5, username: 'me'},
+				{id: 6, username: 'mesha'},
+			]}})
 
 			await quickAdd().createNewTask({title: 'Buy milk @me', project_id: 1})
 
@@ -184,14 +187,19 @@ describe('useQuickAddTask', () => {
 		})
 
 		it('applies the alias to +me in Todoist mode and keeps @me a label', async () => {
-			queryClient.setQueryData(accountKeys.user(0), {id: 1, username: 'kat', settings: {frontend_settings: {quick_add_magic_mode: 'todoist'}}})
+			queryClient.setQueryData(accountKeys.user(0), {
+				id: 1,
+				username: 'kat',
+				settings: {frontend_settings: {quick_add_magic_mode: 'todoist'}},
+			})
 			sdk.labelsCreate.mockResolvedValue({data: {id: 9, title: 'me'}})
 			sdk.taskLabelsCreate.mockResolvedValue({data: {}})
 
 			await quickAdd().createNewTask({title: 'Buy milk +me @me', project_id: 1})
 
 			expect(assigned()).toEqual([1])
-			expect(sdk.labelsCreate).toHaveBeenCalledWith(expect.objectContaining({body: expect.objectContaining({title: 'me'})}))
+			expect(sdk.labelsCreate)
+				.toHaveBeenCalledWith(expect.objectContaining({body: expect.objectContaining({title: 'me'})}))
 		})
 
 		it('skips the alias for a link share', async () => {

@@ -12,10 +12,13 @@ export interface ActiveToken {
 
 const KINDS: TokenKind[] = ['label', 'assignee', 'project']
 
+// prefixParser splits on ' ' + prefix within a line, so a tab is part of the value, not a boundary.
+const isBoundary = (char: string) => char === ' ' || char === '\n'
+
 /**
  * Finds the label, assignee or project token the caret is in, by the rules of prefixParser:
- * the prefix starts the text or follows whitespace, and the value runs to the next whitespace
- * or, when it starts with a quote, to the matching quote (or the end of the line).
+ * the prefix starts the line or follows a space, and the value runs to the next space
+ * or, when it starts with a quote, to the matching quote (or the caret while it is unclosed).
  */
 export function getActiveToken(text: string, caret: number, prefixes: Prefixes | undefined): ActiveToken | null {
 	if (!prefixes) {
@@ -24,7 +27,7 @@ export function getActiveToken(text: string, caret: number, prefixes: Prefixes |
 
 	for (let start = caret - 1; start >= 0 && text[start] !== '\n'; start--) {
 		const kind = KINDS.find(k => prefixes[k] === text[start])
-		if (!kind || (start > 0 && !/\s/.test(text[start - 1]))) {
+		if (!kind || (start > 0 && !isBoundary(text[start - 1]))) {
 			continue
 		}
 
@@ -36,23 +39,36 @@ export function getActiveToken(text: string, caret: number, prefixes: Prefixes |
 			}
 			const lineEnd = text.indexOf('\n', start)
 			const close = text.indexOf(quote, start + 2)
-			const end = close !== -1 && (lineEnd === -1 || close < lineEnd)
-				? close + 1
-				: (lineEnd === -1 ? text.length : lineEnd)
+			// Without a closing quote the token ends at the caret, so a pick keeps the words after it.
+			const end = close !== -1 && (lineEnd === -1 || close < lineEnd) ? close + 1 : caret
 			return {kind, prefix: text[start], start, end, query: typed.slice(1)}
 		}
 
-		if (/\s/.test(typed)) {
+		if ([...typed].some(isBoundary)) {
 			return null
 		}
-		const next = text.slice(caret).search(/\s/)
+		const next = text.slice(caret).search(/[ \n]/)
 		return {kind, prefix: text[start], start, end: next === -1 ? text.length : caret + next, query: typed}
 	}
 
 	return null
 }
 
-// shortcut: a value with both quote types, or containing ` <prefix>`, cannot round-trip (the parser has no escapes); fine for real titles.
+/** Keeps the items whose title contains the query: exact matches first, then prefixes, then the rest. */
+export function rankByTitle<T>(items: T[], query: string, title: (item: T) => string): T[] {
+	const q = query.toLowerCase()
+	const rank = (item: T) => {
+		const value = title(item).toLowerCase()
+		if (value === q) return 0
+		return value.startsWith(q) ? 1 : 2
+	}
+	return items
+		.filter(item => title(item).toLowerCase().includes(q))
+		.sort((a, b) => rank(a) - rank(b))
+}
+
+// shortcut: a value with both quote types, or containing ` <prefix>`, cannot round-trip
+// (the parser has no escapes); fine for real titles.
 function quoted(value: string) {
 	if (!/\s/.test(value) && !/^['"]/.test(value)) {
 		return value

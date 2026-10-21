@@ -26,66 +26,63 @@ import (
 
 const viewKindLabels20261021120000 = 100
 
+// Only the columns an insert needs: the rest are nullable or carry a default.
 type projectView20261021120000 struct {
-	ID                      int64     `xorm:"autoincr not null unique pk"`
-	Title                   string    `xorm:"varchar(255) not null"`
-	ProjectID               int64     `xorm:"not null index"`
-	ViewKind                int       `xorm:"not null"`
-	Filter                  *string   `xorm:"json null default null"`
-	Position                float64   `xorm:"double null"`
-	BucketConfigurationMode int       `xorm:"default 0"`
-	BucketConfiguration     []any     `xorm:"json"`
-	DefaultBucketID         int64     `xorm:"bigint INDEX null"`
-	DoneBucketID            int64     `xorm:"bigint INDEX null"`
-	Updated                 time.Time `xorm:"updated not null"`
-	Created                 time.Time `xorm:"created not null"`
+	ID        int64     `xorm:"autoincr not null unique pk"`
+	Title     string    `xorm:"varchar(255) not null"`
+	ProjectID int64     `xorm:"not null index"`
+	ViewKind  int       `xorm:"not null"`
+	Position  float64   `xorm:"double null"`
+	Updated   time.Time `xorm:"updated not null"`
+	Created   time.Time `xorm:"created not null"`
 }
 
 func (projectView20261021120000) TableName() string {
 	return "project_views"
 }
 
-type viewMaxPosition20261021120000 struct {
-	ProjectID   int64   `xorm:"'project_id'"`
-	MaxPosition float64 `xorm:"'max_position'"`
-}
-
 // Every project and saved filter gets the fork's labels view as its last tab,
 // like new ones do in CreateDefaultViewsForProject.
 func addLabelsViews20261021120000(tx *xorm.Engine) error {
-	rows := []*viewMaxPosition20261021120000{}
-	err := tx.Table("project_views").
-		Select("project_id, COALESCE(MAX(position), 0) AS max_position").
-		// Saved filters own views under project_id -(filter id + 1); views left behind by deleted ones are skipped.
-		Where("project_id IN (SELECT id FROM projects) OR (-project_id - 1) IN (SELECT id FROM saved_filters)").
-		GroupBy("project_id").
-		Find(&rows)
-	if err != nil {
-		return fmt.Errorf("could not get view positions: %w", err)
+	projectIDs := []int64{}
+	if err := tx.Table("projects").Cols("id").Find(&projectIDs); err != nil {
+		return fmt.Errorf("could not get projects: %w", err)
 	}
 
-	existing := []int64{}
-	err = tx.Table("project_views").Where("view_kind = ?", viewKindLabels20261021120000).Cols("project_id").Find(&existing)
-	if err != nil {
-		return fmt.Errorf("could not get existing labels views: %w", err)
+	filterIDs := []int64{}
+	if err := tx.Table("saved_filters").Cols("id").Find(&filterIDs); err != nil {
+		return fmt.Errorf("could not get saved filters: %w", err)
 	}
-	has := make(map[int64]bool, len(existing))
-	for _, id := range existing {
-		has[id] = true
+	for _, id := range filterIDs {
+		// Saved filters own their views under project_id -(filter id + 1).
+		projectIDs = append(projectIDs, -id-1)
 	}
 
-	for _, row := range rows {
-		if has[row.ProjectID] {
+	views := []*projectView20261021120000{}
+	if err := tx.Cols("project_id", "view_kind", "position").Find(&views); err != nil {
+		return fmt.Errorf("could not get views: %w", err)
+	}
+	maxPosition := make(map[int64]float64, len(views))
+	hasLabels := make(map[int64]bool, len(views))
+	for _, v := range views {
+		maxPosition[v.ProjectID] = max(maxPosition[v.ProjectID], v.Position)
+		if v.ViewKind == viewKindLabels20261021120000 {
+			hasLabels[v.ProjectID] = true
+		}
+	}
+
+	for _, id := range projectIDs {
+		if hasLabels[id] {
 			continue
 		}
-		_, err = tx.Insert(&projectView20261021120000{
+		_, err := tx.Insert(&projectView20261021120000{
 			Title:     "Labels",
-			ProjectID: row.ProjectID,
+			ProjectID: id,
 			ViewKind:  viewKindLabels20261021120000,
-			Position:  row.MaxPosition + 100,
+			Position:  maxPosition[id] + 100,
 		})
 		if err != nil {
-			return fmt.Errorf("could not add labels view to project %d: %w", row.ProjectID, err)
+			return fmt.Errorf("could not add labels view to project %d: %w", id, err)
 		}
 	}
 	return nil

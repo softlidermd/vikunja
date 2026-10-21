@@ -613,7 +613,8 @@
     },
     "labels": {
       "title": "By label",
-      "noLabel": "No label"
+      "noLabel": "No label",
+      "labelNotApplied": "The task was created, but the label “{label}” could not be added."
     },
     "pseudo": {
       "favorites": {
@@ -1374,7 +1375,8 @@
     "quickAddSuggest": {
       "me": "Me ({username})",
       "newLabel": "New label «{title}» will be created",
-      "nothingFound": "Nothing found"
+      "nothingFound": "Nothing found",
+      "label": "Suggestions"
     },
     "quickAddMagic": {
       "hint": "Use magic prefixes to define due dates, assignees and other task properties.",

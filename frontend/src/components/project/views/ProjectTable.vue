@@ -700,7 +700,12 @@ async function openPicker(field: 'assignees' | 'labels', task: TaskResponse, eve
 	pickerOpen.value = true
 	blurNextFocus = !canAutoFocus()
 	await nextTick()
-	if (canAutoFocus()) pickerInput.value?.focus()
+	if (canAutoFocus()) {
+		pickerInput.value?.focus()
+	} else {
+		// showModal() may focus something outside the picker, so the flag must not wait for the user's first tap.
+		requestAnimationFrame(() => requestAnimationFrame(() => blurNextFocus = false))
+	}
 }
 
 // TODO: re-enable opening task detail in modal

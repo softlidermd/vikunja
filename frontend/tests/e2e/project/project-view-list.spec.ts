@@ -257,7 +257,9 @@ test.describe('Project View List', () => {
 	})
 
 	test.describe('Quick add suggestions', () => {
-		test('Picks a label with spaces and never submits while the list is open', async ({authenticatedPage: page}) => {
+		test('Picks a label with spaces and never submits while the list is open', async ({
+			authenticatedPage: page,
+		}) => {
 			await createProjects(1)
 			await BucketFactory.create(2, {
 				project_view_id: 4,
@@ -269,10 +271,11 @@ test.describe('Project View List', () => {
 
 			await input.pressSequentially('Write report *cli')
 			await expect(list.getByRole('option')).toHaveText(['Client work'])
-			await expect(input).toHaveAttribute('aria-expanded', 'true')
+			await expect(input).toHaveAttribute('aria-activedescendant', /^quick-add-suggestions-/)
 			await input.press('Enter')
 			await expect(input).toHaveValue('Write report *"Client work" ')
 			await expect(list).toHaveCount(0)
+			await expect(input).not.toHaveAttribute('aria-controls')
 			await expect(page.locator('.tasks')).not.toContainText('Write report')
 
 			await input.press('Enter')
@@ -280,7 +283,9 @@ test.describe('Project View List', () => {
 			await expect(page.locator('.tasks .task')).toContainText('Client work')
 		})
 
-		test('Moves with the arrows, closes on Esc and keeps Shift+Enter a line break', async ({authenticatedPage: page}) => {
+		test('Moves with the arrows, closes on Esc and keeps Shift+Enter a line break', async ({
+			authenticatedPage: page,
+		}) => {
 			await createProjects(1)
 			await LabelFactory.create(1, {title: 'alpha'})
 			await LabelFactory.create(1, {title: 'beta'}, false)
@@ -307,7 +312,25 @@ test.describe('Project View List', () => {
 			await expect(page.locator('.tasks')).not.toContainText('Task')
 		})
 
-		test('Shows Me first for assignees and projects for the project prefix', async ({authenticatedPage: page, currentUser}) => {
+		test('Lets Enter create the task when nothing can be picked', async ({authenticatedPage: page}) => {
+			await createProjects(1)
+			await page.goto('/projects/1/1')
+			const input = page.locator('.task-add textarea')
+			const list = page.locator('.quick-add-suggestions')
+
+			await input.pressSequentially('Nothing to pick @zzz')
+			await expect(list).toContainText('Nothing found')
+			await expect(list.getByRole('option')).toHaveCount(0)
+			await input.press('Enter')
+			await expect(input).toHaveValue('')
+			await page.reload()
+			await expect(page.locator('.tasks .task')).toContainText('Nothing to pick')
+		})
+
+		test('Shows Me first for assignees and projects for the project prefix', async ({
+			authenticatedPage: page,
+			currentUser,
+		}) => {
 			await createProjects(1)
 			await page.goto('/projects/1/1')
 			const input = page.locator('.task-add textarea')

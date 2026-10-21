@@ -6,6 +6,7 @@
 			ref="list"
 			class="quick-add-suggestions"
 			role="listbox"
+			:aria-label="$t('task.quickAddSuggest.label')"
 			@pointerdown.prevent
 			@mousedown.prevent
 		>
@@ -15,9 +16,8 @@
 				:key="row.key"
 				class="suggestion"
 				:class="{'is-selected': row === selected, 'is-inert': !row.value}"
-				role="option"
-				:aria-selected="row === selected"
-				:aria-disabled="!row.value || undefined"
+				:role="row.value ? 'option' : undefined"
+				:aria-selected="row.value ? row === selected : undefined"
 				tabindex="-1"
 				@focus="input?.focus()"
 				@click="row.value && pick(row.value)"
@@ -62,7 +62,7 @@ import {useLabels} from '@/composables/useLabels'
 import {useLabelStyles} from '@/composables/useLabelStyles'
 import {useProjects} from '@/composables/useProjects'
 import {useProjectUserSearch} from '@/composables/useUserSearch'
-import {getActiveToken, insertToken, ME_ALIASES, PREFIXES} from '@/modules/quickAddMagic'
+import {getActiveToken, insertToken, ME_ALIASES, PREFIXES, rankByTitle} from '@/modules/quickAddMagic'
 import {useAuthStore} from '@/stores/auth'
 import type {Label, User as IUser} from '@/client/generated'
 
@@ -108,7 +108,9 @@ watch(() => [token.value?.kind, token.value?.query], () => {
 })
 
 // shortcut: a `+project` in the text does not change whose members are searched; upgrade if users ask for it.
-const searchProjectId = computed(() => props.projectId > 0 ? props.projectId : authStore.settings.default_project_id ?? 0)
+const searchProjectId = computed(() => props.projectId > 0
+	? props.projectId
+	: authStore.settings.default_project_id ?? 0)
 const debouncedQuery = refDebounced(query, 300)
 const userSearch = useProjectUserSearch(searchProjectId, debouncedQuery, () => token.value?.kind === 'assignee')
 // keepPrevious data belongs to an older query, so its rows must not be picked.
@@ -122,20 +124,29 @@ const rows = computed<Row[]>(() => {
 	const q = query.value.toLowerCase()
 	switch (token.value?.kind) {
 		case 'label': {
-			const found = labels.value
-				.filter(label => (label.title ?? '').toLowerCase().includes(q))
+			const found = rankByTitle(labels.value, q, label => label.title ?? '')
 				.map(label => ({key: `l${label.id}`, value: label.title, label}))
 			if (found.length > 0) return found
 			return q === ''
 				? [nothingFound()]
-				: [{key: 'new', value: query.value, isNewLabel: true, text: t('task.quickAddSuggest.newLabel', {title: query.value})}]
+				: [{
+					key: 'new',
+					value: query.value,
+					isNewLabel: true,
+					text: t('task.quickAddSuggest.newLabel', {title: query.value}),
+				}]
 		}
 		case 'assignee': {
 			const me = authStore.isLinkShareAuth ? null : authStore.info
 			const showMe = me && (ME_ALIASES.some(alias => alias.startsWith(q))
 				|| [me.username, me.name].some(value => value?.toLowerCase().includes(q)))
 			const result: Row[] = showMe
-				? [{key: 'me', value: me.username, user: me, text: t('task.quickAddSuggest.me', {username: me.username})}]
+				? [{
+					key: 'me',
+					value: me.username,
+					user: me,
+					text: t('task.quickAddSuggest.me', {username: me.username}),
+				}]
 				: []
 			if (!usersReady.value) {
 				return [...result, {key: 'loading', text: t('misc.loading')}]
@@ -143,12 +154,20 @@ const rows = computed<Row[]>(() => {
 			const members = searchProjectId.value > 0 ? userSearch.users.value : []
 			result.push(...members
 				.filter(user => user.id !== me?.id)
-				.map(user => ({key: `u${user.id}`, value: user.username, user, hint: user.name ? user.username : undefined})))
+				.map(user => ({
+					key: `u${user.id}`,
+					value: user.username,
+					user,
+					// The User row already shows the username when the name is empty or the same.
+					hint: user.name && user.name !== user.username ? user.username : undefined,
+				})))
+			// Sorting is stable, so Me stays first unless a member's username is exactly the query.
+			result.sort((a, b) => Number(b.value?.toLowerCase() === q) - Number(a.value?.toLowerCase() === q))
 			return result.length > 0 ? result : [nothingFound()]
 		}
 		case 'project': {
-			const found = projects.projectsArray
-				.filter(project => project.id > 0 && !project.is_archived && project.title.toLowerCase().includes(q))
+			const open = projects.projectsArray.filter(project => project.id > 0 && !project.is_archived)
+			const found = rankByTitle(open, q, project => project.title)
 				.map(project => ({key: `p${project.id}`, value: project.title, text: project.title}))
 			return found.length > 0 ? found : [nothingFound()]
 		}
@@ -187,7 +206,7 @@ function move(delta: number) {
 
 // Capture phase on the input itself, so the host's own Enter/Esc listeners never see a consumed key.
 useEventListener(() => props.input, 'keydown', (e: KeyboardEvent) => {
-	if (!isOpen.value || e.isComposing || e.keyCode === 229) return
+	if (!isOpen.value || e.isComposing) return
 	switch (e.key) {
 		case 'ArrowDown':
 		case 'ArrowUp':
@@ -196,8 +215,9 @@ useEventListener(() => props.input, 'keydown', (e: KeyboardEvent) => {
 		case 'Enter':
 			// Only a textarea gets a line break; elsewhere Shift+Enter would create the task.
 			if (e.shiftKey && props.input instanceof HTMLTextAreaElement) return
-			if (selected.value) pick(selected.value.value!)
-			else dismissed.value = true
+			// Nothing to pick: the host creates the task and resolves the token itself.
+			if (!selected.value) return
+			pick(selected.value.value!)
 			break
 		case 'Tab':
 			if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || !selected.value) return
@@ -228,17 +248,26 @@ watch([list, () => props.input], ([el, input], _, onCleanup) => {
 	}))
 }, {flush: 'post'})
 
-watchEffect(() => {
+watchEffect(onCleanup => {
 	const el = props.input
 	if (!el) return
-	el.setAttribute('aria-autocomplete', 'list')
-	el.setAttribute('aria-controls', listId)
-	el.setAttribute('aria-expanded', String(isOpen.value))
-	if (isOpen.value && selected.value) {
-		el.setAttribute('aria-activedescendant', `${listId}-${options.value.indexOf(selected.value)}`)
-	} else {
-		el.removeAttribute('aria-activedescendant')
+	// ARIA in HTML allows the combobox role on a text input but no role on a textarea, which stays a textbox.
+	if (el instanceof HTMLInputElement) {
+		el.setAttribute('role', 'combobox')
+		el.setAttribute('aria-expanded', String(isOpen.value))
 	}
+	el.setAttribute('aria-autocomplete', 'list')
+	if (isOpen.value) {
+		el.setAttribute('aria-controls', listId)
+		if (selected.value) {
+			el.setAttribute('aria-activedescendant', `${listId}-${options.value.indexOf(selected.value)}`)
+		}
+	}
+	onCleanup(() => {
+		for (const name of ['role', 'aria-expanded', 'aria-autocomplete', 'aria-controls', 'aria-activedescendant']) {
+			el.removeAttribute(name)
+		}
+	})
 })
 </script>
 

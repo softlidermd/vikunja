@@ -37,7 +37,7 @@
 					:animation="100"
 					:handle="dragHandle"
 					:delay-on-touch-only="!isTouchDevice"
-					:delay="isTouchDevice ? 0 : 1000"
+					:delay="isTouchDevice ? 300 : 1000"
 					ghost-class="task-ghost"
 					@end="onDrop"
 				>
@@ -67,7 +67,7 @@
 					<div
 						v-if="newTaskCard === card.id"
 						class="control"
-						:class="{'is-loading': quickAddLoading}"
+						:class="{'is-loading': addingTask}"
 					>
 						<input
 							:ref="el => { if (el) newTaskInputEl = el as HTMLInputElement }"
@@ -122,6 +122,7 @@ import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
 import {getHexColor} from '@/helpers/task'
 import {useAuthStore} from '@/stores/auth'
+import {error} from '@/message'
 
 const props = defineProps<{
 	isLoadingProject: boolean,
@@ -170,6 +171,7 @@ const cards = computed<LabelCard[]>(() => {
 			if (label.id) used.set(label.id, label as LabelWithId)
 		}
 	}
+	// Spec 4.5 sorts by the ru locale whatever the UI language: it puts Cyrillic titles before Latin ones.
 	const labelCards = (sortLabelsAlphabetically([...used.values()], 'ru-RU') as LabelWithId[]).map(label => ({
 		id: label.id,
 		title: label.title ?? '',
@@ -190,20 +192,25 @@ const canWrite = computed(() =>
 	project.value.id > 0,
 )
 
-const isTouchDevice = typeof window !== 'undefined' && !window.matchMedia('(hover: hover) and (pointer: fine)').matches
+const isTouchDevice = !window.matchMedia('(hover: hover) and (pointer: fine)').matches
 const dragHandle = isTouchDevice ? '.handle' : undefined
 
 const addLabel = useAddTaskLabelMutation()
 const removeLabel = useRemoveTaskLabelMutation()
 
-// shortcut: a refetch cancelled by a newer one is swallowed (the newer one carries the data), and two quick drops may flicker briefly; add optimistic moves if that ever bothers anyone.
+// shortcut: a refetch cancelled by a newer one is swallowed (the newer one carries the data),
+// and two quick drops may flicker briefly; add optimistic moves if that ever bothers anyone.
 const refetchBoard = () => query.refetch().catch(() => {})
+
+// A second drop of the same task during its relabel would remove both labels, so it snaps back instead.
+const relabeling = new Set<number>()
 
 async function onDrop(e: SortableEvent) {
 	const from = cards.value.find(card => card.id === Number(e.from.dataset.labelId))
 	const to = cards.value.find(card => card.id === Number(e.to.dataset.labelId))
 	const task = tasks.value.find(item => item.id === Number(e.item.dataset.taskId))
-	if (!from || !to || !task || from === to) return
+	if (!from || !to || !task || from === to || relabeling.has(task.id)) return
+	relabeling.add(task.id)
 	try {
 		if (to.label && !task.labels.some(label => label.id === to.id)) {
 			await addLabel.mutateAsync({taskId: task.id, label: to.label})
@@ -212,15 +219,17 @@ async function onDrop(e: SortableEvent) {
 			await removeLabel.mutateAsync({taskId: task.id, label: from.label})
 		}
 	} catch { /* The mutation reports the error; vuedraggable has already put the row back. */ } finally {
+		relabeling.delete(task.id)
 		// The relabel can move the task in or out of a filtered view.
 		await refetchBoard()
 	}
 }
 
-const {createNewTask, isLoading: quickAddLoading} = useQuickAddTask()
+const {createNewTask} = useQuickAddTask()
 const newTaskCard = ref<number | null>(null)
 const newTaskText = ref('')
 const newTaskInputEl = ref<HTMLInputElement | null>(null)
+const addingTask = ref(false)
 
 function onNewTaskFocusout(e: FocusEvent) {
 	// A tap on a suggestion must not close the input (backup for the list's own pointerdown guard).
@@ -240,14 +249,25 @@ function onNewTaskKeydown(e: KeyboardEvent, card: LabelCard) {
 }
 
 async function addTask(card: LabelCard) {
-	if (newTaskText.value.trim() === '' || quickAddLoading.value) return
-	const task = await createNewTask({title: newTaskText.value, project_id: projectId.value})
-	if (card.label && task.id && !task.labels?.some(label => label.id === card.id)) {
-		await addLabel.mutateAsync({taskId: task.id, label: card.label})
+	const title = newTaskText.value
+	if (title.trim() === '' || addingTask.value) return
+	addingTask.value = true
+	try {
+		const task = await createNewTask({title, project_id: projectId.value})
+		if (newTaskText.value === title) newTaskText.value = ''
+		if (card.label && task.id && !task.labels?.some(label => label.id === card.id)) {
+			try {
+				await addLabel.mutateAsync({taskId: task.id, label: card.label})
+			} catch {
+				// The task exists by now, so resubmitting the text would only create a duplicate.
+				error({message: t('project.labels.labelNotApplied', {label: card.title})})
+			}
+		}
+		// The create's own refetch ran before the label existed, so a label-filtered view would miss the task.
+		await refetchBoard()
+	} finally {
+		addingTask.value = false
 	}
-	newTaskText.value = ''
-	// The create's own refetch ran before the label existed, so a label-filtered view would miss the task.
-	await refetchBoard()
 }
 </script>
 

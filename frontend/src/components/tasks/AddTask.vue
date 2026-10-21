@@ -258,6 +258,10 @@ function handleEnter(e: KeyboardEvent) {
 	}
 
 	e.preventDefault()
+	// A held Enter must not submit the text its first keydown just completed from the suggestions.
+	if (e.repeat) {
+		return
+	}
 	addTask()
 }
 
