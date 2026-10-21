@@ -30,6 +30,11 @@
 				<QuickAddMagic
 					:highlight-hint-icon="taskAddHovered"
 				/>
+				<QuickAddSuggestions
+					v-model="newTaskTitle"
+					:input="newTaskInput"
+					:project-id="Number($route.params.projectId) || 0"
+				/>
 			</p>
 			<p class="control">
 				<XButton
@@ -70,6 +75,7 @@ import type {Task as ITask} from '@/client/generated'
 
 import Expandable from '@/components/base/Expandable.vue'
 import QuickAddMagic from '@/components/tasks/partials/QuickAddMagic.vue'
+import QuickAddSuggestions from '@/components/tasks/partials/QuickAddSuggestions.vue'
 import {parseSubtasksViaIndention, type TaskWithParent} from '@/helpers/parseSubtasksViaIndention'
 import {getLabelsFromPrefix} from '@/modules/quickAddMagic'
 import {runWrites} from '@/helpers/runWrites'

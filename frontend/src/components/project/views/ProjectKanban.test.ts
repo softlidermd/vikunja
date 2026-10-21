@@ -236,7 +236,7 @@ describe('ProjectKanban', () => {
 		;(wrapper.vm as unknown as {toggleShowNewTaskInput: (id: number) => void}).toggleShowNewTaskInput(1)
 		await nextTick()
 		await wrapper.find('.bucket-footer input').setValue('New task')
-		await wrapper.find('.bucket-footer input').trigger('keyup.enter')
+		await wrapper.find('.bucket-footer input').trigger('keydown', {key: 'Enter'})
 		await flushPromises()
 		expect(wrapper.find('.bucket-footer input').attributes('disabled')).toBeDefined()
 
@@ -256,7 +256,7 @@ describe('ProjectKanban', () => {
 		;(wrapper.vm as unknown as {toggleShowNewTaskInput: (id: number) => void}).toggleShowNewTaskInput(1)
 		await nextTick()
 		await wrapper.find('.bucket-footer input').setValue('New task')
-		await wrapper.find('.bucket-footer input').trigger('keyup.enter')
+		await wrapper.find('.bucket-footer input').trigger('keydown', {key: 'Enter'})
 		await flushPromises()
 
 		expect(wrapper.find('.bucket-footer input').exists()).toBe(false)

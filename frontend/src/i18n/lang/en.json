@@ -1367,6 +1367,11 @@
       "weeks": "Weeks",
       "invalidAmount": "Please enter more than 0."
     },
+    "quickAddSuggest": {
+      "me": "Me ({username})",
+      "newLabel": "New label «{title}» will be created",
+      "nothingFound": "Nothing found"
+    },
     "quickAddMagic": {
       "hint": "Use magic prefixes to define due dates, assignees and other task properties.",
       "quickEntryHint": "Use magic prefixes for dates, labels & more. Open the main Vikunja app and check the tooltip on the task input for more details.",

@@ -6,6 +6,7 @@ import {UserFactory} from '../../factories/user'
 import {ProjectFactory} from '../../factories/project'
 import {createProjects} from './prepareProjects'
 import {BucketFactory} from '../../factories/bucket'
+import {LabelFactory} from '../../factories/labels'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
 
 test.describe('Project View List', () => {
@@ -253,5 +254,73 @@ test.describe('Project View List', () => {
 
 		// Only one task should be visible (the searchable one)
 		await expect(page.locator('.tasks .task')).toHaveCount(1)
+	})
+
+	test.describe('Quick add suggestions', () => {
+		test('Picks a label with spaces and never submits while the list is open', async ({authenticatedPage: page}) => {
+			await createProjects(1)
+			await BucketFactory.create(2, {
+				project_view_id: 4,
+			})
+			await LabelFactory.create(1, {title: 'Client work'})
+			await page.goto('/projects/1/1')
+			const input = page.locator('.task-add textarea')
+			const list = page.locator('.quick-add-suggestions')
+
+			await input.pressSequentially('Write report *cli')
+			await expect(list.getByRole('option')).toHaveText(['Client work'])
+			await expect(input).toHaveAttribute('aria-expanded', 'true')
+			await input.press('Enter')
+			await expect(input).toHaveValue('Write report *"Client work" ')
+			await expect(list).toHaveCount(0)
+			await expect(page.locator('.tasks')).not.toContainText('Write report')
+
+			await input.press('Enter')
+			await expect(page.locator('.tasks .task')).toContainText('Write report')
+			await expect(page.locator('.tasks .task')).toContainText('Client work')
+		})
+
+		test('Moves with the arrows, closes on Esc and keeps Shift+Enter a line break', async ({authenticatedPage: page}) => {
+			await createProjects(1)
+			await LabelFactory.create(1, {title: 'alpha'})
+			await LabelFactory.create(1, {title: 'beta'}, false)
+			await page.goto('/projects/1/1')
+			const input = page.locator('.task-add textarea')
+			const list = page.locator('.quick-add-suggestions')
+
+			await input.pressSequentially('Task *')
+			await expect(list.getByRole('option')).toHaveCount(2)
+			await input.press('ArrowDown')
+			await expect(list.locator('[aria-selected="true"]')).toHaveText('beta')
+			await input.press('Escape')
+			await expect(list).toHaveCount(0)
+			await expect(input).toBeFocused()
+
+			await input.pressSequentially('a')
+			await expect(list).toBeVisible()
+			await input.press('Shift+Enter')
+			await expect(input).toHaveValue('Task *a\n')
+
+			await input.pressSequentially('*be')
+			await input.press('Control+Enter')
+			await expect(input).toHaveValue('Task *a\n*beta ')
+			await expect(page.locator('.tasks')).not.toContainText('Task')
+		})
+
+		test('Shows Me first for assignees and projects for the project prefix', async ({authenticatedPage: page, currentUser}) => {
+			await createProjects(1)
+			await page.goto('/projects/1/1')
+			const input = page.locator('.task-add textarea')
+			const list = page.locator('.quick-add-suggestions')
+
+			await input.pressSequentially('Task @')
+			await expect(list.getByRole('option').first()).toHaveText(`Me (${currentUser.username})`)
+			await list.getByRole('option').first().click()
+			await expect(input).toHaveValue(`Task @${currentUser.username} `)
+			await expect(input).toBeFocused()
+
+			await input.pressSequentially('+')
+			await expect(list.getByRole('option')).toContainText(['First Project'])
+		})
 	})
 })

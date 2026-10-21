@@ -178,17 +178,22 @@
 													:class="{'is-loading': showTaskLoading}"
 												>
 													<input
+														:ref="el => { if (el) newTaskInputEl = el as HTMLInputElement }"
 														v-model="newTaskText"
 														v-focus.always
 														class="input"
 														:disabled="initialLoading || taskLoading || undefined"
 														:placeholder="$t('project.kanban.addTaskPlaceholder')"
 														type="text"
-														@focusout="toggleShowNewTaskInput(bucket.id)"
+														@focusout="onNewTaskFocusout($event, bucket.id)"
 														@focusin="() => newTaskInputFocused = true"
-														@keyup.enter="addTaskToBucket(bucket.id)"
-														@keyup.esc="toggleShowNewTaskInput(bucket.id)"
+														@keydown="onNewTaskKeydown($event, bucket.id)"
 													>
+													<QuickAddSuggestions
+														v-model="newTaskText"
+														:input="newTaskInputEl"
+														:project-id="projectId"
+													/>
 												</div>
 												<p
 													v-if="newTaskError[bucket.id] && newTaskText === ''"
@@ -319,6 +324,7 @@ import {useAuthStore} from '@/stores/auth'
 import ProjectWrapper from '@/components/project/ProjectWrapper.vue'
 import FilterPopup from '@/components/project/partials/FilterPopup.vue'
 import KanbanCard from '@/components/tasks/partials/KanbanCard.vue'
+import QuickAddSuggestions from '@/components/tasks/partials/QuickAddSuggestions.vue'
 import Dropdown from '@/components/misc/Dropdown.vue'
 import DropdownItem from '@/components/misc/DropdownItem.vue'
 
@@ -392,6 +398,7 @@ const newBucketTitle = ref('')
 const showNewBucketInput = ref(false)
 const newTaskError = ref<{ [id: number]: boolean }>({})
 const newTaskInputFocused = ref(false)
+const newTaskInputEl = ref<HTMLInputElement | null>(null)
 
 const showSetLimitInput = ref(false)
 const collapsedBuckets = ref<CollapsedBuckets>({})
@@ -611,6 +618,24 @@ function toggleShowNewTaskInput(bucketId: number) {
 		? null
 		: bucketId
 	newTaskInputFocused.value = false
+}
+
+function onNewTaskFocusout(e: FocusEvent, bucketId: number) {
+	// A tap on a suggestion must not close the input (backup for the list's own pointerdown guard).
+	if ((e.relatedTarget as Element | null)?.closest('.quick-add-suggestions')) return
+	toggleShowNewTaskInput(bucketId)
+}
+
+function onNewTaskKeydown(e: KeyboardEvent, bucketId: number) {
+	if (e.isComposing) return
+	if (e.key === 'Enter') {
+		if (e.repeat) return
+		e.preventDefault()
+		addTaskToBucket(bucketId)
+	} else if (e.key === 'Escape') {
+		// Blurring closes the input through focusout; toggling here too would reopen it when the removal fires focusout.
+		(e.target as HTMLInputElement).blur()
+	}
 }
 
 async function addTaskToBucket(bucketId: number) {
