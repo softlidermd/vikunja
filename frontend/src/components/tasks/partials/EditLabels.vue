@@ -1,5 +1,6 @@
 <template>
 	<Multiselect
+		ref="multiselect"
 		v-model="labels"
 		:loading="loading"
 		:placeholder="$t('task.label.placeholder')"
@@ -89,6 +90,7 @@ const emit = defineEmits<{
 
 const {t} = useI18n({useScope: 'global'})
 
+const multiselect = ref<{focus: () => void} | null>(null)
 const labels = ref<Label[]>([])
 const query = ref('')
 
@@ -173,6 +175,8 @@ async function createAndAddLabel(title: string) {
 	await addLabel(newLabel, false)
 	success({message: t('task.label.addCreateSuccess')})
 }
+
+defineExpose({focus: () => multiselect.value?.focus()})
 </script>
 
 <style lang="scss" scoped>

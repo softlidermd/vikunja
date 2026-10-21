@@ -3,6 +3,7 @@
 		class="control is-expanded"
 		:placeholder="$t('project.search')"
 		:search-results="foundProjects"
+		:show-empty="showEmpty"
 		label="title"
 		:select-placeholder="$t('project.searchSelect')"
 		:model-value="project"
@@ -34,10 +35,13 @@ import Multiselect from '@/components/input/Multiselect.vue'
 const props = withDefaults(defineProps<{
 	modelValue?: ProjectResponse | null
 	savedFiltersOnly?: boolean
+	/** List the real, non-archived projects while the query is empty. */
+	showEmpty?: boolean
 	filter?: (project: ProjectResponse) => boolean,
 }>(), {
 	modelValue: () => normalizeProject({id: 0}),
 	savedFiltersOnly: false,
+	showEmpty: false,
 	filter: () => true,
 })
 
@@ -58,10 +62,19 @@ watch(
 
 const projectList = useProjects()
 
+const listAll = () => projectList.projectsArray.filter(p => p.id > 0 && !p.is_archived && props.filter(p))
+
 const foundProjects = ref<ProjectResponse[]>([])
+if (props.showEmpty) {
+	foundProjects.value = listAll()
+}
 function findProjects(query: string) {
 	if (query === '') {
 		select(null)
+		if (props.showEmpty) {
+			foundProjects.value = listAll()
+			return
+		}
 	}
 	
 	if (props.savedFiltersOnly) {

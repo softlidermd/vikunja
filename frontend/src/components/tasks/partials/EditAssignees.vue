@@ -1,5 +1,6 @@
 <template>
 	<Multiselect
+		ref="multiselect"
 		v-model="assignees"
 		class="edit-assignees"
 		:class="{'has-assignees': assignees.length > 0}"
@@ -70,6 +71,7 @@ const addAssigneeMutation = useAddTaskAssigneeMutation()
 const removeAssigneeMutation = useRemoveTaskAssigneeMutation()
 const {t} = useI18n({useScope: 'global'})
 
+const multiselect = ref<{focus: () => void} | null>(null)
 const userSearch = ref('')
 const searchEnabled = ref(false)
 const {users: userResults, isFetching: usersLoading} = useProjectUserSearch(() => props.projectId, userSearch, searchEnabled)
@@ -133,6 +135,8 @@ const foundUsers = computed(() => withIds(userResults.value)
 		return a.name.localeCompare(b.name)
 	}),
 )
+
+defineExpose({focus: () => multiselect.value?.focus()})
 </script>
 
 <style lang="scss">

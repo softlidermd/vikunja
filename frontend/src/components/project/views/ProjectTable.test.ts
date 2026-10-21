@@ -87,6 +87,8 @@ async function mountTable() {
 			stubs: {
 				ProjectWrapper: {template: '<div><slot name="default"/></div>'},
 				Popup: {template: '<div><slot name="content" :is-open="true"/></div>'},
+				// The picker is focused on open; the auto-stub has no focus().
+				EditLabels: {props: ['taskId'], methods: {focus() {}}, template: '<div/>'},
 			},
 		},
 	})

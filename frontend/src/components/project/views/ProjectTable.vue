@@ -438,11 +438,13 @@
 							<Card
 								class="table-picker"
 								:padding="false"
+								@focusin="onPickerFocusin"
 							>
 								<!-- Keyed per task: an edit still in flight stays with the task
 									its picker was opened for. -->
 								<EditAssignees
 									v-if="picker?.field === 'assignees'"
+									ref="pickerInput"
 									:key="pickerTask.id"
 									:model-value="pickerTask.assignees"
 									:task-id="pickerTask.id"
@@ -451,6 +453,7 @@
 								/>
 								<EditLabels
 									v-else
+									ref="pickerInput"
 									:key="pickerTask.id"
 									:model-value="pickerTask.labels"
 									:task-id="pickerTask.id"
@@ -476,7 +479,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref, type ComponentPublicInstance, type Ref, watch} from 'vue'
+import {computed, nextTick, ref, type ComponentPublicInstance, type Ref, watch} from 'vue'
 
 import {useStorage} from '@vueuse/core'
 
@@ -518,6 +521,7 @@ import {useAuthStore} from '@/stores/auth'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getDisplayName} from '@/helpers/user'
 import {getStatusKanbanView} from '@/helpers/projectView'
+import {canAutoFocus} from '@/directives/focus'
 
 const props = defineProps<{
 	isLoadingProject: boolean,
@@ -673,13 +677,30 @@ function labelsLabel(label: string, labels: TaskResponse['labels']) {
 		: label
 }
 
-function openPicker(field: 'assignees' | 'labels', task: TaskResponse, event: MouseEvent) {
+const pickerInput = ref<{focus: () => void} | null>(null)
+let blurNextFocus = false
+watch(pickerOpen, open => {
+	if (!open) blurNextFocus = false
+})
+
+// The sheet's late showModal() focuses the picker on mobile; undo that so the keyboard stays hidden.
+function onPickerFocusin(e: FocusEvent) {
+	if (blurNextFocus) {
+		(e.target as HTMLElement).blur()
+		blurNextFocus = false
+	}
+}
+
+async function openPicker(field: 'assignees' | 'labels', task: TaskResponse, event: MouseEvent) {
 	picker.value = {
 		field,
 		taskId: task.id,
 	}
 	pickerAnchor.value = event.currentTarget as HTMLElement
 	pickerOpen.value = true
+	blurNextFocus = !canAutoFocus()
+	await nextTick()
+	if (canAutoFocus()) pickerInput.value?.focus()
 }
 
 // TODO: re-enable opening task detail in modal

@@ -414,6 +414,7 @@
 							<div class="control is-expanded">
 								<ProjectSearch
 									:ref="e => setFieldRef('moveProject', e)"
+									show-empty
 									:filter="project => project.id !== task.project_id"
 									@update:modelValue="changeProject"
 								/>
@@ -658,6 +659,7 @@ import {klona} from 'klona/lite'
 
 import {useTask} from '@/composables/useTask'
 import {getHexColor} from '@/helpers/task'
+import {canAutoFocus} from '@/directives/focus'
 import {createTaskDraft, mergeTask} from '@/helpers/task'
 
 import type {Task as ITask} from '@/client/generated'
@@ -1102,7 +1104,10 @@ function setFieldActive(fieldName: keyof typeof activeFields) {
 			return
 		}
 
-		el.focus()
+		// On mobile the picker would pop up the keyboard.
+		if (canAutoFocus() || !['labels', 'assignees', 'moveProject'].includes(fieldName)) {
+			el.focus()
+		}
 
 		// Finish scrolling before the datepicker sheet locks the page.
 		scrollIntoView(el, datepicker ? 'instant' : 'smooth')

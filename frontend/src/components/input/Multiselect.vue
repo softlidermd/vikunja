@@ -569,6 +569,8 @@ function remove(item: T) {
 function focus() {
 	searchInput.value?.focus()
 }
+
+defineExpose({focus})
 </script>
 
 <style lang="scss" scoped>

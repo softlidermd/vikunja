@@ -14,14 +14,13 @@ function getFocusableElement(el: HTMLElement): HTMLElement | null {
 	return el.querySelector<HTMLElement>('input, select, textarea, [contenteditable="true"]')
 }
 
+// Auto focusing on mobile pops up the keyboard over half the screen. Same breakpoint as useIsMobile.
+export const canAutoFocus = () => window.innerWidth > 768
+
 const focus = <Directive<HTMLElement, string>>{
 	// When the bound element is inserted into the DOM...
 	mounted(el, {modifiers}) {
-		// Focus the element only if the viewport is big enough
-		// auto focusing elements on mobile can be annoying since in these cases the
-		// keyboard always pops up and takes half of the available space on the screen.
-		// The threshhold is the same as the breakpoints in css.
-		if (window.innerWidth > 769 || modifiers?.always) {
+		if (canAutoFocus() || modifiers?.always) {
 			const target = getFocusableElement(el)
 			target?.focus()
 		}
