@@ -2,13 +2,22 @@ import {register} from 'register-service-worker'
 
 import {getFullBaseUrl} from './helpers/getFullBaseUrl'
 
+const UPDATE_CHECK_INTERVAL = 15 * 60 * 1000
+
 if (import.meta.env.PROD) {
 	register(getFullBaseUrl() + 'sw.js', {
 		ready() {
 			console.log('App is being served from cache by a service worker.')
 		},
-		registered() {
+		registered(registration) {
 			console.log('Service worker has been registered.')
+			// The browser looks for a new version only on a full page load, which a tab open all day never does.
+			setInterval(() => registration.update(), UPDATE_CHECK_INTERVAL)
+			document.addEventListener('visibilitychange', () => {
+				if (document.visibilityState === 'visible') {
+					registration.update()
+				}
+			})
 		},
 		cached() {
 			console.log('Content has been cached for offline use.')

@@ -18,13 +18,17 @@
 
 <script lang="ts" setup>
 import {computed, ref} from 'vue'
+import {useRouter} from 'vue-router'
 import {useBaseStore} from '@/stores/base'
 
 const baseStore = useBaseStore()
+const router = useRouter()
 
 const updateAvailable = computed(() => baseStore.updateAvailable)
 const registration = ref<ServiceWorkerRegistration | null>(null)
 const refreshing = ref(false)
+// Where to load once the new version took over; empty reloads the current page.
+let reloadTo = ''
 
 document.addEventListener('swUpdated', showRefreshUI, {once: true})
 
@@ -35,9 +39,25 @@ navigator?.serviceWorker?.addEventListener(
 		// input) gets wiped.
 		if (!refreshing.value) return
 		refreshing.value = false
-		window.location.reload()
+		if (reloadTo) {
+			window.location.assign(reloadTo)
+		} else {
+			window.location.reload()
+		}
 	},
 )
+
+// Moving to another page is the safe moment to switch: that page loads fresh anyway, so no unsaved input is lost.
+// Query changes (filters, sort) stay on the same page and do not count. The in-app navigation is cancelled
+// and the page loaded by the new version: activating it deletes the old version's code the app would load next.
+router.beforeEach((to, from) => {
+	if (!updateAvailable.value || to.path === from.path || !registration.value?.waiting) {
+		return
+	}
+	reloadTo = router.resolve(to.fullPath).href
+	refreshApp()
+	return false
+})
 
 function showRefreshUI(e: Event) {
 	console.log('recieved refresh event', e)
