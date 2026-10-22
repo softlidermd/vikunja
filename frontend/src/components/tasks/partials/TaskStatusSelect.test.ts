@@ -24,6 +24,7 @@ const project = vi.hoisted(() => ({
 			id: 4,
 			view_kind: 'kanban',
 			bucket_configuration_mode: 'manual',
+			default_bucket_id: 10,
 			done_bucket_id: 12,
 		},
 	],
@@ -68,13 +69,14 @@ const task = {
 	buckets: [buckets[0]],
 } as Task
 
-function mountSelect(canWrite = true) {
+function mountSelect(canWrite = true, extraProps: {task?: Task, hideDefaultBucket?: boolean} = {}) {
 	const queryClient = new QueryClient({defaultOptions: {queries: {retry: false}}})
 	queryClient.setQueryData(bucketKeys.list(1, 4), buckets)
 	return mount(TaskStatusSelect, {
 		props: {
 			task,
 			canWrite,
+			...extraProps,
 		},
 		global: {
 			plugins: [
@@ -128,6 +130,12 @@ describe('TaskStatusSelect', () => {
 			},
 			body: {task_id: 7},
 		})
+	})
+
+	it('hides the default bucket only when asked to', async () => {
+		expect(mountSelect(true).find('.task-status').exists()).toBe(true)
+		expect(mountSelect(true, {hideDefaultBucket: true}).find('.task-status').exists()).toBe(false)
+		expect(mountSelect(true, {hideDefaultBucket: true, task: {...task, buckets: [buckets[1]]}}).find('.task-status').exists()).toBe(true)
 	})
 
 	it('puts the old bucket back when the move fails', async () => {

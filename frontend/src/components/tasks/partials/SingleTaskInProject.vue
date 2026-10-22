@@ -214,7 +214,6 @@
 
 <script setup lang="ts">
 import {ref, watch, onMounted, computed} from 'vue'
-import {useI18n} from 'vue-i18n'
 
 import {getHexColor} from '@/helpers/task'
 import type {Task as ITask} from '@/client/generated'
@@ -235,19 +234,16 @@ import Popup from '@/components/misc/Popup.vue'
 
 
 import {formatDisplayDate, formatISO, formatDateLong} from '@/helpers/time/formatDate'
-import {success} from '@/message'
 
 import {useProjects} from '@/composables/useProjects'
 import {useCurrentProject} from '@/composables/useCurrentProject'
-import {useUpdateTaskMutation, useFavoriteTaskMutation} from '@/client/queries/taskMutations'
+import {useFavoriteTaskMutation} from '@/client/queries/taskMutations'
 import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
 import {useIntervalFn} from '@vueuse/core'
-import {playPopSound} from '@/helpers/playPop'
 import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
-import {TASK_REPEAT_MODES} from '@/types/IRepeatMode'
 import {useGlobalNow} from '@/composables/useGlobalNow'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
-import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
+import {useMarkTaskDone} from '@/composables/useMarkTaskDone'
 
 const props = withDefaults(defineProps<{
 	theTask: ITask,
@@ -283,20 +279,16 @@ function getTaskById(taskId: number | undefined): ITask | undefined {
 	return props.allTasks.find(t => t.id === taskId)
 }
 
-const {t} = useI18n({useScope: 'global'})
-
 const task = computed(() => props.theTask)
 const labels = computed(() => (task.value.labels ?? []).filter(label => label.id !== props.hiddenLabelId))
 
-const isRepeating = computed(() => (task.value.repeat_after ?? 0) > 0
-	|| ((task.value.repeat_after ?? 0) === 0
-		&& task.value.repeat_mode === TASK_REPEAT_MODES.REPEAT_MODE_MONTH))
-
 const projectList = useProjects()
-const updateTask = useUpdateTaskMutation(true)
-const {queueTaskSave} = useTaskSaveQueue()
+const {markAsDone, isRepeating, isSaving} = useMarkTaskDone(task, (updated, reverted) => {
+	updateDueDate()
+	if (!reverted) emit('taskUpdated', updated)
+})
 const favoriteTask = useFavoriteTaskMutation()
-const isLoading = useDelayedLoading(() => updateTask.isPending.value || favoriteTask.isPending.value)
+const isLoading = useDelayedLoading(() => isSaving.value || favoriteTask.isPending.value)
 
 const project = computed(() => projectList.projects[task.value.project_id ?? 0])
 const projectColor = computed(() => project.value?.hex_color ?? '')
@@ -337,58 +329,6 @@ const isOverdue = computed(() => (
 	new Date(task.value.due_date ?? 0).getTime() > 0 &&
 	new Date(task.value.due_date ?? 0).getTime() <= now.value.getTime()
 ))
-
-let oldTask: ITask
-
-async function markAsDone(checked: boolean, wasReverted: boolean = false) {
-	if (!wasReverted) oldTask = {...task.value}
-
-	// Queue the request now, with the intended done value snapshotted, so a re-render or
-	// teardown during the animation delay can neither drop the save nor make it send a stale state.
-	const source = wasReverted && isRepeating.value ? oldTask : task.value
-	const update = {
-		...source,
-		id: source.id!,
-		done: checked,
-	}
-	const updatePromise = queueTaskSave(update.id, () => updateTask.mutateAsync(update)).catch(() => undefined)
-
-	const finish = async () => {
-		const newTask = await updatePromise
-		if (!newTask) return
-
-		updateDueDate()
-
-		if (wasReverted) {
-			return
-		}
-
-		if (checked) {
-			playPopSound()
-		}
-		emit('taskUpdated', newTask)
-
-		let message = t('task.doneSuccess')
-		if (!task.value.done && !isRepeating.value) {
-			message = t('task.undoneSuccess')
-		}
-
-		success({message}, [{
-			title: t('task.undo'),
-			callback: () => undoDone(checked),
-		}])
-	}
-
-	if (checked) {
-		setTimeout(finish, 300) // Delay only the follow-up to show the animation when marking a task as done
-	} else {
-		await finish() // Don't delay it when un-marking it as it doesn't have an animation the other way around
-	}
-}
-
-function undoDone(checked: boolean) {
-	markAsDone(!checked, true)
-}
 
 async function toggleFavorite() {
 	const updated = await favoriteTask.mutateAsync({...task.value, id: task.value.id!})

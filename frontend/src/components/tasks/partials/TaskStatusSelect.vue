@@ -1,6 +1,6 @@
 <template>
 	<span
-		v-if="kanbanView && currentBucket"
+		v-if="kanbanView && currentBucket && !(hideDefaultBucket && currentBucket.id === kanbanView.default_bucket_id)"
 		class="task-status"
 		:class="{
 			'is-done': currentBucket.id === kanbanView.done_bucket_id,
@@ -49,6 +49,8 @@ import {useBaseStore} from '@/stores/base'
 const props = defineProps<{
 	task: Task,
 	canWrite: boolean,
+	// Where most tasks sit, so a compact row only shows the other statuses.
+	hideDefaultBucket?: boolean,
 }>()
 
 const projectList = useProjects()

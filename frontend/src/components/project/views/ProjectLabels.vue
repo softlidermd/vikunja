@@ -25,44 +25,9 @@
 					<span class="label-card__count">{{ card.tasks.length }}</span>
 				</header>
 
-				<TaskDraggable
-					:model-value="card.tasks"
-					:group="{name: 'labels'}"
-					:sort="false"
-					:disabled="!canWrite"
-					:data-label-id="card.id"
-					tag="ul"
-					:item-key="(task: TaskResponse) => `l${card.id}-t${task.id}`"
-					:component-data="{class: ['label-card__tasks', {'dragging-disabled': !canWrite}]}"
-					:animation="100"
-					:handle="dragHandle"
-					:delay-on-touch-only="!isTouchDevice"
-					:delay="isTouchDevice ? 300 : 1000"
-					ghost-class="task-ghost"
-					@end="onDrop"
-				>
-					<template #item="{element: task}">
-						<SingleTaskInProject
-							:the-task="task"
-							:can-mark-as-done="canWrite"
-							:show-status="true"
-							:can-edit-status="canWrite && !project?.is_archived"
-							:all-tasks="tasks"
-							:hidden-label-id="card.label?.id"
-						>
-							<span
-								v-if="canWrite"
-								class="icon handle"
-							>
-								<Icon icon="grip-lines" />
-							</span>
-						</SingleTaskInProject>
-					</template>
-				</TaskDraggable>
-
-				<footer
+				<div
 					v-if="canWrite"
-					class="label-card__footer"
+					class="label-card__add-row"
 				>
 					<div
 						v-if="newTaskCard === card.id"
@@ -95,7 +60,40 @@
 					>
 						{{ $t('project.kanban.addTask') }}
 					</XButton>
-				</footer>
+				</div>
+
+				<TaskDraggable
+					:model-value="card.tasks"
+					:group="{name: 'labels'}"
+					:sort="false"
+					:disabled="!canWrite"
+					:data-label-id="card.id"
+					tag="ul"
+					:item-key="(task: TaskResponse) => `l${card.id}-t${task.id}`"
+					:component-data="{class: ['label-card__tasks', {'dragging-disabled': !canWrite}]}"
+					:animation="100"
+					:handle="dragHandle"
+					:delay-on-touch-only="!isTouchDevice"
+					:delay="isTouchDevice ? 300 : 1000"
+					ghost-class="task-ghost"
+					@end="onDrop"
+				>
+					<template #item="{element: task}">
+						<LabelBoardTask
+							:task="task"
+							:can-mark-as-done="canWrite"
+							:can-edit-status="canWrite && !project?.is_archived"
+							:hidden-label-id="card.label?.id"
+						>
+							<span
+								v-if="canWrite"
+								class="icon handle"
+							>
+								<Icon icon="grip-lines" />
+							</span>
+						</LabelBoardTask>
+					</template>
+				</TaskDraggable>
 			</section>
 		</div>
 	</ProjectWrapper>
@@ -108,7 +106,7 @@ import {useI18n} from 'vue-i18n'
 import type {SortableEvent} from 'sortablejs'
 
 import ProjectWrapper from '@/components/project/ProjectWrapper.vue'
-import SingleTaskInProject from '@/components/tasks/partials/SingleTaskInProject.vue'
+import LabelBoardTask from '@/components/tasks/partials/LabelBoardTask.vue'
 import QuickAddSuggestions from '@/components/tasks/partials/QuickAddSuggestions.vue'
 import {draggableFor} from '@/components/base/Draggable'
 
@@ -162,9 +160,15 @@ const query = useQuery(computed(() => ({
 const showLoading = useDelayedLoading(query.isLoading)
 
 // Done tasks leave the board at once, before the refetch drops them.
-const tasks = computed(() => (query.data.value ?? []).filter(task => !task.done))
+// Newest first, like Google Tasks: a task added from the top of a card shows up right there.
+const tasks = computed(() => (query.data.value ?? [])
+	.filter(task => !task.done)
+	.sort((a, b) => (b.id ?? 0) - (a.id ?? 0)))
 
 const cards = computed<LabelCard[]>(() => {
+	// Phones snap the board to a card: a lone "No label" card shown before the load would stay snapped
+	// while the label cards appear in front of it, opening the board at its far end.
+	if (!query.data.value) return []
 	const used = new Map<number, LabelWithId>()
 	for (const task of tasks.value) {
 		for (const label of task.labels) {
@@ -296,7 +300,7 @@ $board-height: '100vh - 4.5rem - 1.5rem - 1rem - 1.5rem - 11px';
 .label-card {
 	// Contains the rows' absolutely positioned screen-reader inputs, which would otherwise widen the page.
 	position: relative;
-	flex: 0 0 300px;
+	flex: 0 0 340px;
 	max-inline-size: calc(100vw - 2rem);
 	max-block-size: 100%;
 	display: flex;
@@ -356,8 +360,8 @@ $board-height: '100vh - 4.5rem - 1.5rem - 1rem - 1.5rem - 11px';
 	list-style: none;
 }
 
-.label-card__footer {
-	padding: 0 .5rem .75rem;
+.label-card__add-row {
+	padding: 0 .5rem .25rem;
 
 	.label-card__add {
 		justify-content: flex-start;
@@ -382,38 +386,19 @@ $board-height: '100vh - 4.5rem - 1.5rem - 1rem - 1.5rem - 11px';
 	}
 }
 
-// Google Tasks style: the checkbox sits on the title's first line, not in the middle of a wrapped row.
-:deep(.single-task) {
-	align-items: flex-start;
-
-	.fancy-checkbox {
-		margin-block-start: 3px;
-	}
-
-	// A 300px card is too narrow for the title and the status side by side, so the status drops under the title.
-	.tasktext {
-		flex: 1 1 calc(100% - 2.5rem);
-	}
-
-	.task-status {
-		margin-block-start: .25rem;
-		margin-inline-start: 1.625rem;
-	}
-}
-
-:deep(.single-task .handle) {
+:deep(.board-task .handle) {
 	cursor: grab;
 	margin-inline-end: .25rem;
 	color: var(--grey-400);
 }
 
 @media (hover: hover) and (pointer: fine) {
-	:deep(.single-task .handle) {
+	:deep(.board-task .handle) {
 		display: none;
 	}
 }
 
-:deep(.label-card__tasks:not(.dragging-disabled) .single-task) {
+:deep(.label-card__tasks:not(.dragging-disabled) .board-task) {
 	cursor: grab;
 	-webkit-touch-callout: none;
 	user-select: none;

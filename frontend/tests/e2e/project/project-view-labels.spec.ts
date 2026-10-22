@@ -42,7 +42,7 @@ const card = (page: Page, title: string) => page.locator('.label-card').filter({
 })
 
 const drag = (page: Page, from: string, task: string, to: string) => card(page, from)
-	.locator('.single-task')
+	.locator('.board-task')
 	.filter({hasText: task})
 	.dragTo(card(page, to).locator('.label-card__tasks'))
 
@@ -82,7 +82,7 @@ test.describe('Project View Labels', () => {
 		await page.goto(`/projects/1/${VIEW_ID}`)
 
 		await card(page, 'Alpha').getByRole('button', {name: 'Add a task'}).click()
-		const input = card(page, 'Alpha').locator('.label-card__footer input')
+		const input = card(page, 'Alpha').locator('.label-card__add-row input')
 		await expect(input).toBeFocused()
 		await input.fill('Card task')
 		await input.press('Enter')
@@ -106,14 +106,14 @@ test.describe('Project View Labels', () => {
 		await page.goto(`/projects/1/${VIEW_ID}`)
 
 		await card(page, 'Alpha').getByRole('button', {name: 'Add a task'}).click()
-		const input = card(page, 'Alpha').locator('.label-card__footer input')
+		const input = card(page, 'Alpha').locator('.label-card__add-row input')
 		await input.fill('Card task')
 		await input.press('Enter')
 
 		await expect(page.locator('.global-notification')).toContainText('the label “Alpha” could not be added')
 		await expect(input).toHaveValue('')
 		await page.reload()
-		await expect(card(page, 'No label').locator('.single-task').filter({hasText: 'Card task'})).toHaveCount(1)
+		await expect(card(page, 'No label').locator('.board-task').filter({hasText: 'Card task'})).toHaveCount(1)
 	})
 
 	test('Dragging from one card to another relabels the task', async ({
@@ -164,7 +164,7 @@ test.describe('Project View Labels', () => {
 
 		await expect.poll(() => taskLabelIds(apiContext, userToken, 1)).toEqual([1, 3])
 		await expect(page.locator('.label-card__title')).toHaveText(['beta', 'Gamma', 'No label'])
-		await expect(card(page, 'beta').locator('.single-task').filter({hasText: 'Task 1'})).toHaveCount(1)
+		await expect(card(page, 'beta').locator('.board-task').filter({hasText: 'Task 1'})).toHaveCount(1)
 		await expect(card(page, 'Gamma')).toContainText('Task 1')
 	})
 
@@ -177,14 +177,14 @@ test.describe('Project View Labels', () => {
 		await seedTasks([[2, 3], [2]])
 		await page.goto(`/projects/1/${VIEW_ID}`)
 
-		await card(page, 'Alpha').locator('.single-task').filter({hasText: 'Task 1'}).locator('.fancy-checkbox').click()
+		await card(page, 'Alpha').locator('.board-task').filter({hasText: 'Task 1'}).locator('.fancy-checkbox').click()
 
-		await expect(page.locator('.label-card .single-task').filter({hasText: 'Task 1'})).toHaveCount(0)
+		await expect(page.locator('.label-card .board-task').filter({hasText: 'Task 1'})).toHaveCount(0)
 		await expect(card(page, 'Alpha')).toContainText('Task 2')
 		await expect.poll(async () => (await getTask(apiContext, userToken, 1)).done).toBe(true)
 		await page.reload()
 		await expect(card(page, 'Alpha')).toContainText('Task 2')
-		await expect(page.locator('.label-card .single-task').filter({hasText: 'Task 1'})).toHaveCount(0)
+		await expect(page.locator('.label-card .board-task').filter({hasText: 'Task 1'})).toHaveCount(0)
 	})
 
 	test('A label-filtered view shows tasks added to the card and drops tasks dragged out', async ({
@@ -197,20 +197,20 @@ test.describe('Project View Labels', () => {
 		await page.goto(`/projects/1/${VIEW_ID}`)
 
 		await expect(card(page, 'Alpha')).toContainText('Task 1')
-		await expect(page.locator('.label-card .single-task').filter({hasText: 'Task 2'})).toHaveCount(0)
+		await expect(page.locator('.label-card .board-task').filter({hasText: 'Task 2'})).toHaveCount(0)
 
 		await card(page, 'Alpha').getByRole('button', {name: 'Add a task'}).click()
-		const input = card(page, 'Alpha').locator('.label-card__footer input')
+		const input = card(page, 'Alpha').locator('.label-card__add-row input')
 		await input.fill('Filtered task')
 		await input.press('Enter')
 		await expect(card(page, 'Alpha')).toContainText('Filtered task')
 
 		await drag(page, 'Alpha', 'Task 1', 'No label')
-		await expect(page.locator('.label-card .single-task').filter({hasText: 'Task 1'})).toHaveCount(0)
+		await expect(page.locator('.label-card .board-task').filter({hasText: 'Task 1'})).toHaveCount(0)
 		await expect.poll(() => taskLabelIds(apiContext, userToken, 1)).toEqual([])
 
 		await page.reload()
 		await expect(card(page, 'Alpha')).toContainText('Filtered task')
-		await expect(page.locator('.label-card .single-task').filter({hasText: 'Task 1'})).toHaveCount(0)
+		await expect(page.locator('.label-card .board-task').filter({hasText: 'Task 1'})).toHaveCount(0)
 	})
 })
