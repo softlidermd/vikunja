@@ -79,7 +79,7 @@ export function buildStoredQuery(state: TaskListQueryState): LocationQueryRaw {
 }
 
 // The id is only a tie-breaker for the explicitly selected sort fields.
-function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskFilterParams {
+export function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskFilterParams {
 	const sortKeys = Object.keys(sortBy) as (keyof SortBy)[]
 	const idIndex = sortKeys.indexOf('id')
 	if (idIndex >= 0) {
@@ -92,32 +92,17 @@ function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskFilterPa
 }
 
 /**
- * This mixin provides a base set of methods and properties to get tasks.
+ * A project view's sort, filter, search and page in the URL, remembered per view so they
+ * come back when the view is opened again without a query (tab links, closing a task).
  */
-export function useTaskList(
-	projectIdGetter: ComputedGetter<number>,
-	projectViewIdGetter: ComputedGetter<number>,
-	sortByDefault: SortBy = SORT_BY_DEFAULT,
-	expandGetter: ComputedGetter<TaskExpansion> = () => ['subtasks'],
-) {
-	
-	const projectId = computed(() => projectIdGetter())
+export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortByDefault: SortBy) {
 	const projectViewId = computed(() => projectViewIdGetter())
-
 	const router = useRouter()
 	const viewFiltersStore = useViewFiltersStore()
-
-	const params = ref<TaskFilterParams>({...getDefaultTaskFilterParams()})
 
 	const page = useRouteQuery('page', '1', { transform: normalizePageNumber })
 	const filter = useRouteQuery('filter')
 	const s = useRouteQuery('s')
-
-	watch(filter, v => { params.value.filter = String(v ?? '') }, { immediate: true })
-	watch(s, v => { params.value.q = String(v ?? '') }, { immediate: true })
-
-	watch(() => params.value.filter, v => { filter.value = v || undefined })
-	watch(() => params.value.q, v => { s.value = v || undefined })
 
 	const sortQuery = useRouteQuery('sort')
 
@@ -175,6 +160,35 @@ export function useTaskList(
 		{immediate: true},
 	)
 
+	// Hold fetches while a stored query is being restored, or before this view's query was read.
+	const isReady = computed(() => !pendingQueryRestore.value && projectViewId.value === syncedViewId.value)
+
+	return {page, filter, s, sortQuery, sortBy, isReady}
+}
+
+/**
+ * This mixin provides a base set of methods and properties to get tasks.
+ */
+export function useTaskList(
+	projectIdGetter: ComputedGetter<number>,
+	projectViewIdGetter: ComputedGetter<number>,
+	sortByDefault: SortBy = SORT_BY_DEFAULT,
+	expandGetter: ComputedGetter<TaskExpansion> = () => ['subtasks'],
+) {
+	
+	const projectId = computed(() => projectIdGetter())
+	const projectViewId = computed(() => projectViewIdGetter())
+
+	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault)
+
+	const params = ref<TaskFilterParams>({...getDefaultTaskFilterParams()})
+
+	watch(filter, v => { params.value.filter = String(v ?? '') }, { immediate: true })
+	watch(s, v => { params.value.q = String(v ?? '') }, { immediate: true })
+
+	watch(() => params.value.filter, v => { filter.value = v || undefined })
+	watch(() => params.value.q, v => { s.value = v || undefined })
+
 	const allParams = computed(() => {
 		const loadParams = {...params.value}
 
@@ -214,7 +228,7 @@ export function useTaskList(
 	const query = useTasks(scope, {
 		page,
 		// Scope updates before the restore decision is made; hold the fetch until then.
-		enabled: () => !pendingQueryRestore.value && projectViewId.value === syncedViewId.value,
+		enabled: () => isReady.value,
 	})
 	const loading = query.isFetching
 	const {tasks, totalPages} = query

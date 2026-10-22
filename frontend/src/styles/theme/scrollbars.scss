@@ -1,31 +1,35 @@
-$scrollbar-height: 8px;
-$scrollbar-track-color: var(--grey-200);
-$scrollbar-thumb-color: var(--grey-300);
-$scrollbar-hover-color: var(--grey-500);
-
-// Chrome
+// Thin, rounded, no track and no arrow buttons.
+// Chrome and Safari: the ::-webkit rules. Chrome ignores them as soon as an element has
+// scrollbar-color or scrollbar-width, which would bring back the arrows, so those are Firefox only.
 ::-webkit-scrollbar {
-  width: $scrollbar-height;
-  height: $scrollbar-height;
+  width: 10px;
+  height: 10px;
 }
 
-::-webkit-scrollbar-track {
-  background: $scrollbar-track-color;
-  border-radius: .5rem;
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 ::-webkit-scrollbar-thumb {
-  border-radius: .5rem;
-  background: $scrollbar-thumb-color;
-  transition: all $transition;
+  // The transparent border insets the thumb, so it looks slimmer than its hit area.
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--grey-300);
+  background-clip: padding-box;
 
   &:hover {
-    background: $scrollbar-hover-color;
+    background-color: var(--grey-500);
   }
 }
 
-// Firefox
-* {
-  scrollbar-color: $scrollbar-thumb-color $scrollbar-track-color;
-  scrollbar-width: thin;
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-color: var(--grey-300) transparent;
+    scrollbar-width: thin;
+  }
 }

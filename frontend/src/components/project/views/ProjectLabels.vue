@@ -114,8 +114,7 @@
 
 <script setup lang="ts">
 import {computed, ref, toRef} from 'vue'
-import {keepPreviousData, useQuery} from '@tanstack/vue-query'
-import {useRouteQuery} from '@vueuse/router'
+import {useQuery} from '@tanstack/vue-query'
 import {useI18n} from 'vue-i18n'
 import type {SortableEvent} from 'sortablejs'
 
@@ -126,13 +125,13 @@ import LabelBoardTask from '@/components/tasks/partials/LabelBoardTask.vue'
 import QuickAddSuggestions from '@/components/tasks/partials/QuickAddSuggestions.vue'
 import {draggableFor} from '@/components/base/Draggable'
 
-import {allTasksQuery, type TaskFilterParams, type TaskResponse} from '@/client/queries/tasks'
+import {allTasksQuery, taskKeys, type TaskFilterParams, type TaskResponse} from '@/client/queries/tasks'
 import {isSavedFilterProject} from '@/client/queries/projects'
 import {sortLabelsAlphabetically} from '@/client/queries/labels'
 import {useAddTaskLabelMutation, useRemoveTaskLabelMutation} from '@/client/queries/taskMutations'
 import type {Label} from '@/client/generated'
 import {useCurrentProject} from '@/composables/useCurrentProject'
-import type {SortBy} from '@/composables/useTaskList'
+import {formatSortOrder, useViewQuery, type SortBy} from '@/composables/useTaskList'
 import {useQuickAddTask} from '@/composables/useQuickAddTask'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
@@ -161,37 +160,32 @@ const {t} = useI18n({useScope: 'global'})
 const authStore = useAuthStore()
 const {currentProject: project} = useCurrentProject()
 
-// Filter, search and sort live in the URL like the other views, so they survive opening a task.
-const filterQuery = useRouteQuery('filter')
-const searchQuery = useRouteQuery('s')
-const sortQuery = useRouteQuery('sort')
-
 // Newest first by default, like Google Tasks: a task added from the top of a card shows up right there.
-const DEFAULT_SORT = 'created:desc'
-const sortBy = computed<SortBy>({
-	get() {
-		const [field, order] = String(sortQuery.value || DEFAULT_SORT).split(':')
-		return {[field]: order === 'asc' ? 'asc' : 'desc'} as SortBy
-	},
-	set(value) {
-		const [field] = Object.keys(value) as (keyof SortBy)[]
-		const sort = `${field}:${value[field]}`
-		sortQuery.value = sort === DEFAULT_SORT ? undefined : sort
-	},
-})
+const DEFAULT_SORT: SortBy = {created: 'desc'}
+// Validated and remembered per view like the list, so a tab switch or a closed task keeps them.
+const {filter, s: search, sortQuery, sortBy, isReady} = useViewQuery(() => props.viewId, DEFAULT_SORT)
+// Not in the URL, like the list and Kanban.
+const includeNulls = ref(false)
 
 const filterParams = computed<TaskFilterParams>(() => ({
 	sort_by: [],
 	order_by: [],
-	filter: String(filterQuery.value ?? ''),
-	filter_include_nulls: false,
-	q: String(searchQuery.value ?? ''),
+	filter: String(filter.value ?? ''),
+	filter_include_nulls: includeNulls.value,
+	q: String(search.value ?? ''),
 }))
 
 function updateFilters(params: TaskFilterParams) {
-	filterQuery.value = params.filter || undefined
-	searchQuery.value = params.q || undefined
+	filter.value = params.filter || undefined
+	search.value = params.q || undefined
+	includeNulls.value = params.filter_include_nulls ?? false
 }
+
+// As in the list: a search without a chosen sort is left to the server's relevance order,
+// and a newer task wins a tie (same second), which keeps a just-added task on top.
+const sortParams = computed(() => filterParams.value.q && !sortQuery.value
+	? {sort_by: [], order_by: []}
+	: formatSortOrder({...sortBy.value, id: sortBy.value.id ?? 'desc'}, {}))
 
 const query = useQuery(computed(() => ({
 	...allTasksQuery({
@@ -200,17 +194,22 @@ const query = useQuery(computed(() => ({
 		params: {
 			filter: filterParams.value.filter ? `(${filterParams.value.filter}) && done = false` : 'done = false',
 			q: filterParams.value.q,
-			sort_by: Object.keys(sortBy.value),
-			order_by: Object.values(sortBy.value),
+			filter_include_nulls: includeNulls.value,
+			...sortParams.value,
 			filter_timezone: authStore.settings.timezone,
 			// The same expansions as the List view: the status chip needs the buckets.
 			expand: ['comment_count', 'is_unread', 'buckets'],
 		},
 	}),
 	// A view filter edited in the settings must show when the board is opened again.
+	enabled: isReady.value,
 	refetchOnMount: 'always' as const,
-	// A new filter or sort keeps the cards on screen until its tasks arrive, instead of blanking the board.
-	placeholderData: keepPreviousData,
+	// A new filter or sort keeps the cards on screen until its tasks arrive. Never another
+	// board's cards: the component is reused across projects, and a drop there would relabel them.
+	placeholderData: (previous: TaskResponse[] | undefined, previousQuery?: {queryKey: readonly unknown[]}) => {
+		const [project, view] = previousQuery?.queryKey.slice(taskKeys.allLists.length) ?? []
+		return project === projectId.value && view === props.viewId ? previous : undefined
+	},
 })))
 const showLoading = useDelayedLoading(query.isLoading)
 

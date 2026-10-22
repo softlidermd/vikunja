@@ -199,14 +199,11 @@ function openTaskDetail(e: MouseEvent) {
 	min-inline-size: 0;
 }
 
+// Not line-clamped: the clamp would also cut off the dots and avatars that trail a long title.
 .board-task__title-line {
-	display: -webkit-box;
-	overflow: hidden;
 	font-size: .9375rem;
 	line-height: 1.4;
 	overflow-wrap: anywhere;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 4;
 }
 
 .board-task__title {
@@ -225,6 +222,11 @@ function openTaskDetail(e: MouseEvent) {
 
 .board-task__assignees {
 	display: inline-flex;
+
+	// The list shows names beside avatars on phones; after a title they would wrap onto a line of their own.
+	:deep(.username) {
+		display: none;
+	}
 }
 
 .board-task__priority {

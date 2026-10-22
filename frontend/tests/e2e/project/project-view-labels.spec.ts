@@ -72,6 +72,36 @@ test.describe('Project View Labels', () => {
 		await expect(card(page, 'Alpha').locator('.label-card__count')).toHaveText('1')
 	})
 
+	test('Sorts and filters every card from the URL and never shows done tasks', async ({
+		authenticatedPage: page,
+	}) => {
+		await seedBoard()
+		await seedTasks([[2], [2], [2]])
+		await TaskFactory.create(1, {
+			id: 4,
+			index: 4,
+			title: 'Done task',
+			done: true,
+		}, false)
+		await LabelTaskFactory.create(1, {
+			id: 4,
+			task_id: 4,
+			label_id: 2,
+		}, false)
+		const titles = card(page, 'Alpha').locator('.board-task__title')
+
+		// Newest first by default, the id breaking ties between tasks created in the same second.
+		await page.goto(`/projects/1/${VIEW_ID}`)
+		await expect(titles).toHaveText(['Task 3', 'Task 2', 'Task 1'])
+
+		await page.goto(`/projects/1/${VIEW_ID}?sort=title:asc`)
+		await expect(titles).toHaveText(['Task 1', 'Task 2', 'Task 3'])
+
+		await page.goto(`/projects/1/${VIEW_ID}?filter=${encodeURIComponent('done = true')}`)
+		await expect(page.locator('.label-card__title')).toHaveText(['No label'])
+		await expect(page.locator('.board-task')).toHaveCount(0)
+	})
+
 	test('Adds a task with the card label', async ({
 		authenticatedPage: page,
 		apiContext,
