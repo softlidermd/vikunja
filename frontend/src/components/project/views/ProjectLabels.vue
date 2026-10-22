@@ -5,6 +5,19 @@
 		:project-id="projectId"
 		:view-id
 	>
+		<template #header>
+			<div class="filter-container">
+				<SortPopup v-model="sortBy" />
+				<FilterPopup
+					v-if="!isSavedFilterProject(project)"
+					:model-value="filterParams"
+					:view-id="viewId"
+					:project-id="projectId"
+					@update:modelValue="updateFilters"
+				/>
+			</div>
+		</template>
+
 		<div
 			class="labels-board loader-container"
 			:class="{'is-loading': showLoading}"
@@ -101,20 +114,25 @@
 
 <script setup lang="ts">
 import {computed, ref, toRef} from 'vue'
-import {useQuery} from '@tanstack/vue-query'
+import {keepPreviousData, useQuery} from '@tanstack/vue-query'
+import {useRouteQuery} from '@vueuse/router'
 import {useI18n} from 'vue-i18n'
 import type {SortableEvent} from 'sortablejs'
 
 import ProjectWrapper from '@/components/project/ProjectWrapper.vue'
+import FilterPopup from '@/components/project/partials/FilterPopup.vue'
+import SortPopup from '@/components/project/partials/SortPopup.vue'
 import LabelBoardTask from '@/components/tasks/partials/LabelBoardTask.vue'
 import QuickAddSuggestions from '@/components/tasks/partials/QuickAddSuggestions.vue'
 import {draggableFor} from '@/components/base/Draggable'
 
-import {allTasksQuery, type TaskResponse} from '@/client/queries/tasks'
+import {allTasksQuery, type TaskFilterParams, type TaskResponse} from '@/client/queries/tasks'
+import {isSavedFilterProject} from '@/client/queries/projects'
 import {sortLabelsAlphabetically} from '@/client/queries/labels'
 import {useAddTaskLabelMutation, useRemoveTaskLabelMutation} from '@/client/queries/taskMutations'
 import type {Label} from '@/client/generated'
 import {useCurrentProject} from '@/composables/useCurrentProject'
+import type {SortBy} from '@/composables/useTaskList'
 import {useQuickAddTask} from '@/composables/useQuickAddTask'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
@@ -143,12 +161,47 @@ const {t} = useI18n({useScope: 'global'})
 const authStore = useAuthStore()
 const {currentProject: project} = useCurrentProject()
 
+// Filter, search and sort live in the URL like the other views, so they survive opening a task.
+const filterQuery = useRouteQuery('filter')
+const searchQuery = useRouteQuery('s')
+const sortQuery = useRouteQuery('sort')
+
+// Newest first by default, like Google Tasks: a task added from the top of a card shows up right there.
+const DEFAULT_SORT = 'created:desc'
+const sortBy = computed<SortBy>({
+	get() {
+		const [field, order] = String(sortQuery.value || DEFAULT_SORT).split(':')
+		return {[field]: order === 'asc' ? 'asc' : 'desc'} as SortBy
+	},
+	set(value) {
+		const [field] = Object.keys(value) as (keyof SortBy)[]
+		const sort = `${field}:${value[field]}`
+		sortQuery.value = sort === DEFAULT_SORT ? undefined : sort
+	},
+})
+
+const filterParams = computed<TaskFilterParams>(() => ({
+	sort_by: [],
+	order_by: [],
+	filter: String(filterQuery.value ?? ''),
+	filter_include_nulls: false,
+	q: String(searchQuery.value ?? ''),
+}))
+
+function updateFilters(params: TaskFilterParams) {
+	filterQuery.value = params.filter || undefined
+	searchQuery.value = params.q || undefined
+}
+
 const query = useQuery(computed(() => ({
 	...allTasksQuery({
 		project: projectId.value,
 		view: props.viewId,
 		params: {
-			filter: 'done = false',
+			filter: filterParams.value.filter ? `(${filterParams.value.filter}) && done = false` : 'done = false',
+			q: filterParams.value.q,
+			sort_by: Object.keys(sortBy.value),
+			order_by: Object.values(sortBy.value),
 			filter_timezone: authStore.settings.timezone,
 			// The same expansions as the List view: the status chip needs the buckets.
 			expand: ['comment_count', 'is_unread', 'buckets'],
@@ -156,14 +209,13 @@ const query = useQuery(computed(() => ({
 	}),
 	// A view filter edited in the settings must show when the board is opened again.
 	refetchOnMount: 'always' as const,
+	// A new filter or sort keeps the cards on screen until its tasks arrive, instead of blanking the board.
+	placeholderData: keepPreviousData,
 })))
 const showLoading = useDelayedLoading(query.isLoading)
 
 // Done tasks leave the board at once, before the refetch drops them.
-// Newest first, like Google Tasks: a task added from the top of a card shows up right there.
-const tasks = computed(() => (query.data.value ?? [])
-	.filter(task => !task.done)
-	.sort((a, b) => (b.id ?? 0) - (a.id ?? 0)))
+const tasks = computed(() => (query.data.value ?? []).filter(task => !task.done))
 
 const cards = computed<LabelCard[]>(() => {
 	// Phones snap the board to a card: a lone "No label" card shown before the load would stay snapped
@@ -295,6 +347,16 @@ $board-height: '100vh - 4.5rem - 1.5rem - 1rem - 1.5rem - 11px';
 		padding-inline: .5rem;
 		scroll-snap-type: x mandatory;
 		scroll-padding-inline: .5rem;
+	}
+}
+
+.filter-container {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+
+	:deep(.popup) {
+		max-inline-size: 300px;
 	}
 }
 

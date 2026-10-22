@@ -19,23 +19,23 @@
 		</span>
 
 		<div class="board-task__body">
-			<TaskGlanceTooltip :task="task">
-				<RouterLink
-					:to="taskRoute"
-					class="board-task__title"
-				>
-					<span
-						v-if="priorityName"
-						v-tooltip="priorityName"
-						class="board-task__priority"
-						role="img"
-						:aria-label="priorityName"
-					>!</span>
-					{{ task.title }}
-				</RouterLink>
-			</TaskGlanceTooltip>
-
-			<div class="board-task__meta">
+			<!-- Dots and avatars trail the title text, so a task with nothing else stays one line tall. -->
+			<div class="board-task__title-line">
+				<TaskGlanceTooltip :task="task">
+					<RouterLink
+						:to="taskRoute"
+						class="board-task__title"
+					>
+						<span
+							v-if="priorityName"
+							v-tooltip="priorityName"
+							class="board-task__priority"
+							role="img"
+							:aria-label="priorityName"
+						>!</span>
+						{{ task.title }}
+					</RouterLink>
+				</TaskGlanceTooltip>
 				<span
 					v-for="label in labels"
 					:key="label.id"
@@ -47,10 +47,14 @@
 				/>
 				<AssigneeList
 					v-if="(task.assignees?.length ?? 0) > 0"
+					class="board-task__assignees"
 					:assignees="task.assignees ?? []"
 					:avatar-size="20"
 					inline
 				/>
+			</div>
+
+			<div class="board-task__meta">
 				<time
 					v-if="dueDate"
 					v-tooltip="formatDateLong(dueDate)"
@@ -195,19 +199,32 @@ function openTaskDetail(e: MouseEvent) {
 	min-inline-size: 0;
 }
 
-.board-task__title {
+.board-task__title-line {
 	display: -webkit-box;
 	overflow: hidden;
-	color: var(--text);
 	font-size: .9375rem;
 	line-height: 1.4;
 	overflow-wrap: anywhere;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 4;
+}
+
+.board-task__title {
+	color: var(--text);
 
 	&:hover {
 		color: var(--grey-900);
 	}
+}
+
+.board-task__dot,
+.board-task__assignees {
+	margin-inline-start: .375rem;
+	vertical-align: middle;
+}
+
+.board-task__assignees {
+	display: inline-flex;
 }
 
 .board-task__priority {
@@ -235,6 +252,7 @@ function openTaskDetail(e: MouseEvent) {
 }
 
 .board-task__dot {
+	display: inline-block;
 	inline-size: .5rem;
 	block-size: .5rem;
 	border-radius: 50%;
