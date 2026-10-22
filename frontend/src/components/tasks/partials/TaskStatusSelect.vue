@@ -1,6 +1,6 @@
 <template>
 	<span
-		v-if="kanbanView && currentBucket && !(hideDefaultBucket && currentBucket.id === kanbanView.default_bucket_id)"
+		v-if="kanbanView && currentBucket && !isHiddenDefault"
 		class="task-status"
 		:class="{
 			'is-done': currentBucket.id === kanbanView.done_bucket_id,
@@ -72,6 +72,10 @@ const bucketsResult = useQuery(computed(() => {
 }))
 
 const currentBucket = computed(() => props.task.buckets?.find(b => b.project_view_id === kanbanView.value?.id))
+// Deleting the default bucket leaves the id at 0, and the server then uses the leftmost bucket.
+const defaultBucketId = computed(() => kanbanView.value?.default_bucket_id ||
+	[...(bucketsResult.data.value ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0]?.id)
+const isHiddenDefault = computed(() => props.hideDefaultBucket && currentBucket.value?.id === defaultBucketId.value)
 // Until the buckets load, the select still has to show the current one.
 const options = computed(() => bucketsResult.data.value?.length
 	? bucketsResult.data.value

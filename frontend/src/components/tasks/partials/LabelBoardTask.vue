@@ -128,7 +128,9 @@ const isOverdue = computed(() => dueDate.value !== null && new Date(dueDate.valu
 
 function openTaskDetail(e: MouseEvent) {
 	const target = e.target as HTMLElement
-	if (target.closest('a, button, label, input, select, [role="button"]') || window.getSelection()?.toString()) {
+	const selected = window.getSelection()?.toString()
+	// A bare newline is what a plain click leaves selected in some browsers, the same rule as the list row.
+	if (target.closest('a, button, label, input, select, [role="button"]') || (selected && selected !== '\n')) {
 		return
 	}
 	router.push(taskRoute.value)
@@ -139,7 +141,8 @@ function openTaskDetail(e: MouseEvent) {
 .board-task {
 	display: flex;
 	align-items: flex-start;
-	gap: .5rem;
+	// Wider than the checkbox's 44px hit area spills out (13px), so a click on the title's first letter opens it.
+	gap: .875rem;
 	padding: .5rem;
 	border-radius: $radius;
 	cursor: pointer;
@@ -150,7 +153,7 @@ function openTaskDetail(e: MouseEvent) {
 	}
 
 	&:has(:focus-visible) {
-		box-shadow: 0 0 0 2px hsla(var(--primary-hsl), .5);
+		@include focus-ring;
 	}
 
 	&.loader-container.is-loading::after {
@@ -209,7 +212,7 @@ function openTaskDetail(e: MouseEvent) {
 
 .board-task__priority {
 	margin-inline-end: .25rem;
-	color: var(--danger);
+	color: var(--danger-text);
 	font-weight: 700;
 }
 

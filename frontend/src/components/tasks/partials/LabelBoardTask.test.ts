@@ -20,19 +20,42 @@ const baseTask = {
 	project_id: 1,
 	title: 'Write the invoice',
 	done: false,
-	labels: [{id: 1, title: 'Billing', hex_color: 'e8e8e8'}, {id: 2, title: 'Urgent', hex_color: 'ff0000'}],
+	labels: [
+		{
+			id: 1,
+			title: 'Billing',
+			hex_color: 'e8e8e8',
+		},
+		{
+			id: 2,
+			title: 'Urgent',
+			hex_color: 'ff0000',
+		},
+	],
 } as Task
 
 function mountRow(task: Partial<Task> = {}) {
 	const router = createRouter({
 		history: createMemoryHistory(),
 		routes: [
-			{path: '/', component: {render: () => null}},
-			{path: '/tasks/:id', name: 'task.detail', component: {render: () => null}},
+			{
+				path: '/',
+				component: {render: () => null},
+			},
+			{
+				path: '/tasks/:id',
+				name: 'task.detail',
+				component: {render: () => null},
+			},
 		],
 	})
 	const wrapper = mount(LabelBoardTask, {
-		props: {task: {...baseTask, ...task}, canMarkAsDone: true, canEditStatus: true, hiddenLabelId: 1},
+		props: {
+			task: {...baseTask, ...task},
+			canMarkAsDone: true,
+			canEditStatus: true,
+			hiddenLabelId: 1,
+		},
 		global: {
 			plugins: [createPinia(), router, [VueQueryPlugin, {queryClient: new QueryClient()}]],
 			directives: {tooltip: {}},

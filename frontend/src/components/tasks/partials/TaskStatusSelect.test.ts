@@ -69,7 +69,12 @@ const task = {
 	buckets: [buckets[0]],
 } as Task
 
-function mountSelect(canWrite = true, extraProps: {task?: Task, hideDefaultBucket?: boolean} = {}) {
+interface ExtraProps {
+	task?: Task
+	hideDefaultBucket?: boolean
+}
+
+function mountSelect(canWrite = true, extraProps: ExtraProps = {}) {
 	const queryClient = new QueryClient({defaultOptions: {queries: {retry: false}}})
 	queryClient.setQueryData(bucketKeys.list(1, 4), buckets)
 	return mount(TaskStatusSelect, {
@@ -133,9 +138,22 @@ describe('TaskStatusSelect', () => {
 	})
 
 	it('hides the default bucket only when asked to', async () => {
+		const inDoing = {...task, buckets: [buckets[1]]}
 		expect(mountSelect(true).find('.task-status').exists()).toBe(true)
 		expect(mountSelect(true, {hideDefaultBucket: true}).find('.task-status').exists()).toBe(false)
-		expect(mountSelect(true, {hideDefaultBucket: true, task: {...task, buckets: [buckets[1]]}}).find('.task-status').exists()).toBe(true)
+		expect(mountSelect(true, {hideDefaultBucket: true, task: inDoing}).find('.task-status').exists()).toBe(true)
+	})
+
+	it('treats the leftmost bucket as the default once the default bucket was deleted', async () => {
+		const view = project.views[1] as {default_bucket_id?: number}
+		view.default_bucket_id = 0
+		try {
+			const wrapper = mountSelect(true, {hideDefaultBucket: true})
+			await flushPromises()
+			expect(wrapper.find('.task-status').exists()).toBe(false)
+		} finally {
+			view.default_bucket_id = 10
+		}
 	})
 
 	it('puts the old bucket back when the move fails', async () => {

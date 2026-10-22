@@ -168,7 +168,8 @@ const tasks = computed(() => (query.data.value ?? [])
 const cards = computed<LabelCard[]>(() => {
 	// Phones snap the board to a card: a lone "No label" card shown before the load would stay snapped
 	// while the label cards appear in front of it, opening the board at its far end.
-	if (!query.data.value) return []
+	// Only while loading: after a failed load the board still offers its add line.
+	if (query.isPending.value) return []
 	const used = new Map<number, LabelWithId>()
 	for (const task of tasks.value) {
 		for (const label of task.labels) {

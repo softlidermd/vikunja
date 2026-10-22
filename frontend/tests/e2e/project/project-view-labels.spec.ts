@@ -90,6 +90,9 @@ test.describe('Project View Labels', () => {
 		const row = card(page, 'Alpha').locator('[data-task-id]').filter({hasText: 'Card task'})
 		await expect(row).toBeVisible()
 		await expect(input).toHaveValue('')
+		// The add line sits above the tasks, and the new task comes first, ahead of the older Task 1.
+		await expect(card(page, 'Alpha').locator('.label-card__add-row + .label-card__tasks')).toHaveCount(1)
+		await expect(card(page, 'Alpha').locator('.board-task__title')).toHaveText([/Card task/, /Task 1/])
 		const taskId = Number(await row.getAttribute('data-task-id'))
 		await expect.poll(() => taskLabelIds(apiContext, userToken, taskId)).toEqual([2])
 	})
