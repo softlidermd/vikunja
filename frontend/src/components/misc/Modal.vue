@@ -285,8 +285,8 @@ $modal-width: 1024px;
 	// dialog's subtree re-renders, or while display is transitioned) even
 	// though getComputedStyle still reports the color. The dialog fills the
 	// viewport anyway, and its opacity transition fades the scrim with it —
-	// same as the old div-based .modal-mask.
-	background: rgba(0, 0, 0, .8);
+	// same as the old div-based .modal-mask. 50% black like Bootstrap's backdrop.
+	background: rgba(0, 0, 0, .5);
 	color: #ffffff;
 	// Fill viewport
 	position: fixed;
