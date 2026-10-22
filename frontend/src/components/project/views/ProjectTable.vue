@@ -253,12 +253,16 @@
 									<th v-if="activeColumns.createdBy">
 										{{ $t('task.attributes.createdBy') }}
 									</th>
+									<th v-if="canWrite">
+										<span class="is-sr-only">{{ $t('misc.actions') }}</span>
+									</th>
 								</tr>
 							</thead>
 							<tbody>
 								<tr
 									v-for="t in tasks"
 									:key="t.id"
+									:data-progress="getTaskProgress(t, statusView, statusDefaultBucketId)"
 								>
 									<td v-if="activeColumns.index">
 										<RouterLink :to="taskDetailRoutes[t.id]">
@@ -421,6 +425,12 @@
 											:user="t.created_by ?? {}"
 										/>
 									</td>
+									<td v-if="canWrite">
+										<TaskQuickActions
+											:task="t"
+											can-write
+										/>
+									</td>
 								</tr>
 							</tbody>
 						</table>
@@ -500,6 +510,7 @@ import EditAssignees from '@/components/tasks/partials/EditAssignees.vue'
 import EditLabels from '@/components/tasks/partials/EditLabels.vue'
 import Datepicker from '@/components/input/Datepicker.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import TaskQuickActions from '@/components/tasks/partials/TaskQuickActions.vue'
 import TaskStatusSelect from '@/components/tasks/partials/TaskStatusSelect.vue'
 
 import type {SortBy} from '@/composables/useTaskList'
@@ -521,6 +532,9 @@ import {useAuthStore} from '@/stores/auth'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getDisplayName} from '@/helpers/user'
 import {getStatusKanbanView} from '@/helpers/projectView'
+import {getDefaultBucketId, getTaskProgress} from '@/composables/useTaskStatus'
+import {bucketsQuery} from '@/client/queries/kanban'
+import {useQuery} from '@tanstack/vue-query'
 import {canAutoFocus} from '@/directives/focus'
 
 const props = defineProps<{
@@ -584,8 +598,13 @@ const taskList = useTaskList(
 )
 
 // Saved filters span projects and some projects have no kanban board, so there is no status to show.
-const hasStatus = computed(() => props.projectId > 0
-	&& getStatusKanbanView(project.value?.views, props.viewId) !== null)
+const statusView = computed(() => props.projectId > 0 ? getStatusKanbanView(project.value?.views, props.viewId) : null)
+const hasStatus = computed(() => statusView.value !== null)
+const statusBuckets = useQuery(computed(() => {
+	const options = bucketsQuery(props.projectId, statusView.value?.id ?? 0)
+	return {...options, enabled: options.enabled && !statusView.value?.default_bucket_id}
+}))
+const statusDefaultBucketId = computed(() => getDefaultBucketId(statusView.value, statusBuckets.data.value))
 const showStatus = computed(() => hasStatus.value && activeColumns.value.status)
 
 const {

@@ -1,0 +1,29 @@
+// A task's status at a glance on the List, Table and labels board rows: a tint and a bar on the start edge.
+[data-progress='in-progress'] {
+  --task-progress: var(--primary-h), var(--primary-s), var(--primary-l);
+}
+
+[data-progress='done'] {
+  --task-progress: var(--success-h), var(--success-s), var(--success-l);
+}
+
+:is(.board-task, .single-task)[data-progress],
+tr[data-progress] > td {
+  background-color: hsla(var(--task-progress), .1);
+}
+
+// Doubled attribute: beats the rows' own hover background, so the tint deepens instead of turning grey.
+:is(.board-task, .single-task)[data-progress][data-progress]:hover,
+tr[data-progress]:hover > td {
+  background-color: hsla(var(--task-progress), .18);
+}
+
+// A shadow, not a border, so the row keeps its size.
+:is(.board-task, .single-task)[data-progress],
+tr[data-progress] > td:first-child {
+  box-shadow: inset 3px 0 0 hsl(var(--task-progress));
+
+  [dir='rtl'] & {
+    box-shadow: inset -3px 0 0 hsl(var(--task-progress));
+  }
+}

@@ -3,6 +3,7 @@
 		class="board-task loader-container"
 		:class="{'is-loading': isLoading}"
 		:data-task-id="task.id"
+		:data-progress="progress"
 		@click="openTaskDetail"
 	>
 		<span
@@ -69,13 +70,17 @@
 				/>
 			</div>
 		</div>
+		<TaskQuickActions
+			:task="task"
+			:can-write="canEditStatus"
+		/>
 		<slot />
 	</div>
 </template>
 
 <script setup lang="ts">
 import {computed} from 'vue'
-import {useRouter} from 'vue-router'
+import {useRoute, useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
 import type {Task} from '@/client/generated'
@@ -83,10 +88,12 @@ import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
 import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
 import CommentCount from '@/components/tasks/partials/CommentCount.vue'
 import TaskGlanceTooltip from '@/components/tasks/partials/TaskGlanceTooltip.vue'
+import TaskQuickActions from '@/components/tasks/partials/TaskQuickActions.vue'
 import TaskStatusSelect from '@/components/tasks/partials/TaskStatusSelect.vue'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {useGlobalNow} from '@/composables/useGlobalNow'
 import {useMarkTaskDone} from '@/composables/useMarkTaskDone'
+import {useTaskStatus} from '@/composables/useTaskStatus'
 import {PRIORITIES} from '@/constants/priorities'
 import {getHexColor} from '@/helpers/task'
 import {formatDateLong, formatDisplayDate, formatISO} from '@/helpers/time/formatDate'
@@ -101,13 +108,16 @@ const props = defineProps<{
 
 const {t} = useI18n({useScope: 'global'})
 const router = useRouter()
+const route = useRoute()
 const {now} = useGlobalNow()
 
 const task = computed(() => props.task)
 const {markAsDone, isSaving} = useMarkTaskDone(task)
+const {progress} = useTaskStatus(task, false)
 const isLoading = useDelayedLoading(isSaving)
 
-const taskRoute = computed(() => ({name: 'task.detail', params: {id: props.task.id}}))
+// Opens as a modal over the board, like Kanban, so the board keeps its scroll position.
+const taskRoute = computed(() => ({name: 'task.detail', params: {id: props.task.id}, state: {backdropView: route.fullPath}}))
 const labels = computed(() => (props.task.labels ?? []).filter(label => label.id !== props.hiddenLabelId))
 
 // Only what needs attention: lower priorities are the noise this row exists to drop.

@@ -9,6 +9,7 @@
 			class="task loader-container single-task"
 			tabindex="-1"
 			:data-is-overdue="isOverdue || undefined"
+			:data-progress="progress"
 			@click="openTaskDetail"
 			@keyup.enter="openTaskDetail"
 		>
@@ -174,6 +175,12 @@
 				{{ project.title }}
 			</RouterLink>
 
+			<TaskQuickActions
+				v-if="canEditStatus"
+				:task="task"
+				:can-write="!disabled"
+			/>
+
 			<BaseButton
 				:class="{'is-favorite': task.is_favorite}"
 				class="favorite"
@@ -221,6 +228,7 @@ import type {Task as ITask} from '@/client/generated'
 import PriorityLabel from '@/components/tasks/partials/PriorityLabel.vue'
 import Labels from '@/components/tasks/partials/Labels.vue'
 import TaskGlanceTooltip from '@/components/tasks/partials/TaskGlanceTooltip.vue'
+import TaskQuickActions from '@/components/tasks/partials/TaskQuickActions.vue'
 import DeferTask from '@/components/tasks/partials/DeferTask.vue'
 import ChecklistSummary from '@/components/tasks/partials/ChecklistSummary.vue'
 import CommentCount from '@/components/tasks/partials/CommentCount.vue'
@@ -244,6 +252,7 @@ import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
 import {useGlobalNow} from '@/composables/useGlobalNow'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {useMarkTaskDone} from '@/composables/useMarkTaskDone'
+import {useTaskStatus} from '@/composables/useTaskStatus'
 
 const props = withDefaults(defineProps<{
 	theTask: ITask,
@@ -288,6 +297,7 @@ const {markAsDone, isRepeating, isSaving} = useMarkTaskDone(task, (updated, reve
 	if (!reverted) emit('taskUpdated', updated)
 })
 const favoriteTask = useFavoriteTaskMutation()
+const {progress} = useTaskStatus(task, false)
 const isLoading = useDelayedLoading(() => isSaving.value || favoriteTask.isPending.value)
 
 const project = computed(() => projectList.projects[task.value.project_id ?? 0])

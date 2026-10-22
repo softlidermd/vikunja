@@ -4,6 +4,7 @@
 		class="task-status"
 		:class="{
 			'is-done': currentBucket.id === kanbanView.done_bucket_id,
+			'is-in-progress': progress === 'in-progress',
 			'is-editable': canWrite,
 		}"
 	>
@@ -35,16 +36,10 @@
 
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
-import {useQuery} from '@tanstack/vue-query'
 
 import type {Task} from '@/client/generated'
-import {bucketsQuery} from '@/client/queries/kanban'
-import {useMoveTaskMutation} from '@/client/queries/taskMutations'
 import {isRequestContextAbort} from '@/client/requestContext'
-import {useProjects} from '@/composables/useProjects'
-import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
-import {getStatusKanbanView} from '@/helpers/projectView'
-import {useBaseStore} from '@/stores/base'
+import {useTaskStatus} from '@/composables/useTaskStatus'
 
 const props = defineProps<{
 	task: Task,
@@ -53,32 +48,12 @@ const props = defineProps<{
 	hideDefaultBucket?: boolean,
 }>()
 
-const projectList = useProjects()
-const baseStore = useBaseStore()
-const moveMutation = useMoveTaskMutation()
-const {queueTaskSave} = useTaskSaveQueue()
+const {kanbanView, buckets, currentBucket, defaultBucketId, progress, moveToBucket} = useTaskStatus(() => props.task, () => props.canWrite)
 
-const kanbanView = computed(() => getStatusKanbanView(
-	projectList.projects[props.task.project_id ?? 0]?.views,
-	baseStore.currentProjectViewId,
-))
-
-const bucketsResult = useQuery(computed(() => {
-	const options = bucketsQuery(props.task.project_id ?? 0, kanbanView.value?.id ?? 0)
-	return {
-		...options,
-		enabled: props.canWrite && options.enabled,
-	}
-}))
-
-const currentBucket = computed(() => props.task.buckets?.find(b => b.project_view_id === kanbanView.value?.id))
-// Deleting the default bucket leaves the id at 0, and the server then uses the leftmost bucket.
-const defaultBucketId = computed(() => kanbanView.value?.default_bucket_id ||
-	[...(bucketsResult.data.value ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0]?.id)
 const isHiddenDefault = computed(() => props.hideDefaultBucket && currentBucket.value?.id === defaultBucketId.value)
 // Until the buckets load, the select still has to show the current one.
-const options = computed(() => bucketsResult.data.value?.length
-	? bucketsResult.data.value
+const options = computed(() => buckets.value.length
+	? buckets.value
 	: [currentBucket.value!])
 
 const selected = ref<number>()
@@ -87,23 +62,13 @@ watch(() => currentBucket.value?.id, id => {
 }, {immediate: true})
 
 async function changeBucket() {
-	const view = kanbanView.value?.id
 	const bucket = selected.value
-	const task = props.task
-	if (view === undefined || bucket === undefined || task.id === undefined) {
+	if (bucket === undefined) {
 		return
 	}
 	let placed: number | undefined
 	try {
-		// Queued with the task's other saves: the response is the whole task and would overwrite a newer edit.
-		const result = await queueTaskSave(task.id, () => moveMutation.mutateAsync({
-			project: task.project_id!,
-			view,
-			bucket,
-			task,
-		}))
-		// A repeating task moved to done is reopened in its old bucket, so the watched bucket id does not change.
-		placed = result?.bucket_id
+		placed = await moveToBucket(bucket)
 	} catch (e) {
 		if (isRequestContextAbort(e)) {
 			return
@@ -131,6 +96,11 @@ async function changeBucket() {
 	line-height: 1.375rem;
 	white-space: nowrap;
 	vertical-align: middle;
+
+	&.is-in-progress {
+		background: hsla(var(--primary-hsl), .2);
+		color: var(--text);
+	}
 
 	&.is-done {
 		// A tint with theme text: bright green text on a light background fails contrast.

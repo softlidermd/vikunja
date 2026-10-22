@@ -15,6 +15,10 @@ vi.mock('@/message', () => ({error: vi.fn(), success: vi.fn()}))
 vi.mock('@/helpers/playPop', () => ({playPopSound: vi.fn()}))
 vi.mock('@/composables/useProjects', () => ({useProjects: () => ({projects: {}})}))
 vi.mock('@/composables/useCurrentProject', () => ({useCurrentProject: () => ({currentProject: {value: null}})}))
+vi.mock('@/composables/useTaskStatus', async () => {
+	const {ref} = await import('vue')
+	return {useTaskStatus: () => ({progress: ref(undefined)})}
+})
 vi.mock('vue-i18n', async importOriginal => ({
 	...(await importOriginal<typeof import('vue-i18n')>()),
 	useI18n: () => ({t: (key: string) => key}),
