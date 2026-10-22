@@ -117,7 +117,11 @@ const {progress} = useTaskStatus(task, false)
 const isLoading = useDelayedLoading(isSaving)
 
 // Opens as a modal over the board, like Kanban, so the board keeps its scroll position.
-const taskRoute = computed(() => ({name: 'task.detail', params: {id: props.task.id}, state: {backdropView: route.fullPath}}))
+const taskRoute = computed(() => ({
+	name: 'task.detail',
+	params: {id: props.task.id},
+	state: {backdropView: route.fullPath},
+}))
 const labels = computed(() => (props.task.labels ?? []).filter(label => label.id !== props.hiddenLabelId))
 
 // Only what needs attention: lower priorities are the noise this row exists to drop.

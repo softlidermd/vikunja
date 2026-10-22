@@ -1,7 +1,7 @@
 import {describe, it, expect} from 'vitest'
 
 import type {ProjectView, Task} from '@/client/generated'
-import {getDefaultBucketId, getTaskProgress} from './useTaskStatus'
+import {getTaskProgress} from './useTaskStatus'
 
 const view = {
 	id: 4,
@@ -30,12 +30,5 @@ describe('getTaskProgress', () => {
 
 	it('marks nothing in progress while the default bucket is unknown', () => {
 		expect(getTaskProgress(inBucket(11), view, undefined)).toBeUndefined()
-	})
-})
-
-describe('getDefaultBucketId', () => {
-	it('falls back to the leftmost bucket once the default bucket was deleted', () => {
-		const buckets = [{id: 21, position: 2}, {id: 20, position: 1}]
-		expect(getDefaultBucketId({...view, default_bucket_id: 0}, buckets)).toBe(20)
 	})
 })

@@ -48,7 +48,14 @@ const props = defineProps<{
 	hideDefaultBucket?: boolean,
 }>()
 
-const {kanbanView, buckets, currentBucket, defaultBucketId, progress, moveToBucket} = useTaskStatus(() => props.task, () => props.canWrite)
+const {
+	kanbanView,
+	buckets,
+	currentBucket,
+	defaultBucketId,
+	progress,
+	moveToBucket,
+} = useTaskStatus(() => props.task, () => props.canWrite)
 
 const isHiddenDefault = computed(() => props.hideDefaultBucket && currentBucket.value?.id === defaultBucketId.value)
 // Until the buckets load, the select still has to show the current one.
@@ -113,6 +120,10 @@ async function changeBucket() {
 
 		&:hover {
 			background: var(--grey-200);
+		}
+
+		&.is-in-progress:hover {
+			background: hsla(var(--primary-hsl), .3);
 		}
 
 		&.is-done:hover {

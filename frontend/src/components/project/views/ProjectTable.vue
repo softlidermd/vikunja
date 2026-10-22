@@ -532,7 +532,8 @@ import {useAuthStore} from '@/stores/auth'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getDisplayName} from '@/helpers/user'
 import {getStatusKanbanView} from '@/helpers/projectView'
-import {getDefaultBucketId, getTaskProgress} from '@/composables/useTaskStatus'
+import {getTaskProgress} from '@/composables/useTaskStatus'
+import {getDefaultBucketId} from '@/helpers/task'
 import {bucketsQuery} from '@/client/queries/kanban'
 import {useQuery} from '@tanstack/vue-query'
 import {canAutoFocus} from '@/directives/focus'
@@ -598,13 +599,20 @@ const taskList = useTaskList(
 )
 
 // Saved filters span projects and some projects have no kanban board, so there is no status to show.
-const statusView = computed(() => props.projectId > 0 ? getStatusKanbanView(project.value?.views, props.viewId) : null)
+const statusView = computed(() => props.projectId > 0
+	? getStatusKanbanView(project.value?.views, props.viewId)
+	: null)
 const hasStatus = computed(() => statusView.value !== null)
 const statusBuckets = useQuery(computed(() => {
 	const options = bucketsQuery(props.projectId, statusView.value?.id ?? 0)
-	return {...options, enabled: options.enabled && !statusView.value?.default_bucket_id}
+	return {
+		...options,
+		enabled: options.enabled && !statusView.value?.default_bucket_id,
+	}
 }))
-const statusDefaultBucketId = computed(() => getDefaultBucketId(statusView.value, statusBuckets.data.value))
+const statusDefaultBucketId = computed(() => statusView.value
+	? getDefaultBucketId(statusView.value, statusBuckets.data.value ?? [])
+	: undefined)
 const showStatus = computed(() => hasStatus.value && activeColumns.value.status)
 
 const {

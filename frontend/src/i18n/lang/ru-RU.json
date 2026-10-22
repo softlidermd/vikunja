@@ -976,11 +976,8 @@
 	"task": {
 		"quickActions": {
 			"label": "Действия с задачей «{task}»",
-			"status": "Статус",
 			"assignMe": "Назначить меня",
-			"unassignMe": "Снять меня",
-			"copyLink": "Копировать ссылку",
-			"linkCopied": "Ссылка скопирована."
+			"unassignMe": "Снять меня"
 		},
 		"new": "Создать задачу",
 		"createSuccess": "Задача удалена.",
@@ -1584,6 +1581,10 @@
 			"licenseManage": "Управление"
 		},
 		"searchUsersPlaceholder": "Поиск по имени пользователя или электронной почте…",
+		"inviteLinks": {
+			"copy": "Копировать ссылку",
+			"copied": "Ссылка скопирована"
+		},
 		"users": {
 			"status": "Статус",
 			"details": "Детали",

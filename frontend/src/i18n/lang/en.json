@@ -1123,11 +1123,8 @@
   "task": {
     "quickActions": {
       "label": "Actions for {task}",
-      "status": "Status",
       "assignMe": "Assign to me",
-      "unassignMe": "Remove me",
-      "copyLink": "Copy link",
-      "linkCopied": "The link has been copied."
+      "unassignMe": "Remove me"
     },
     "new": "Create a task",
     "createSuccess": "The task was successfully created.",

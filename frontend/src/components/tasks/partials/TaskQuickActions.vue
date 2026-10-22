@@ -1,5 +1,5 @@
 <template>
-	<!-- The menu is a DOM child of the row: stop its clicks opening the task, its keys reaching the row and its presses starting a drag. -->
+	<!-- A DOM child of the row: keep its clicks, keys and presses from opening the task or starting a drag. -->
 	<span
 		class="task-quick-actions"
 		@click.stop
@@ -22,6 +22,8 @@
 					:aria-label="$t('task.quickActions.label', {task: task.title})"
 					:aria-expanded="open ? 'true' : 'false'"
 					@click="toggle()"
+					@pointerenter="wantsBuckets = true"
+					@focus="wantsBuckets = true"
 				>
 					<Icon icon="ellipsis-v" />
 				</BaseButton>
@@ -36,7 +38,7 @@
 				>
 					<template v-if="canWrite && kanbanView && buckets.length > 0">
 						<p class="task-quick-actions__heading">
-							{{ $t('task.quickActions.status') }}
+							{{ $t('task.attributes.status') }}
 						</p>
 						<DropdownItem
 							v-for="bucket in buckets"
@@ -61,7 +63,7 @@
 						icon="link"
 						@click="run(close, copyLink)"
 					>
-						{{ $t('task.quickActions.copyLink') }}
+						{{ $t('admin.inviteLinks.copy') }}
 					</DropdownItem>
 					<DropdownItem
 						v-if="canWrite"
@@ -97,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref, watch} from 'vue'
+import {computed, nextTick, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
@@ -113,6 +115,7 @@ import Icon from '@/components/misc/Icon'
 import Modal from '@/components/misc/Modal.vue'
 import Popup from '@/components/misc/Popup.vue'
 import {useCopyToClipboard} from '@/composables/useCopyToClipboard'
+import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {useTaskStatus} from '@/composables/useTaskStatus'
 import {success} from '@/message'
 import {useAuthStore} from '@/stores/auth'
@@ -129,12 +132,17 @@ const copy = useCopyToClipboard()
 const addAssignee = useAddTaskAssigneeMutation()
 const removeAssignee = useRemoveTaskAssigneeMutation()
 const deleteMutation = useDeleteTaskMutation()
+const {queueTaskSave} = useTaskSaveQueue()
 
 const open = ref(false)
 const showDeleteModal = ref(false)
+// Loaded when the trigger is pointed at, not per row up front, and before the menu opens so it does not grow under the cursor.
+const wantsBuckets = ref(false)
 
-// Buckets load on the first open only, so a long list does not fetch them up front.
-const {kanbanView, buckets, currentBucket, moveToBucket} = useTaskStatus(() => props.task, () => open.value && props.canWrite)
+const {kanbanView, buckets, currentBucket, moveToBucket} = useTaskStatus(
+	() => props.task,
+	() => (wantsBuckets.value || open.value) && props.canWrite,
+)
 
 const trigger = ref<InstanceType<typeof BaseButton> | null>(null)
 const triggerEl = computed<HTMLElement | null>(() => trigger.value?.$el ?? null)
@@ -168,22 +176,36 @@ async function toggleAssignMe() {
 	if (user?.id === undefined || props.task.id === undefined) {
 		return
 	}
-	// The assignee endpoints add or remove one user, so the other assignees stay.
-	const input = {taskId: props.task.id, user: {...user, id: user.id}}
-	await (isAssignedToMe.value ? removeAssignee : addAssignee).mutateAsync(input)
+	const input = {
+		taskId: props.task.id,
+		user: {...user, id: user.id},
+	}
+	const remove = isAssignedToMe.value
+	// Queued: a status move still in flight answers with the whole task and would drop the new assignee.
+	await queueTaskSave(input.taskId, async () => {
+		await (remove ? removeAssignee.mutateAsync(input) : addAssignee.mutateAsync(input))
+	})
 }
 
 async function copyLink() {
 	const {href} = router.resolve({name: 'task.detail', params: {id: props.task.id}})
 	if (await copy(new URL(href, window.location.href).href)) {
-		success({message: t('task.quickActions.linkCopied')})
+		success({message: t('admin.inviteLinks.copied')})
 	}
 }
 
 async function deleteTask() {
+	if (deleteMutation.isPending.value) {
+		return
+	}
+	// The row, its trigger and this dialog go away with the task, so the focus moves to a neighbouring row.
+	const row = triggerEl.value?.closest('[data-task-id], tr')
+	const neighbour = row?.nextElementSibling ?? row?.previousElementSibling
 	await deleteMutation.mutateAsync(props.task.id!)
 	showDeleteModal.value = false
 	success({message: t('task.detail.deleteSuccess')})
+	await nextTick()
+	neighbour?.querySelector<HTMLElement>('.task-quick-actions__trigger, a[href]')?.focus()
 }
 </script>
 
@@ -210,10 +232,10 @@ async function deleteTask() {
 	}
 }
 
-// Like the List row's favorite star: shown on the row's hover so it does not add noise to every row.
-// Touch screens have no hover, so it stays visible there.
+// Shown on the row's hover like the List row's star; touch has no hover, so it stays visible there.
+// :focus, not :focus-visible: the focus returned after Escape or an action is programmatic.
 @media (hover: hover) and (pointer: fine) {
-	.task-quick-actions__trigger:not(:focus-visible, [aria-expanded='true']) {
+	.task-quick-actions__trigger:not(:focus, [aria-expanded='true']) {
 		opacity: 0;
 	}
 

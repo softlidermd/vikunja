@@ -5,6 +5,8 @@ import {ProjectViewFactory} from '../../factories/project_view'
 import {TaskFactory} from '../../factories/task'
 import {LabelFactory} from '../../factories/labels'
 import {LabelTaskFactory} from '../../factories/label_task'
+import {BucketFactory} from '../../factories/bucket'
+import {TaskBucketFactory} from '../../factories/task_buckets'
 
 const VIEW_ID = 5
 
@@ -199,6 +201,52 @@ test.describe('Project View Labels', () => {
 		await expect(page.locator('.label-card__title')).toHaveText(['beta', 'Gamma', 'No label'])
 		await expect(card(page, 'beta').locator('.board-task').filter({hasText: 'Task 1'})).toHaveCount(1)
 		await expect(card(page, 'Gamma')).toContainText('Task 1')
+	})
+
+	test('The row menu moves a task to another Kanban bucket and highlights the row', async ({
+		authenticatedPage: page,
+		apiContext,
+		userToken,
+	}) => {
+		await seedBoard()
+		await seedTasks([[2]])
+		await ProjectViewFactory.create(1, {
+			id: 6,
+			project_id: 1,
+			view_kind: 3,
+			bucket_configuration_mode: 1,
+			default_bucket_id: 1,
+			done_bucket_id: 3,
+		}, false)
+		const bucketTitles = ['To-Do', 'Doing', 'Done']
+		await BucketFactory.create(3, {
+			id: '{increment}',
+			title: (i: number) => bucketTitles[i - 1],
+			project_view_id: 6,
+			position: (i: number) => i,
+		})
+		await TaskBucketFactory.create(1, {
+			task_id: 1,
+			bucket_id: 1,
+			project_view_id: 6,
+		})
+		await page.goto(`/projects/1/${VIEW_ID}`)
+
+		const row = card(page, 'Alpha').locator('.board-task').filter({hasText: 'Task 1'})
+		await expect(row).not.toHaveAttribute('data-progress')
+		await row.hover()
+		await row.locator('.task-quick-actions__trigger').click()
+		await page.locator('.task-quick-actions__menu .dropdown-item', {hasText: 'Doing'}).click()
+
+		await expect(row).toHaveAttribute('data-progress', 'in-progress')
+		await expect(row.locator('.task-status')).toContainText('Doing')
+		await expect(page).toHaveURL(new RegExp(`/projects/1/${VIEW_ID}$`))
+		await expect.poll(async () => {
+			const response = await apiContext.get('tasks/1?expand=buckets', {headers: {Authorization: `Bearer ${userToken}`}})
+			return ((await response.json()).buckets ?? []).map((bucket: {id: number}) => bucket.id)
+		}).toEqual([2])
+		await page.reload()
+		await expect(row).toHaveAttribute('data-progress', 'in-progress')
 	})
 
 	test('Ticking a task done removes it from every card', async ({
