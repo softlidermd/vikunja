@@ -268,7 +268,8 @@ export function parseFilter(filter: string): Condition[] | null {
 		}
 		if (operator === 'in' || operator === '?=' || (operator === '=' && values.length === 1)) {
 			conditions.push({field, negate: false, values})
-		} else if (operator === 'not in') {
+		} else if (operator === 'not in' && field !== 'bucket_id') {
+			// A task has a bucket row per Kanban view, so "not in" still matches through its other views' rows.
 			conditions.push({field, negate: true, values})
 		} else {
 			return null

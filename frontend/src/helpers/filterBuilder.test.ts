@@ -73,6 +73,7 @@ describe('filter builder', () => {
 			'just some search text',
 			'assignees in "unclosed',
 			'labels in 1,',
+			'bucket_id not in 2',
 		]) {
 			expect(parseFilter(query), query).toBeNull()
 		}

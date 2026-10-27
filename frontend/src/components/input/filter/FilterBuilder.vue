@@ -56,6 +56,7 @@
 					>
 						<template v-if="isMultiCondition(condition)">
 							<div
+								v-if="condition.field !== 'bucket_id'"
 								class="filter-builder__segmented"
 								role="group"
 							>
@@ -410,10 +411,8 @@ const statusView = computed(() => getStatusKanbanView(projectViews.value, props.
 // Any bucket_id in a Kanban view's filter makes the API return a flat list instead of the board.
 const canFilterStatus = computed(() => statusView.value !== null && props.viewId !== undefined &&
 	projectViews.value?.find(view => view.id === props.viewId)?.view_kind !== PROJECT_VIEW_KINDS.KANBAN)
-const statusBuckets = useQuery(computed(() => {
-	const options = bucketsQuery(props.projectId ?? 0, statusView.value?.id ?? 0)
-	return {...options, enabled: options.enabled && canFilterStatus.value}
-}))
+// Loaded even where the chip can't be added, so a status filter from elsewhere shows bucket names, not ids.
+const statusBuckets = useQuery(computed(() => bucketsQuery(props.projectId ?? 0, statusView.value?.id ?? 0)))
 
 const addableFields = computed(() => BUILDER_FIELDS.filter(field =>
 	!conditions.value.some(c => c.field === field) && (field !== 'bucket_id' || canFilterStatus.value)))

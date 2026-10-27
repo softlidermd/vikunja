@@ -10,6 +10,7 @@ import {
 } from '@/client/queries/projectViews'
 
 import {hasFilterQuery, transformFilterStringForApi, transformFilterStringFromApi} from '@/helpers/filters'
+import {PROJECT_VIEW_KINDS} from '@/constants/projectView'
 import {useLabels} from '@/composables/useLabels'
 import {useProjects} from '@/composables/useProjects'
 
@@ -254,6 +255,7 @@ function handleBubbleSave(event: FocusEvent) {
 		<FilterBuilder
 			v-model="view.filter.filter"
 			:project-id="view.project_id"
+			:view-id="view.view_kind === PROJECT_VIEW_KINDS.KANBAN ? undefined : view.id || undefined"
 		/>
 		<FilterInput
 			id="filter"
