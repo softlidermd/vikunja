@@ -53,6 +53,7 @@ export const AVAILABLE_FILTER_FIELDS = [
 	'done',
 	'priority',
 	'percentDone',
+	'bucketId',
 ]
 
 export const FILTER_OPERATORS = [

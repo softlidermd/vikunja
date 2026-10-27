@@ -36,6 +36,16 @@ describe('filter builder', () => {
 		])
 	})
 
+	it('reads a status (bucket) filter as a chip and writes it back', () => {
+		const conditions = parseFilter('bucketId in 2, 3 && done = false')
+		expect(conditions).toEqual([
+			{field: 'bucket_id', negate: false, values: ['2', '3']},
+			{field: 'done', value: false},
+		])
+		expect(serializeFilter(conditions!)).toBe('bucket_id in 2, 3 && done = false')
+		expect(looksLikeFilter('bucket_id = 2')).toBe(true)
+	})
+
 	it('recognises date presets in either clause order, and absolute ranges', () => {
 		expect(parseFilter('due_date < now')).toEqual([{field: 'due_date', preset: 'overdue', from: '', to: ''}])
 		expect(parseFilter('due_date < now/w+1w && due_date >= now/w')).toEqual([

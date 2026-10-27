@@ -694,7 +694,8 @@
         "labels": "Label",
         "created_by": "Created by",
         "due_date": "Due date",
-        "done": "Status"
+        "done": "Completion",
+        "bucket_id": "Status"
       }
     },
     "attributes": {

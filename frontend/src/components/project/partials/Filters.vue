@@ -9,6 +9,7 @@
 		<FilterBuilder
 			v-model="filterQuery"
 			:project-id="projectId"
+			:view-id="viewId"
 			@update:modelValue="() => change('modelValue')"
 		/>
 		<FilterInput
@@ -104,6 +105,7 @@ const projectId = computed(() => {
 
 	return undefined
 })
+const viewId = computed(() => projectId.value ? Number(route.params.viewId) || undefined : undefined)
 
 const params = ref<EditableTaskCollection>({
 	sort_by: [],

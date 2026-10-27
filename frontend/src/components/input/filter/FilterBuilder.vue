@@ -270,6 +270,7 @@
 import {computed, reactive, ref, useId, watch, type ComponentPublicInstance} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {watchDebounced} from '@vueuse/core'
+import {useQuery} from '@tanstack/vue-query'
 
 import BaseButton from '@/components/base/BaseButton.vue'
 import Popup from '@/components/misc/Popup.vue'
@@ -280,7 +281,10 @@ import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
 import {camelCase} from 'change-case'
 import {PRIORITIES} from '@/constants/priorities'
+import {PROJECT_VIEW_KINDS} from '@/constants/projectView'
+import {bucketsQuery} from '@/client/queries/kanban'
 import {transformFilterStringForApi} from '@/helpers/filters'
+import {getStatusKanbanView} from '@/helpers/projectView'
 import {
 	BUILDER_FIELDS,
 	DUE_PRESETS,
@@ -301,9 +305,11 @@ import {
 const props = withDefaults(defineProps<{
 	modelValue?: string
 	projectId?: number
+	viewId?: number
 }>(), {
 	modelValue: '',
 	projectId: undefined,
+	viewId: undefined,
 })
 
 const emit = defineEmits<{
@@ -399,7 +405,18 @@ function addField(field: BuilderField) {
 	commit()
 }
 
-const addableFields = computed(() => BUILDER_FIELDS.filter(field => !conditions.value.some(c => c.field === field)))
+const projectViews = computed(() => projectList.projects[props.projectId ?? 0]?.views)
+const statusView = computed(() => getStatusKanbanView(projectViews.value, props.viewId))
+// Any bucket_id in a Kanban view's filter makes the API return a flat list instead of the board.
+const canFilterStatus = computed(() => statusView.value !== null && props.viewId !== undefined &&
+	projectViews.value?.find(view => view.id === props.viewId)?.view_kind !== PROJECT_VIEW_KINDS.KANBAN)
+const statusBuckets = useQuery(computed(() => {
+	const options = bucketsQuery(props.projectId ?? 0, statusView.value?.id ?? 0)
+	return {...options, enabled: options.enabled && canFilterStatus.value}
+}))
+
+const addableFields = computed(() => BUILDER_FIELDS.filter(field =>
+	!conditions.value.some(c => c.field === field) && (field !== 'bucket_id' || canFilterStatus.value)))
 
 const addButton = ref<ComponentPublicInstance | null>(null)
 const addEl = computed(() => (addButton.value?.$el as HTMLElement | undefined) ?? null)
@@ -472,6 +489,9 @@ function displayValue(field: BuilderField, value: string): string {
 	if (field === 'project') {
 		return projectList.projects[Number(value)]?.title ?? value
 	}
+	if (field === 'bucket_id') {
+		return statusBuckets.data.value?.find(bucket => bucket.id === Number(value))?.title ?? value
+	}
 	return userNames[value] ?? value
 }
 
@@ -489,6 +509,8 @@ function optionsFor(condition: MultiCondition): Option[] {
 		options = projectList.projectsArray
 			.filter(project => project.id > 0)
 			.map(project => ({value: String(project.id), title: project.title ?? ''}))
+	} else if (condition.field === 'bucket_id') {
+		options = (statusBuckets.data.value ?? []).map(bucket => ({value: String(bucket.id), title: bucket.title ?? ''}))
 	} else {
 		// The server already filtered users by the search text.
 		options = userResults.value
@@ -499,7 +521,7 @@ function optionsFor(condition: MultiCondition): Option[] {
 				subtitle: user.name ? '@' + user.username : undefined,
 			}))
 	}
-	if (condition.field === 'labels' || condition.field === 'project') {
+	if (condition.field === 'labels' || condition.field === 'project' || condition.field === 'bucket_id') {
 		options = options.filter(option => option.title.toLowerCase().includes(query))
 	}
 	// Keep selected values listed even when the search or the user lookup no longer returns them.

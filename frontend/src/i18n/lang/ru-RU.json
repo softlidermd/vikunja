@@ -603,7 +603,8 @@
 				"labels": "Метка",
 				"created_by": "Автор",
 				"due_date": "Срок",
-				"done": "Статус"
+				"done": "Выполнение",
+				"bucket_id": "Статус"
 			}
 		},
 		"attributes": {

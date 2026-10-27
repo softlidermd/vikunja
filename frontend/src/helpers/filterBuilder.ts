@@ -4,7 +4,8 @@ import {AVAILABLE_FILTER_FIELDS, FILTER_OPERATORS_REGEX} from '@/helpers/filters
 
 // A view over the API-form filter string: a flat AND of the conditions below, anything else parses to null.
 
-export type MultiField = 'assignees' | 'labels' | 'project' | 'created_by'
+// bucket_id is the task status: its bucket in the project's Kanban view.
+export type MultiField = 'assignees' | 'labels' | 'project' | 'created_by' | 'bucket_id'
 export type BuilderField = MultiField | 'due_date' | 'priority' | 'done'
 
 export const DUE_PRESETS = [
@@ -30,11 +31,12 @@ export const BUILDER_FIELDS: BuilderField[] = [
 	'labels',
 	'due_date',
 	'priority',
+	'bucket_id',
 	'done',
 	'project',
 	'created_by',
 ]
-const MULTI_FIELDS = new Set<BuilderField>(['assignees', 'labels', 'project', 'created_by'])
+const MULTI_FIELDS = new Set<BuilderField>(['assignees', 'labels', 'project', 'created_by', 'bucket_id'])
 
 export function isMultiCondition(condition: Condition): condition is MultiCondition {
 	return MULTI_FIELDS.has(condition.field)
@@ -59,6 +61,8 @@ const FIELD_ALIASES: Record<string, BuilderField> = {
 	dueDate: 'due_date',
 	priority: 'priority',
 	done: 'done',
+	bucket_id: 'bucket_id',
+	bucketId: 'bucket_id',
 }
 
 type Clause = [operator: string, value: string]

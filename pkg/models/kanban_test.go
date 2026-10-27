@@ -114,6 +114,25 @@ func TestBucket_ReadAll(t *testing.T) {
 		assert.Equal(t, int64(4), tasks[1].ID)
 		assert.Equal(t, int64(5), tasks[2].ID)
 	})
+	t.Run("filtered by bucket from a table view", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		b := &TaskCollection{
+			ProjectViewID: 3,
+			ProjectID:     1,
+			Filter:        "bucket_id in 2",
+		}
+		taskIn, _, _, err := b.ReadAll(s, &user.User{ID: 1}, "", -1, 0)
+		require.NoError(t, err)
+
+		tasks := taskIn.([]*Task)
+		require.Len(t, tasks, 3)
+		assert.Equal(t, int64(3), tasks[0].ID)
+		assert.Equal(t, int64(4), tasks[1].ID)
+		assert.Equal(t, int64(5), tasks[2].ID)
+	})
 	t.Run("accessed by link share", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 		s := db.NewSession()

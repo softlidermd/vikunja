@@ -152,7 +152,9 @@ func getTaskFilterOptsFromCollection(tf *TaskCollection, projectView *ProjectVie
 		filterTimezone:     tf.FilterTimezone,
 	}
 
-	if projectView != nil {
+	// Only a view with buckets has task_buckets rows to pin the bucket_id join to. A table or list view filters on
+	// the kanban buckets the task is in instead; bucket ids are unique across views.
+	if projectView != nil && projectView.BucketConfigurationMode != BucketConfigurationModeNone {
 		opts.projectViewID = projectView.ID
 	}
 
