@@ -22,7 +22,9 @@ export type DuePreset = typeof DUE_PRESETS[number]
 
 export type MultiCondition = {field: MultiField, negate: boolean, values: string[]}
 export type DueCondition = {field: 'due_date', preset: DuePreset | 'custom' | null, from: string, to: string}
-export type PriorityCondition = {field: 'priority', value: number | null, exact: boolean}
+// atLeast uses values[0] only; in and notIn may hold 0 (unset).
+export type PriorityMode = 'atLeast' | 'in' | 'notIn'
+export type PriorityCondition = {field: 'priority', mode: PriorityMode, values: number[]}
 export type DoneCondition = {field: 'done', value: boolean | null}
 export type Condition = MultiCondition | DueCondition | PriorityCondition | DoneCondition
 
@@ -45,7 +47,7 @@ export function isMultiCondition(condition: Condition): condition is MultiCondit
 export function emptyCondition(field: BuilderField): Condition {
 	switch (field) {
 		case 'due_date': return {field, preset: null, from: '', to: ''}
-		case 'priority': return {field, value: null, exact: false}
+		case 'priority': return {field, mode: 'atLeast', values: []}
 		case 'done': return {field, value: false}
 		default: return {field, negate: false, values: []}
 	}
@@ -245,12 +247,19 @@ export function parseFilter(filter: string): Condition[] | null {
 		seen.add(field)
 
 		if (field === 'priority') {
-			const value = Number(values[0])
-			const validLevel = Number.isInteger(value) && value >= 1 && value <= 5
-			if (values.length !== 1 || !(operator === '>=' || operator === '=') || !validLevel) {
+			const levels = values.map(Number)
+			if (!levels.every(level => Number.isInteger(level) && level >= 0 && level <= 5)) {
 				return null
 			}
-			conditions.push({field, value, exact: operator === '='})
+			if (operator === '>=' && levels.length === 1 && levels[0]! >= 1) {
+				conditions.push({field, mode: 'atLeast', values: levels})
+			} else if (operator === 'in' || (operator === '=' && levels.length === 1)) {
+				conditions.push({field, mode: 'in', values: levels})
+			} else if (operator === 'not in' || (operator === '!=' && levels.length === 1)) {
+				conditions.push({field, mode: 'notIn', values: levels})
+			} else {
+				return null
+			}
 			continue
 		}
 
@@ -318,8 +327,19 @@ export function serializeCondition(condition: Condition): string {
 				: dueClauses(preset)
 			return clauses.map(([op, value]) => `due_date ${op} ${value}`).join(' && ')
 		}
-		case 'priority':
-			return condition.value === null ? '' : `priority ${condition.exact ? '=' : '>='} ${condition.value}`
+		case 'priority': {
+			const {mode, values} = condition
+			if (values.length === 0) {
+				return ''
+			}
+			if (mode === 'atLeast') {
+				return `priority >= ${values[0]}`
+			}
+			if (mode === 'in' && values.length === 1) {
+				return `priority = ${values[0]}`
+			}
+			return `priority ${mode === 'in' ? 'in' : 'not in'} ${values.join(', ')}`
+		}
 		case 'done':
 			return condition.value === null ? '' : `done = ${condition.value}`
 		default:

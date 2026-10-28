@@ -24,7 +24,7 @@ describe('filter builder', () => {
 			{field: 'assignees', negate: false, values: ['alice', 'bob']},
 			{field: 'labels', negate: true, values: ['3']},
 			{field: 'done', value: false},
-			{field: 'priority', value: 3, exact: false},
+			{field: 'priority', mode: 'atLeast', values: [3]},
 		])
 	})
 
@@ -32,8 +32,19 @@ describe('filter builder', () => {
 		expect(parseFilter('createdBy = alice && project ?= 4 && priority=5')).toEqual([
 			{field: 'created_by', negate: false, values: ['alice']},
 			{field: 'project', negate: false, values: ['4']},
-			{field: 'priority', value: 5, exact: true},
+			{field: 'priority', mode: 'in', values: [5]},
 		])
+	})
+
+	it('excludes or picks several priorities, unset included', () => {
+		expect(parseFilter('priority not in 1')).toEqual([{field: 'priority', mode: 'notIn', values: [1]}])
+		expect(parseFilter('priority != 1')).toEqual([{field: 'priority', mode: 'notIn', values: [1]}])
+		expect(parseFilter('priority in 0, 3')).toEqual([{field: 'priority', mode: 'in', values: [0, 3]}])
+		expect(serializeFilter([{field: 'priority', mode: 'notIn', values: [0, 1]}])).toBe('priority not in 0, 1')
+		expect(serializeFilter([{field: 'priority', mode: 'in', values: [0, 3]}])).toBe('priority in 0, 3')
+		expect(serializeFilter([{field: 'priority', mode: 'in', values: []}])).toBe('')
+		expect(parseFilter('priority >= 0')).toBeNull()
+		expect(parseFilter('priority in 6')).toBeNull()
 	})
 
 	it('reads a status (bucket) filter as a chip and writes it back', () => {
@@ -83,7 +94,7 @@ describe('filter builder', () => {
 		const conditions: Condition[] = [
 			{field: 'assignees', negate: false, values: ['alice', 'bob']},
 			{field: 'due_date', preset: 'custom', from: '2026-10-01', to: '2026-10-31'},
-			{field: 'priority', value: 4, exact: true},
+			{field: 'priority', mode: 'in', values: [4]},
 			{field: 'done', value: true},
 		]
 		const query = serializeFilter(conditions)
@@ -98,7 +109,7 @@ describe('filter builder', () => {
 			{field: 'labels', negate: false, values: []},
 			{field: 'due_date', preset: null, from: '', to: ''},
 			{field: 'done', value: null},
-			{field: 'priority', value: 2, exact: false},
+			{field: 'priority', mode: 'atLeast', values: [2]},
 		])).toBe('priority >= 2')
 		expect(parseFilter('')).toEqual([])
 	})

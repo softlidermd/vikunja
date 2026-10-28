@@ -166,28 +166,23 @@
 								role="group"
 							>
 								<BaseButton
-									:class="{'is-selected': !condition.exact}"
-									:aria-pressed="!condition.exact"
-									@click="update(index, {exact: false})"
+									v-for="mode in PRIORITY_MODES"
+									:key="mode"
+									:class="{'is-selected': condition.mode === mode}"
+									:aria-pressed="condition.mode === mode"
+									@click="setPriorityMode(index, mode)"
 								>
-									{{ $t('filters.builder.atLeast') }}
-								</BaseButton>
-								<BaseButton
-									:class="{'is-selected': condition.exact}"
-									:aria-pressed="condition.exact"
-									@click="update(index, {exact: true})"
-								>
-									{{ $t('filters.builder.exactly') }}
+									{{ $t(PRIORITY_MODE_LABELS[mode]) }}
 								</BaseButton>
 							</div>
 							<div class="filter-builder__levels">
 								<BaseButton
-									v-for="level in PRIORITY_LEVELS"
+									v-for="level in condition.mode === 'atLeast' ? PRIORITY_LEVELS : [PRIORITIES.UNSET, ...PRIORITY_LEVELS]"
 									:key="level"
 									class="filter-builder__level"
 									:class="{'is-selected': isLevelSelected(condition, level)}"
-									:aria-pressed="condition.value === level"
-									@click="update(index, {value: condition.value === level ? null : level})"
+									:aria-pressed="condition.values.includes(level)"
+									@click="togglePriorityLevel(index, level)"
 								>
 									{{ priorityLabel(level) }}
 								</BaseButton>
@@ -301,6 +296,7 @@ import {
 	type DuePreset,
 	type MultiCondition,
 	type PriorityCondition,
+	type PriorityMode,
 } from '@/helpers/filterBuilder'
 
 const props = withDefaults(defineProps<{
@@ -322,6 +318,12 @@ const uid = useId()
 
 const PRIORITY_NAMES = Object.fromEntries(Object.entries(PRIORITIES).map(([name, level]) => [level, camelCase(name)]))
 const PRIORITY_LEVELS = Object.values(PRIORITIES).filter(level => level > PRIORITIES.UNSET)
+const PRIORITY_MODES: PriorityMode[] = ['atLeast', 'in', 'notIn']
+const PRIORITY_MODE_LABELS: Record<PriorityMode, string> = {
+	atLeast: 'filters.builder.atLeast',
+	in: 'filters.builder.exactly',
+	notIn: 'filters.builder.except',
+}
 const DONE_STATES = [null, false, true] as const
 
 const conditions = ref<Condition[]>([])
@@ -555,8 +557,25 @@ function doneLabel(value: boolean | null): string {
 }
 
 function isLevelSelected(condition: PriorityCondition, level: number): boolean {
-	if (condition.value === null) return false
-	return condition.exact ? level === condition.value : level >= condition.value
+	return condition.mode === 'atLeast'
+		? condition.values.length > 0 && level >= condition.values[0]!
+		: condition.values.includes(level)
+}
+
+function setPriorityMode(index: number, mode: PriorityMode) {
+	const {values} = conditions.value[index] as PriorityCondition
+	// "At least" takes a single real level: keep the lowest one picked.
+	const lowest = Math.min(...values.filter(level => level > PRIORITIES.UNSET))
+	update(index, {mode, values: mode === 'atLeast' ? (isFinite(lowest) ? [lowest] : []) : values})
+}
+
+function togglePriorityLevel(index: number, level: number) {
+	const {mode, values} = conditions.value[index] as PriorityCondition
+	if (mode === 'atLeast') {
+		update(index, {values: values[0] === level ? [] : [level]})
+		return
+	}
+	update(index, {values: values.includes(level) ? values.filter(v => v !== level) : [...values, level].sort((a, b) => a - b)})
 }
 
 function formatDay(date: string): string {
@@ -585,12 +604,15 @@ function summary(condition: Condition): string {
 		return t('filters.builder.summary', {field, value})
 	}
 	if (condition.field === 'priority') {
-		const value = condition.value === null
-			? t('filters.builder.any')
-			: condition.exact
-				? priorityLabel(condition.value)
-				: t('filters.builder.orAbove', {priority: priorityLabel(condition.value)})
-		return t('filters.builder.summary', {field, value})
+		const {mode, values} = condition
+		if (values.length === 0) {
+			return t('filters.builder.summary', {field, value: t('filters.builder.any')})
+		}
+		if (mode === 'atLeast') {
+			return t('filters.builder.summary', {field, value: t('filters.builder.orAbove', {priority: priorityLabel(values[0]!)})})
+		}
+		const value = values.map(priorityLabel).join(', ')
+		return t(mode === 'notIn' ? 'filters.builder.summaryNot' : 'filters.builder.summary', {field, value})
 	}
 	return t('filters.builder.summary', {field, value: doneLabel(condition.value)})
 }

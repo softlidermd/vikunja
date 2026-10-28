@@ -681,6 +681,7 @@
       "matchesNone": "Hides tasks with any of these",
       "atLeast": "at least",
       "exactly": "exactly",
+      "except": "except",
       "orAbove": "{priority} or above",
       "overdue": "Overdue",
       "customRange": "Custom range",

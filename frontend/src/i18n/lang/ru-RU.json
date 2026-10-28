@@ -590,6 +590,7 @@
 			"matchesNone": "Скрывает задачи с любым из выбранных",
 			"atLeast": "не ниже",
 			"exactly": "ровно",
+			"except": "кроме",
 			"orAbove": "{priority} и выше",
 			"overdue": "Просроченные",
 			"customRange": "Свой диапазон",
