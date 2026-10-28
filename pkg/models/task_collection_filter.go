@@ -537,7 +537,8 @@ func getNativeValueForTaskField(fieldName string, comparator taskFilterComparato
 			}
 			valueSlice = append(valueSlice, v)
 		}
-		return nil, valueSlice, nil
+		// The field marks numeric filters, so "include nulls" treats 0 as unset for "in" just like for "=".
+		return &field, valueSlice, nil
 	}
 
 	val, err := getValueForField(field, value, loc)

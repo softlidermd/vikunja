@@ -311,6 +311,7 @@ func TestParseFilter(t *testing.T) {
 		assert.Equal(t, int64(1), result[0].value.([]interface{})[0])
 		assert.Equal(t, int64(3), result[0].value.([]interface{})[1])
 		assert.Equal(t, int64(5), result[0].value.([]interface{})[2])
+		assert.True(t, result[0].isNumeric, "include nulls must treat 0 as unset for in, as for =")
 	})
 	t.Run("done_at field with relative time", func(t *testing.T) {
 		result, err := getTaskFiltersFromFilterString("done_at > now-7d", "UTC")

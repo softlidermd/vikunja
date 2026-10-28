@@ -762,8 +762,9 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 	font-weight: 700;
 }
 
-// Options inherit the select's color; keep the opened list plain.
-.is-high-priority :deep(option) {
+// Options inherit the select's color; keep the opened list plain except the chosen one, which some engines
+// (Chromium on Linux) use to paint the closed select.
+.is-high-priority :deep(option:not(:checked)) {
 	color: var(--text);
 	font-weight: 400;
 }
