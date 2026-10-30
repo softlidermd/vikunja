@@ -167,10 +167,15 @@ export function useQuickAddTask() {
 		const built = await build(input, context)
 		assertClientRequestContext(context)
 		const created = await create.mutateAsync({...built.task, project_id: built.task.project_id!})
-		const {task, skipped} = await finishTask(created, built, context)
-		refetchListsIfFinished([built])
-		reportSkippedLabels(skipped)
-		return task
+		let finished: Awaited<ReturnType<typeof finishTask>>
+		try {
+			finished = await finishTask(created, built, context)
+		} finally {
+			// Also after a failed write: the assignees or labels saved before it still change list membership.
+			refetchListsIfFinished([built])
+		}
+		reportSkippedLabels(finished.skipped)
+		return finished.task
 	}
 
 	async function createNewTasksBulk(entries: {title: string, project_id: number}[]) {

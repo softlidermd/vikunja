@@ -158,6 +158,22 @@ describe('useQuickAddTask', () => {
 			.toBeGreaterThan(sdk.taskLabelsCreate.mock.invocationCallOrder[0]!)
 	})
 
+	it('refetches the visible lists when a single create fails after saving the assignee', async () => {
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent'}], total_pages: 1}})
+		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Buy milk', project_id: 1}})
+		sdk.taskLabelsCreate.mockRejectedValue({status: 500})
+		const client = new QueryClient()
+		const invalidate = vi.spyOn(client, 'invalidateQueries')
+
+		await expect(quickAdd(client).createNewTask({title: 'Buy milk @me *Urgent', project_id: 1})).rejects.toBeTruthy()
+
+		const lastActive = Math.max(...invalidate.mock.calls
+			.map((call, index) => ({options: call[0], order: invalidate.mock.invocationCallOrder[index]!}))
+			.filter(({options}) => (options as {refetchType?: string} | undefined)?.refetchType === 'active')
+			.map(({order}) => order))
+		expect(lastActive).toBeGreaterThan(sdk.taskAssigneesCreate.mock.invocationCallOrder[0]!)
+	})
+
 	describe('self-assign aliases', () => {
 		const assigned = () => sdk.taskAssigneesCreate.mock.calls.map(([options]) => options.body.user_id)
 
