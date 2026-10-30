@@ -1,6 +1,8 @@
 import {computed} from 'vue'
 import {useRouter} from 'vue-router'
+import {useQueryClient} from '@tanstack/vue-query'
 import type {Task, Label} from '@/client/generated'
+import {invalidateTaskMembership} from '@/client/queries/taskCache'
 import {
 	useCreateTaskMutation,
 	useBulkCreateTasksMutation,
@@ -41,6 +43,7 @@ export function useQuickAddTask() {
 	const addAssignee = useAddTaskAssigneeMutation()
 	const addLabel = useAddTaskLabelMutation()
 	const createLabel = useCreateLabelMutation()
+	const queryClient = useQueryClient()
 	const auth = useAuthStore()
 	const config = useConfigStore()
 	const router = useRouter()
@@ -151,12 +154,21 @@ export function useQuickAddTask() {
 		)
 	}
 
+	// Creating refetched the visible lists before the labels and assignees were added, so a list filtered
+	// by them (labels in X, assigned to me) left the new task out until a reload.
+	function refetchListsIfFinished(built: Awaited<ReturnType<typeof build>>[]) {
+		if (built.some(item => item.parsedLabels.length > 0 || (item.task.assignees?.length ?? 0) > 0)) {
+			void invalidateTaskMembership(queryClient, undefined, 'active')
+		}
+	}
+
 	async function createNewTask(input: Partial<Task>) {
 		const context = captureClientRequestContext()
 		const built = await build(input, context)
 		assertClientRequestContext(context)
 		const created = await create.mutateAsync({...built.task, project_id: built.task.project_id!})
 		const {task, skipped} = await finishTask(created, built, context)
+		refetchListsIfFinished([built])
 		reportSkippedLabels(skipped)
 		return task
 	}
@@ -176,6 +188,7 @@ export function useQuickAddTask() {
 				assertClientRequestContext(context)
 			}
 		}, config.concurrent_writes)
+		refetchListsIfFinished(built)
 		return result
 	}
 

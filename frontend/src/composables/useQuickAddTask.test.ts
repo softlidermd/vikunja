@@ -32,9 +32,8 @@ import {useAuthStore} from '@/stores/auth'
 import {AUTH_TYPES} from '@/constants/auth'
 import {useQuickAddTask} from './useQuickAddTask'
 
-function quickAdd() {
+function quickAdd(queryClient = new QueryClient()) {
 	let actions!: ReturnType<typeof useQuickAddTask>
-	const queryClient = new QueryClient()
 	mount(defineComponent({
 		setup() {
 			actions = useQuickAddTask()
@@ -141,6 +140,22 @@ describe('useQuickAddTask', () => {
 		expect(result.tasks[0]).toMatchObject({id: 7, title: 'Buy milk'})
 		expect(sdk.labelsCreate).not.toHaveBeenCalled()
 		expect(error).toHaveBeenCalledTimes(1)
+	})
+
+	it('refetches the visible lists once the label is on the task', async () => {
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent'}], total_pages: 1}})
+		sdk.tasksBulkCreate.mockResolvedValue({data: {tasks: [{id: 7, title: 'Buy milk', project_id: 1}]}})
+		sdk.taskLabelsCreate.mockResolvedValue({data: {}})
+		const client = new QueryClient()
+		const invalidate = vi.spyOn(client, 'invalidateQueries')
+
+		await quickAdd(client).createNewTasksBulk([{title: 'Buy milk *Urgent', project_id: 1}])
+
+		const activeRefetches = invalidate.mock.calls
+			.map((call, index) => ({options: call[0], order: invalidate.mock.invocationCallOrder[index]!}))
+			.filter(({options}) => (options as {refetchType?: string} | undefined)?.refetchType === 'active')
+		expect(Math.max(...activeRefetches.map(({order}) => order)))
+			.toBeGreaterThan(sdk.taskLabelsCreate.mock.invocationCallOrder[0]!)
 	})
 
 	describe('self-assign aliases', () => {
