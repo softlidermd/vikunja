@@ -14,6 +14,7 @@ import {
 	invalidateTaskMembership,
 	mapTaskEverywhere,
 	refetchSavedFilterViews,
+	refetchStaleTaskLists,
 	replaceTaskEverywhere,
 	removeTaskEverywhere,
 	removeTaskFromBoard,
@@ -202,6 +203,19 @@ describe('task cache reconciliation', () => {
 		await vi.waitFor(() => expect(updates()).toEqual([1, 1, 1]))
 		await refetchSavedFilterViews(client)
 		expect(updates()).toEqual([2, 1, 2])
+		unsubscribes.forEach(unsubscribe => unsubscribe())
+	})
+	it('refetches only the open task lists an edit marked stale', async () => {
+		sdk.projectTasksList.mockResolvedValue({data: {items: [], total: 0}})
+		const client = new QueryClient()
+		const queries = [tasksQuery({project: 1}), tasksQuery({project: 2})]
+		const unsubscribes = queries.map(({queryKey, queryFn}) =>
+			new QueryObserver(client, {queryKey, queryFn}).subscribe(() => {}))
+		const updates = () => queries.map(({queryKey}) => client.getQueryState(queryKey)?.dataUpdateCount)
+		await vi.waitFor(() => expect(updates()).toEqual([1, 1]))
+		await client.invalidateQueries({queryKey: queries[0].queryKey, refetchType: 'none'})
+		await refetchStaleTaskLists(client)
+		expect(updates()).toEqual([2, 1])
 		unsubscribes.forEach(unsubscribe => unsubscribe())
 	})
 	it('does not create queries for unmounted resources', () => {

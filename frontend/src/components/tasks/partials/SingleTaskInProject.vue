@@ -312,8 +312,6 @@ const {currentProject} = useCurrentProject()
 const taskDetailRoute = computed(() => ({
 	name: 'task.detail',
 	params: {id: task.value.id},
-	// TODO: re-enable opening task detail in modal
-	// state: { backdropView: router.currentRoute.value.fullPath },
 }))
 
 function updateDueDate() {

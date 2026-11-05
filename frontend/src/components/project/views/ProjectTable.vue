@@ -737,15 +737,12 @@ async function openPicker(field: 'assignees' | 'labels', task: TaskResponse, eve
 	}
 }
 
-// TODO: re-enable opening task detail in modal
-// const router = useRouter()
 const taskDetailRoutes = computed(() => Object.fromEntries(
 	tasks.value.map(({id}) => ([
 		id,
 		{
 			name: 'task.detail',
 			params: {id},
-			// state: { backdropView: router.currentRoute.value.fullPath },
 		},
 	])),
 ))

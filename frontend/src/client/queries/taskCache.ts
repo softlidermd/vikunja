@@ -165,6 +165,16 @@ export async function refetchSavedFilterViews(client: QueryClient) {
 	])
 }
 
+// Field edits only mark lists stale, so a list kept open behind the task modal is behind until this runs.
+// Lists keep showing their rows while refetching, so the page keeps its scroll position.
+export async function refetchStaleTaskLists(client: QueryClient) {
+	await Promise.all([taskKeys.lists, taskKeys.allLists].map(queryKey => client.refetchQueries({
+		queryKey,
+		type: 'active',
+		predicate: query => query.state.isInvalidated,
+	})))
+}
+
 // Not awaited: queued saves of the same task would otherwise wait for the refetch.
 export function settleTaskEdit(client: QueryClient, id: number) {
 	void refetchSavedFilterViews(client)

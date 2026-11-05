@@ -1,12 +1,30 @@
-import {computed, defineAsyncComponent, h, shallowRef, type VNode, type AsyncComponentLoader, watchEffect} from 'vue'
+import {computed, defineAsyncComponent, h, ref, shallowRef, type VNode, type AsyncComponentLoader, watch, watchEffect} from 'vue'
 import {useRoute, useRouter, type RouteLocationNormalizedGeneric} from 'vue-router'
+import {useQueryClient} from '@tanstack/vue-query'
+import {refetchStaleTaskLists} from '@/client/queries/taskCache'
 import {useBaseStore} from '@/stores/base'
 import {useProjects} from '@/composables/useProjects'
 
 export function useRouteWithModal() {
 	const router = useRouter()
 	const route = useRoute()
-	const backdropView = computed(() => route.fullPath ? window.history.state?.backdropView : undefined)
+	const queryClient = useQueryClient()
+
+	// Tasks always open in the modal: over the page they were opened from, or over home after a reload or direct link.
+	const lastPage = ref('/')
+	watch(() => route.fullPath, () => {
+		if (route.name !== 'task.detail') lastPage.value = route.fullPath
+	}, {immediate: true})
+	const backdropView = computed<string | undefined>(() => {
+		const stated = route.fullPath ? window.history.state?.backdropView : undefined
+		if (route.name !== 'task.detail') return stated
+		return stated && router.resolve(stated).name !== 'task.detail' ? stated : lastPage.value
+	})
+
+	// Edits in the modal only mark the lists behind it stale; reload them in place once it closes.
+	watch(backdropView, (current, previous) => {
+		if (previous && !current) void refetchStaleTaskLists(queryClient)
+	})
 	const baseStore = useBaseStore()
 	const projectList = useProjects()
 
@@ -80,7 +98,7 @@ export function useRouteWithModal() {
 			// Only navigate if we have a valid project and view
 			if (viewId) {
 				// Preserve query parameters (e.g., date range) from the backdrop view
-				const backdropRoute = historyState.value?.backdropView && router.resolve(historyState.value.backdropView)
+				const backdropRoute = backdropView.value ? router.resolve(backdropView.value) : undefined
 				const newRoute = {
 					name: 'project.view',
 					params: {
@@ -102,7 +120,7 @@ export function useRouteWithModal() {
 		}
 
 		// Try backdrop view
-		const backdropRoute = historyState.value?.backdropView && router.resolve(historyState.value.backdropView)
+		const backdropRoute = backdropView.value ? router.resolve(backdropView.value) : undefined
 		if (backdropRoute && backdropRoute.params?.projectId !== '0') {
 			router.push(backdropRoute)
 			return

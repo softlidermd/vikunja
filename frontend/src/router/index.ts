@@ -37,6 +37,11 @@ const router = createRouter({
 			return {el: to.hash}
 		}
 
+		// Tasks open in a modal, so the page behind it keeps its place.
+		if (to.name === 'task.detail') {
+			return false
+		}
+
 		// Otherwise just scroll to the top
 		return {
 			left: 0,
