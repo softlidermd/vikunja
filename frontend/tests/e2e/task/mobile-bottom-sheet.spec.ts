@@ -11,6 +11,11 @@ const TASK_ID = 1
 // Makes the page overflow the 375x740 viewport, so the scroll-lock test has something to scroll.
 const LONG_DESCRIPTION = Array.from({length: 60}, (_, i) => `<p>Description line ${i + 1}</p>`).join('')
 
+// Tasks open in the modal, whose container scrolls instead of the page.
+function modalScrollTop(page: Page) {
+	return page.evaluate(() => document.querySelector('.task-detail-view-modal .modal-container')?.scrollTop ?? 0)
+}
+
 async function nextFrame(page: Page) {
 	await page.evaluate(() => new Promise(requestAnimationFrame))
 }
@@ -29,7 +34,10 @@ async function openDueDateSheet(page: Page) {
 
 	const setDueDateButton = page.locator('.task-view .action-buttons .button').filter({hasText: 'Set Due Date'})
 	await expect(setDueDateButton).toBeVisible({timeout: 10000})
-	expect(await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight)).toBe(true)
+	expect(await page.evaluate(() => {
+		const container = document.querySelector('.task-detail-view-modal .modal-container')
+		return container !== null && container.scrollHeight > container.clientHeight
+	})).toBe(true)
 	await setDueDateButton.click()
 
 	const datepickerShow = page.locator('.task-view .columns.details .column').filter({hasText: 'Due Date'}).locator('.date-input .datepicker .show')
@@ -73,17 +81,17 @@ test.describe('Mobile bottom sheet', () => {
 	test('Locks page scrolling while the sheet is open', async ({authenticatedPage: page}) => {
 		await openDueDateSheet(page)
 
-		const scrollY = await page.evaluate(() => window.scrollY)
+		const scrollY = await modalScrollTop(page)
 
 		// The strip left free at the top by the panel (see closeViaScrim).
 		await page.mouse.move(10, 5)
 		await page.mouse.wheel(0, 400)
 		await nextFrame(page)
-		expect(await page.evaluate(() => window.scrollY)).toBe(scrollY)
+		expect(await modalScrollTop(page)).toBe(scrollY)
 
 		await closeViaScrim(page)
 
 		await page.mouse.wheel(0, 400)
-		await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollY)
+		await expect.poll(() => modalScrollTop(page)).toBeGreaterThan(scrollY)
 	})
 })

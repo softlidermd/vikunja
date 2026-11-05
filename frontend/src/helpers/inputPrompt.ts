@@ -63,25 +63,29 @@ export default function inputPrompt(pos: ClientRect, placeholder: string, oldVal
 		// Position the popup initially
 		updatePosition()
 
-		// Track scroll position
-		let lastScrollY = window.scrollY
-		let lastScrollX = window.scrollX
+		// The editor can sit in a scrolling container (the task modal), not only in the page.
+		const scrollOffsets = new Map<EventTarget, {x: number, y: number}>([[document, {x: window.scrollX, y: window.scrollY}]])
+		for (let el = editor?.view.dom.parentElement; el; el = el.parentElement) {
+			scrollOffsets.set(el, {x: el.scrollLeft, y: el.scrollTop})
+		}
 
 		// Update position on scroll
-		const handleScroll = () => {
-			const deltaY = window.scrollY - lastScrollY
-			const deltaX = window.scrollX - lastScrollX
+		const handleScroll = (event: Event) => {
+			const target = event.target ?? document
+			const last = scrollOffsets.get(target)
+			if (!last) return
+			const current = target instanceof Element
+				? {x: target.scrollLeft, y: target.scrollTop}
+				: {x: window.scrollX, y: window.scrollY}
 
 			// Update the local mutable rect to account for scroll
 			currentRect = new DOMRect(
-				currentRect.x - deltaX,
-				currentRect.y - deltaY,
+				currentRect.x - (current.x - last.x),
+				currentRect.y - (current.y - last.y),
 				currentRect.width,
 				currentRect.height,
 			)
-
-			lastScrollY = window.scrollY
-			lastScrollX = window.scrollX
+			scrollOffsets.set(target, current)
 
 			updatePosition()
 		}

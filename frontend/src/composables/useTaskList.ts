@@ -11,6 +11,7 @@ import {
 import {normalizePageNumber} from '@/client/queries/pagination'
 import {isRequestContextAbort} from '@/client/requestContext'
 import {useTasks} from '@/composables/useTasks'
+import {useViewRoute, type RouteQueryValue} from '@/composables/useViewRoute'
 import {error} from '@/message'
 import {useAuthStore} from '@/stores/auth'
 import {useViewFiltersStore} from '@/stores/viewFilters'
@@ -100,11 +101,12 @@ export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortBy
 	const router = useRouter()
 	const viewFiltersStore = useViewFiltersStore()
 
-	const page = useRouteQuery('page', '1', { transform: normalizePageNumber })
-	const filter = useRouteQuery('filter')
-	const s = useRouteQuery('s')
+	const route = useViewRoute()
+	const page = useRouteQuery('page', '1', { transform: normalizePageNumber, route })
+	const filter = useRouteQuery<RouteQueryValue>('filter', undefined, {route})
+	const s = useRouteQuery<RouteQueryValue>('s', undefined, {route})
 
-	const sortQuery = useRouteQuery('sort')
+	const sortQuery = useRouteQuery<RouteQueryValue>('sort', undefined, {route})
 
 	const sortBy = computed<SortBy>({
 		get() {

@@ -1,5 +1,19 @@
-import {computed, defineAsyncComponent, h, ref, shallowRef, type VNode, type AsyncComponentLoader, watch, watchEffect} from 'vue'
-import {useRoute, useRouter, type RouteLocationNormalizedGeneric} from 'vue-router'
+import {
+	computed,
+	defineAsyncComponent,
+	h,
+	ref,
+	shallowRef,
+	watch,
+	watchEffect,
+	type AsyncComponentLoader,
+	type VNode,
+} from 'vue'
+import {
+	useRoute,
+	useRouter,
+	type RouteLocationNormalizedGeneric,
+} from 'vue-router'
 import {useQueryClient} from '@tanstack/vue-query'
 import {refetchStaleTaskLists} from '@/client/queries/taskCache'
 import {useBaseStore} from '@/stores/base'
@@ -10,15 +24,16 @@ export function useRouteWithModal() {
 	const route = useRoute()
 	const queryClient = useQueryClient()
 
-	// Tasks always open in the modal: over the page they were opened from, or over home after a reload or direct link.
+	// Tasks always open in the modal: over the page they were opened from (also after a reload), else over home.
 	const lastPage = ref('/')
 	watch(() => route.fullPath, () => {
 		if (route.name !== 'task.detail') lastPage.value = route.fullPath
 	}, {immediate: true})
 	const backdropView = computed<string | undefined>(() => {
-		const stated = route.fullPath ? window.history.state?.backdropView : undefined
-		if (route.name !== 'task.detail') return stated
-		return stated && router.resolve(stated).name !== 'task.detail' ? stated : lastPage.value
+		const state = route.fullPath ? window.history.state : undefined
+		if (route.name !== 'task.detail') return state?.backdropView
+		return [state?.backdropView, state?.back, lastPage.value]
+			.find((path): path is string => typeof path === 'string' && router.resolve(path).name !== 'task.detail')
 	})
 
 	// Edits in the modal only mark the lists behind it stale; reload them in place once it closes.
@@ -83,12 +98,13 @@ export function useRouteWithModal() {
 		// If the current project was changed because the user moved the currently opened task while coming from kanban,
 		// we need to reflect that change in the route when they close the task modal.
 		// The last route is only available as resolved string, therefore we need to use a regex for matching here
-		const routeMatch = new RegExp('\\/projects\\/\\d+\\/(\\d+)', 'g')
+		const routeMatch = new RegExp('\\/projects\\/(\\d+)\\/(\\d+)', 'g')
 		const match = historyState.value?.back
 			? routeMatch.exec(historyState.value.back)
 			: null
-		if (match !== null && baseStore.currentProjectId !== 0) {
-			let viewId: string | number | undefined = match[1]
+		// Otherwise going back restores the page and its scroll position.
+		if (match !== null && baseStore.currentProjectId !== 0 && Number(match[1]) !== baseStore.currentProjectId) {
+			let viewId: string | number | undefined = match[2]
 
 			if (!viewId) {
 				const project = projectList.projects[baseStore.currentProjectId]

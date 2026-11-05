@@ -69,6 +69,7 @@ vi.mock('@vueuse/router', () => ({
 }))
 
 vi.mock('vue-router', () => ({
+	useRoute: () => ({name: 'project.view', query: {}, params: {}, hash: ''}),
 	useRouter: () => ({push: vi.fn(), currentRoute: {value: {fullPath: '/', params: {}}}}),
 }))
 

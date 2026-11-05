@@ -73,7 +73,7 @@ test('unassigning a task drops its card from an open "assigned to me" saved filt
 	await expect(card).toHaveCount(0)
 })
 
-test('moving a favourite task to another project keeps it in Favorites and drops it from the source board',async ({authenticatedPage: page, apiContext, userToken}) => {
+test('moving a favourite task to another project keeps it in Favorites and drops it from the source board', async ({authenticatedPage: page, apiContext, userToken}) => {
 	const headers = {Authorization: `Bearer ${userToken}`}
 	const [source, target] = await ProjectFactory.create(2, {
 		title: (i: number) => i === 0 ? 'Source Project' : 'Target Project',

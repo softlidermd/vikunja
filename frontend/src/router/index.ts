@@ -37,8 +37,8 @@ const router = createRouter({
 			return {el: to.hash}
 		}
 
-		// Tasks open in a modal, so the page behind it keeps its place.
-		if (to.name === 'task.detail') {
+		// Tasks open in a modal, so the page behind it keeps its place. Link shares still show the full task page.
+		if (to.name === 'task.detail' && !useAuthStore().authLinkShare) {
 			return false
 		}
 

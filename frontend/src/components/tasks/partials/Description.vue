@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, onBeforeUnmount} from 'vue'
-import {onBeforeRouteLeave} from 'vue-router'
+import {useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
 import CustomTransition from '@/components/misc/CustomTransition.vue'
@@ -190,7 +190,10 @@ onBeforeUnmount(async () => {
 	}
 })
 
-onBeforeRouteLeave(() => save())
+// A global guard, not onBeforeRouteLeave: in the task modal this component is outside RouterView,
+// where route-leave guards never run, and navigation must still wait for the save.
+const removeSaveGuard = useRouter().beforeEach(() => save())
+onBeforeUnmount(removeSaveGuard)
 
 async function save() {
 	if (!hasChanges.value) {

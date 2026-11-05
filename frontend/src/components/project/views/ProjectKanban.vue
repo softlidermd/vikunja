@@ -309,6 +309,7 @@ import {computed, nextTick, ref, watch, toRef} from 'vue'
 import {useQueryClient} from '@tanstack/vue-query'
 import {useRouter} from 'vue-router'
 import {useRouteQuery} from '@vueuse/router'
+import {useViewRoute, type RouteQueryValue} from '@/composables/useViewRoute'
 import {useI18n} from 'vue-i18n'
 import {draggableFor} from '@/components/base/Draggable'
 import type {SortableEvent} from 'sortablejs'
@@ -401,8 +402,9 @@ const showSetLimitInput = ref(false)
 const collapsedBuckets = ref<CollapsedBuckets>({})
 
 // URL-synchronized filter parameters
-const filter = useRouteQuery('filter')
-const s = useRouteQuery('s')
+const viewRoute = useViewRoute()
+const filter = useRouteQuery<RouteQueryValue>('filter', undefined, {route: viewRoute})
+const s = useRouteQuery<RouteQueryValue>('s', undefined, {route: viewRoute})
 
 const params = ref<TaskFilterParams>({
 	sort_by: [],

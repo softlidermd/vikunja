@@ -189,30 +189,48 @@ test.describe('Task', () => {
 	})
 
 	test.describe('Task Detail View', () => {
-		test('provides back navigation to the project in the list view', async ({authenticatedPage: page}) => {
-			const tasks = await TaskFactory.create(1)
+		test('opens a list task in the modal and reloads the list in place when it closes', async ({authenticatedPage: page}) => {
+			await TaskFactory.create(60, {title: (i: number) => `Scroll task ${i}`})
 			const loadTasksPromise = page.waitForResponse(response =>
 				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
 			)
 			await page.goto('/projects/1/1')
 			await loadTasksPromise
-			await page.locator('.list-view .task').first().locator('a.task-link').click()
-			await expect(page.locator('.task-view .back-button')).toBeVisible()
-			await page.locator('.task-view .back-button').click()
-			await expect(page).toHaveURL(/\/projects\/1\/\d+/)
+			const row = page.locator('.list-view .task').nth(45)
+			const title = (await row.locator('a.task-link').innerText()).trim()
+			await row.scrollIntoViewIfNeeded()
+			const scrollTop = () => page.evaluate(() => document.documentElement.scrollTop)
+			const before = await scrollTop()
+			expect(before).toBeGreaterThan(0)
+
+			await row.locator('a.task-link').click()
+			await expect(page.locator('dialog .task-view')).toBeVisible()
+			await expect(page).toHaveURL(/\/tasks\/\d+/)
+			await page.locator('dialog .task-view .button--mark-done').click()
+			await expect(page.locator('.global-notification')).toContainText('Success')
+			const refetched = page.waitForResponse(response =>
+				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
+			)
+			await page.getByRole('button', {name: 'Close dialog'}).click()
+
+			await expect(page).toHaveURL(/\/projects\/1\/1/)
+			await refetched
+			await expect(page.locator('.list-view .task').filter({hasText: title})).toBeVisible()
+			expect(Math.abs(await scrollTop() - before)).toBeLessThan(100)
 		})
 
-		test('provides back navigation to the project in the table view', async ({authenticatedPage: page}) => {
-			const tasks = await TaskFactory.create(1)
+		test('opens a table task in the modal and returns to the table on close', async ({authenticatedPage: page}) => {
+			await TaskFactory.create(1)
 			const loadTasksPromise = page.waitForResponse(response =>
 				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
 			)
 			await page.goto('/projects/1/3')
 			await loadTasksPromise
 			await page.locator('tbody tr').first().locator('a').first().click()
-			await expect(page.locator('.task-view .back-button')).toBeVisible()
-			await page.locator('.task-view .back-button').click()
-			await expect(page).toHaveURL(/\/projects\/1\/\d+/)
+			await expect(page.locator('dialog .task-view')).toBeVisible()
+			await expect(page.locator('tbody tr')).toHaveCount(1)
+			await page.getByRole('button', {name: 'Close dialog'}).click()
+			await expect(page).toHaveURL(/\/projects\/1\/3/)
 		})
 
 		test('provides close navigation to the project in the kanban view on mobile', async ({authenticatedPage: page}) => {
@@ -550,7 +568,8 @@ test.describe('Task', () => {
 			})
 			expect(deleted.ok()).toBeTruthy()
 
-			await page.locator(`li[data-project-id="${projects[0].id}"] .list-menu-link`).first().click()
+			// The task modal covers the sidebar, so leave through the project link in the task heading.
+			await page.locator('.task-view nav.subtitle a').first().click()
 
 			await expect(page).toHaveURL(/\/projects\/1\/\d+/)
 			await expect(page.locator('.switch-view-container')).toBeVisible()
@@ -2014,7 +2033,8 @@ Everything looks good!
 		test('Should follow scroll when URL input is open', async ({authenticatedPage: page}) => {
 			const tasks = await TaskFactory.create(1, {
 				id: 1,
-				description: 'Test text for link',
+				// Long enough for the task modal to scroll.
+				description: '<p>Test text for link</p>' + '<p>Filler line</p>'.repeat(60),
 			})
 			await page.goto(`/tasks/${tasks[0].id}`)
 			await page.waitForLoadState('networkidle')
@@ -2047,8 +2067,9 @@ Everything looks good!
 			const initialBox = await urlInput.boundingBox()
 			expect(initialBox).not.toBeNull()
 
-			// Scroll down while URL input is open
-			await page.evaluate(() => window.scrollBy(0, 300))
+			// Scroll the task modal down while URL input is open
+			await page.evaluate(() => document.querySelector('.task-detail-view-modal .modal-container')?.scrollBy(0, 300))
+			expect(await page.evaluate(() => document.querySelector('.task-detail-view-modal .modal-container')?.scrollTop)).toBeGreaterThan(200)
 			await page.waitForTimeout(400)
 
 			// Get new position after scroll
