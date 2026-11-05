@@ -55,7 +55,7 @@
                 },
                 {
                     "key": "maxitemsperpage",
-                    "default_value": "50",
+                    "default_value": "100",
                     "comment": "The max number of items which can be returned per page"
                 },
                 {

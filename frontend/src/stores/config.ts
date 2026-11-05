@@ -53,7 +53,7 @@ function defaultConfig(): ConfigState {
 		motd: '',
 		link_sharing_enabled: true,
 		max_file_size: '20MB',
-		max_items_per_page: 50,
+		max_items_per_page: 100,
 		available_migrators: [],
 		task_attachments_enabled: true,
 		totp_enabled: true,

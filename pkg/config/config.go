@@ -382,7 +382,7 @@ func initDefaultConfig() {
 	ServiceEnableCaldav.setDefault(true)
 
 	ServiceRootpath.setDefault(getRootpathLocation())
-	ServiceMaxItemsPerPage.setDefault(50)
+	ServiceMaxItemsPerPage.setDefault(100)
 	ServiceMotd.setDefault("")
 	ServiceEnableLinkSharing.setDefault(true)
 	ServiceEnableRegistration.setDefault(true)
