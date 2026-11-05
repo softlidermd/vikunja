@@ -5,7 +5,7 @@
 		class="content details comments-container"
 	>
 		<h2
-			v-if="canWrite || comments.length > 0"
+			v-if="canWrite || comments.length > 0 || listPending"
 			class="comments-heading task-section-title"
 			:class="{'d-print-none': comments.length === 0}"
 		>

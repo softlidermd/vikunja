@@ -40,7 +40,7 @@
 								{{ $t('task.attributes.title') }}
 							</FancyCheckbox>
 							<FancyCheckbox
-								v-if="hasStatus"
+								v-if="hasStatus || isPseudoProject"
 								v-model="activeColumns.status"
 							>
 								{{ $t('task.attributes.status') }}
@@ -538,7 +538,7 @@ import {getStatusKanbanView} from '@/helpers/projectView'
 import {getTaskProgress} from '@/composables/useTaskStatus'
 import {getDefaultBucketId} from '@/helpers/task'
 import {bucketsQuery} from '@/client/queries/kanban'
-import {useQuery} from '@tanstack/vue-query'
+import {useQueries, useQuery} from '@tanstack/vue-query'
 import {canAutoFocus} from '@/directives/focus'
 
 const props = defineProps<{
@@ -626,10 +626,9 @@ const showStatus = computed(() => (hasStatus.value || isPseudoProject.value) && 
 
 function rowProgress(task: TaskResponse) {
 	if (!isPseudoProject.value) return getTaskProgress(task, statusView.value, statusDefaultBucketId.value)
-	const view = getStatusKanbanView(projectList.projects[task.project_id]?.views, undefined)
-	// shortcut: a board whose default bucket was deleted has no default_bucket_id, so its open tasks get no
-	// in-progress colour here; load that board's buckets if it matters.
-	return getTaskProgress(task, view, view?.default_bucket_id || undefined)
+	const view = taskStatusView(task)
+	const buckets = boardBuckets.value[boardsWithoutDefault.value.findIndex(board => board.view === view?.id)]?.data
+	return getTaskProgress(task, view, view ? getDefaultBucketId(view, buckets ?? []) : undefined)
 }
 
 const {
@@ -640,6 +639,23 @@ const {
 } = taskList
 const loading = useDelayedLoading(taskList.loading)
 const tasks: Ref<TaskResponse[]> = taskList.tasks
+
+function taskStatusView(task: TaskResponse) {
+	return getStatusKanbanView(projectList.projects[task.project_id]?.views, undefined)
+}
+// A board whose default bucket was deleted falls back to its first bucket, as the status chip does.
+const boardsWithoutDefault = computed(() => {
+	if (!isPseudoProject.value) return []
+	const boards = new Map<number, {project: number, view: number}>()
+	for (const task of tasks.value) {
+		const view = taskStatusView(task)
+		if (view?.id && !view.default_bucket_id) boards.set(view.id, {project: task.project_id, view: view.id})
+	}
+	return [...boards.values()]
+})
+const boardBuckets = useQueries({
+	queries: computed(() => boardsWithoutDefault.value.map(board => bucketsQuery(board.project, board.view))),
+})
 
 watch(
 	() => activeColumns.value,

@@ -11,6 +11,7 @@ import {
 import {normalizePageNumber} from '@/client/queries/pagination'
 import {isRequestContextAbort} from '@/client/requestContext'
 import {useTasks} from '@/composables/useTasks'
+import {useClampedPage} from '@/composables/useClampedPage'
 import {useViewRoute, type RouteQueryValue} from '@/composables/useViewRoute'
 import {error} from '@/message'
 import {useAuthStore} from '@/stores/auth'
@@ -235,12 +236,9 @@ export function useTaskList(
 	const loading = query.isFetching
 	const {tasks, totalPages} = query
 
-	// A remembered or linked page can lie past the end (fewer tasks, a larger page size). It renders empty
-	// without pagination to leave it, so move to the last page.
-	watch(query.data, data => {
-		const lastPage = Math.max(1, data?.total_pages ?? 1)
-		if (data && page.value > lastPage) page.value = lastPage
-	})
+	// A remembered or linked page can lie past the end (fewer tasks, a larger page size); it would render
+	// empty without pagination to leave it.
+	useClampedPage(page, query)
 
 	watch(query.error, cause => {
 		if (cause && !isRequestContextAbort(cause)) error(cause)

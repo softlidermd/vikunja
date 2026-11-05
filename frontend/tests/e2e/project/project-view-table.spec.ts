@@ -3,6 +3,8 @@ import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
 import {LabelFactory} from '../../factories/labels'
+import {UserFactory} from '../../factories/user'
+import {UserProjectFactory} from '../../factories/users_project'
 import {createDefaultViews, createProjects} from './prepareProjects'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
 
@@ -208,5 +210,37 @@ test.describe('Project View Table', () => {
 		await expect(picker.getByRole('combobox')).toBeFocused()
 		await expect(picker.getByRole('listbox')).toBeVisible()
 		await expect(picker.getByRole('option').filter({hasText: label.title})).toBeVisible()
+	})
+
+	test('Should edit a saved filter row only where its project is writable', async ({authenticatedPage: page, apiContext, userToken, currentUser}) => {
+		const headers = {Authorization: `Bearer ${userToken}`}
+		const [owner] = await UserFactory.create(1, {id: 100}, false)
+		const [own, shared] = await ProjectFactory.create(2, {
+			title: (i: number) => i === 1 ? 'Own project' : 'Shared project',
+			owner_id: (i: number) => i === 1 ? currentUser.id : owner.id,
+		})
+		await UserProjectFactory.create(1, {project_id: shared.id, user_id: currentUser.id, permission: 0})
+		const [ownTask, sharedTask] = await TaskFactory.create(2, {
+			title: (i: number) => i === 1 ? 'Own task' : 'Shared task',
+			project_id: (i: number) => i === 1 ? own.id : shared.id,
+			done: false,
+		})
+		const response = await apiContext.post('/api/v2/filters', {headers, data: {title: 'Open tasks', filters: {filter: 'done = false'}}})
+		expect(response.ok()).toBeTruthy()
+		const projectId = -(await response.json()).id - 1
+		const views = await (await apiContext.get(`projects/${projectId}/views`, {headers})).json()
+		const table = views.find((view: {view_kind: string}) => view.view_kind === 'table')
+
+		await page.goto(`/projects/${projectId}/${table.id}`)
+		const row = (title: string) => page.locator('.project-table tbody tr').filter({
+			has: page.getByRole('link', {name: title, exact: true}),
+		})
+		await expect(row(sharedTask.title)).toBeVisible()
+		await expect(row(sharedTask.title).locator('.fancy-checkbox')).toHaveCount(0)
+		await expect(row(sharedTask.title).getByRole('button', {name: /Labels/})).toHaveCount(0)
+
+		// The wrapper is wider than the box, so click the box itself.
+		await row(ownTask.title).locator('.fancy-checkbox svg').click()
+		await expect.poll(async () => (await (await apiContext.get(`tasks/${ownTask.id}`, {headers})).json()).done).toBe(true)
 	})
 })
