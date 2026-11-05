@@ -85,6 +85,8 @@ func (b *TaskBucket) upsert(s *xorm.Session) (err error) {
 }
 
 // updateTaskBucket is internally used to actually do the update.
+//
+//nolint:gocyclo
 func updateTaskBucket(s *xorm.Session, a web.Auth, b *TaskBucket) (err error) {
 	oldTaskBucket := &TaskBucket{}
 	_, err = s.
@@ -94,7 +96,7 @@ func updateTaskBucket(s *xorm.Session, a web.Auth, b *TaskBucket) (err error) {
 		return
 	}
 
-	if oldTaskBucket.BucketID == b.BucketID {
+	if oldTaskBucket.BucketID == b.BucketID && GetSavedFilterIDFromProjectID(b.ProjectID) == 0 {
 		// no need to do anything
 		return
 	}
@@ -102,6 +104,12 @@ func updateTaskBucket(s *xorm.Session, a web.Auth, b *TaskBucket) (err error) {
 	view, err := GetProjectViewByIDAndProject(s, b.ProjectViewID, b.ProjectID)
 	if err != nil {
 		return err
+	}
+
+	// A mirrored filter row can already equal the drop column while the project card sits elsewhere.
+	if oldTaskBucket.BucketID == b.BucketID && !isMirroredFilterView(view) {
+		// no need to do anything
+		return
 	}
 
 	bucket, err := getBucketByID(s, b.BucketID)
@@ -131,6 +139,16 @@ func updateTaskBucket(s *xorm.Session, a web.Auth, b *TaskBucket) (err error) {
 			return err
 		}
 		bucket.Count = taskCount
+	}
+
+	if isMirroredFilterView(view) {
+		handled, err := moveTaskViaStatusView(s, a, b, view, bucket, task, oldTaskBucket.BucketID)
+		if err != nil || handled {
+			return err
+		}
+		if oldTaskBucket.BucketID == b.BucketID {
+			return nil
+		}
 	}
 
 	var updateBucket = true

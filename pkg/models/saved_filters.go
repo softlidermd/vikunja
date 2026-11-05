@@ -368,6 +368,7 @@ type filterViewState struct {
 	bucketIDs        map[viewTask]int64
 	hasPosition      map[viewTask]bool
 	defaultBucketIDs map[int64]int64
+	mirrorTargets    map[viewTask]int64
 }
 
 func (state *filterViewState) defaultBucketID(s *xorm.Session, view *ProjectView) (bucketID int64, err error) {
@@ -384,11 +385,12 @@ func (state *filterViewState) defaultBucketID(s *xorm.Session, view *ProjectView
 	return bucketID, nil
 }
 
-func preloadFilterViewState(s *xorm.Session, viewsByTask map[int64][]filterView) (state *filterViewState, err error) {
+func preloadFilterViewState(s *xorm.Session, viewsByTask map[int64][]filterView, tasks []*Task) (state *filterViewState, err error) {
 	state = &filterViewState{
 		bucketIDs:        map[viewTask]int64{},
 		hasPosition:      map[viewTask]bool{},
 		defaultBucketIDs: map[int64]int64{},
+		mirrorTargets:    map[viewTask]int64{},
 	}
 
 	taskIDs := make([]int64, 0, len(viewsByTask))
@@ -433,13 +435,21 @@ func preloadFilterViewState(s *xorm.Session, viewsByTask map[int64][]filterView)
 		state.hasPosition[viewTask{viewID: tp.ProjectViewID, taskID: tp.TaskID}] = true
 	}
 
+	state.mirrorTargets, err = loadMirrorTargets(s, tasks, viewIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	return state, nil
 }
 
 func addTaskToFilterView(s *xorm.Session, filter *SavedFilter, view *ProjectView, task *Task, state *filterViewState) (taskBucket *TaskBucket, taskPosition *TaskPosition, err error) {
 	currentBucketID, hasBucket := state.bucketIDs[viewTask{viewID: view.ID, taskID: task.ID}]
+	mirrorTarget, isMirrored := state.mirrorTargets[viewTask{viewID: view.ID, taskID: task.ID}]
 	var bucketID int64
 	switch {
+	case isMirrored:
+		bucketID = mirrorTarget
 	case task.Done && view.DoneBucketID != 0:
 		bucketID = view.DoneBucketID
 	case !hasBucket || (view.DoneBucketID != 0 && currentBucketID == view.DoneBucketID):

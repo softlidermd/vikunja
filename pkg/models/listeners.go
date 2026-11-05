@@ -1117,7 +1117,7 @@ func updateTasksInSavedFilterViews(tasks []*Task) (err error) {
 		return err
 	}
 
-	state, err := preloadFilterViewState(s, viewsByTask)
+	state, err := preloadFilterViewState(s, viewsByTask, tasks)
 	if err != nil {
 		return err
 	}

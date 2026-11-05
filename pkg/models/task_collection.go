@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"code.vikunja.io/api/pkg/log"
 	"code.vikunja.io/api/pkg/user"
 	"code.vikunja.io/api/pkg/web"
 
@@ -211,6 +212,12 @@ func getTaskOrTasksInBuckets(s *xorm.Session, a web.Auth, projects []*Project, v
 
 	if view != nil && !strings.Contains(opts.filter, taskPropertyBucketID) {
 		if view.BucketConfigurationMode != BucketConfigurationModeNone {
+			if isMirroredFilterView(view) {
+				// Best-effort: on error the stored placement is served.
+				if err := syncMirroredFilterView(s, projects, view, opts); err != nil {
+					log.Warningf("Could not mirror project status onto saved filter view %d: %v", view.ID, err)
+				}
+			}
 			tasksInBuckets, err := GetTasksInBucketsForView(s, view, projects, opts, a)
 			return tasksInBuckets, len(tasksInBuckets), int64(len(tasksInBuckets)), err
 		}
