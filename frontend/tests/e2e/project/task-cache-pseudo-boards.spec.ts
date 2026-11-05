@@ -5,6 +5,7 @@ import {ProjectViewFactory} from '../../factories/project_view'
 import {TaskFactory} from '../../factories/task'
 import {BucketFactory} from '../../factories/bucket'
 import {TaskBucketFactory} from '../../factories/task_buckets'
+import {TaskAssigneeFactory} from '../../factories/task_assignee'
 
 for (const scope of ['favorites', 'saved filter']) {
 	test(`persists ${scope} task edits in its board response`, async ({authenticatedPage: page, apiContext, userToken}) => {
@@ -46,7 +47,33 @@ for (const scope of ['favorites', 'saved filter']) {
 	})
 }
 
-test('moving a favourite task to another project keeps it in Favorites and drops it from the source board', async ({authenticatedPage: page, apiContext, userToken}) => {
+test('unassigning a task drops its card from an open "assigned to me" saved filter board', async ({authenticatedPage: page, apiContext, userToken, currentUser}) => {
+	const headers = {Authorization: `Bearer ${userToken}`}
+	const [project] = await ProjectFactory.create(1)
+	const [task] = await TaskFactory.create(1, {project_id: project.id, title: 'Mine for now', done: false})
+	await TaskAssigneeFactory.create(1, {task_id: task.id, user_id: currentUser.id})
+	const response = await apiContext.post('/api/v2/filters', {headers, data: {
+		title: 'My open tasks',
+		filters: {filter: `done = false && assignees in ${currentUser.username}`},
+	}})
+	expect(response.ok()).toBeTruthy()
+	const projectId = -(await response.json()).id - 1
+	const [view] = await ProjectViewFactory.create(1, {id: 80, project_id: projectId, view_kind: 3, bucket_configuration_mode: 1})
+	const [bucket] = await BucketFactory.create(1, {project_view_id: view.id})
+	await TaskBucketFactory.create(1, {task_id: task.id, bucket_id: bucket.id, project_view_id: view.id})
+
+	await page.goto(`/projects/${projectId}/${view.id}`)
+	const card = page.locator('.kanban .task').filter({hasText: task.title})
+	await expect(card).toBeVisible()
+	await card.getByText(task.title, {exact: true}).click()
+	await page.locator('.task-view .column.assignees .multiselect .input-wrapper span.assignee .remove-assignee').click()
+	await expect(page.locator('.global-notification')).toContainText('Success')
+
+	// The board stays mounted behind the task modal, so only a refetch can drop the card.
+	await expect(card).toHaveCount(0)
+})
+
+test('moving a favourite task to another project keeps it in Favorites and drops it from the source board',async ({authenticatedPage: page, apiContext, userToken}) => {
 	const headers = {Authorization: `Bearer ${userToken}`}
 	const [source, target] = await ProjectFactory.create(2, {
 		title: (i: number) => i === 0 ? 'Source Project' : 'Target Project',
