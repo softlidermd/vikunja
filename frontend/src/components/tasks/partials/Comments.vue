@@ -14,6 +14,13 @@
 					<Icon :icon="['far', 'comments']" />
 				</span>
 				{{ $t('task.comment.title') }}
+				<!-- In the heading, not above the list: a line there pushes the new comment box down and back. -->
+				<span
+					v-if="listPending"
+					class="loader is-inline-block mis-2"
+					role="status"
+					:aria-label="$t('task.comment.loading')"
+				/>
 			</span>
 			<BaseButton
 				v-if="comments.length > 0"
@@ -25,13 +32,6 @@
 			</BaseButton>
 		</h2>
 		<div class="comments">
-			<span
-				v-if="listPending"
-				class="is-flex is-align-items-center mbs-4 mbe-4 mis-2"
-			>
-				<span class="loader is-inline-block mie-2" />
-				{{ $t('task.comment.loading') }}
-			</span>
 			<div
 				v-for="c in comments"
 				:id="`comment-${c.id}`"
@@ -221,7 +221,9 @@ import {useI18n} from 'vue-i18n'
 
 import BaseButton from '@/components/base/BaseButton.vue'
 import CustomTransition from '@/components/misc/CustomTransition.vue'
-import Editor from '@/components/input/AsyncEditor'
+// Not AsyncEditor: this only renders inside the lazily loaded task view, and an async editor mounts after
+// the task modal has painted, so the modal visibly grows.
+import Editor from '@/components/input/editor/TipTap.vue'
 import PaginationEmit from '@/components/misc/PaginationEmit.vue'
 import UserAvatar from '@/components/misc/UserAvatar.vue'
 
@@ -344,7 +346,7 @@ async function startReplyTo(parent: CommentResponse) {
 	if (!editorActive.value) {
 		editorActive.value = true
 	}
-	// Editor mounts asynchronously through defineAsyncComponent; wait until
+	// The editor mounts on the render after editorActive flips; wait until
 	// the ref is populated before pushing content in. Bail with a warning
 	// rather than fall back to `newCommentText = draft` — the modelValue
 	// watcher in TipTap.vue would land the editor in preview mode, leaving

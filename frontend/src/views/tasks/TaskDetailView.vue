@@ -1495,6 +1495,7 @@ h2 .button {
 
 	// Two compact columns keep every action within a 1080p screen.
 	@media screen and (min-width: $desktop) {
+		inline-size: 40%;
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: .375rem;
@@ -1524,6 +1525,13 @@ h2 .button {
 .detail-content {
 	@media print {
 		inline-size: 100% !important;
+	}
+}
+
+// Leaves the modal's action column room for its labels on one line.
+.is-modal .detail-content.is-two-thirds {
+	@media screen and (min-width: $desktop) {
+		inline-size: 60%;
 	}
 }
 

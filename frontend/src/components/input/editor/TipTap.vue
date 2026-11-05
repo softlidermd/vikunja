@@ -841,7 +841,7 @@ watch(
 
 .tiptap__editor {
 	&.tiptap__editor-is-edit-enabled {
-		min-block-size: 10rem;
+		min-block-size: 5rem;
 
 		.ProseMirror {
 			padding: .5rem;

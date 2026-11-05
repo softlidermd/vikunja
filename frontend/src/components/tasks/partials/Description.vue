@@ -56,7 +56,9 @@ import {useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
 import CustomTransition from '@/components/misc/CustomTransition.vue'
-import Editor from '@/components/input/AsyncEditor'
+// Not AsyncEditor: this only renders inside the lazily loaded task view, and an async editor mounts after
+// the task modal has painted, so the modal visibly grows.
+import Editor from '@/components/input/editor/TipTap.vue'
 
 import { clearEditorDraft } from '@/helpers/editorDraftStorage'
 import { isEditorContentEmpty } from '@/helpers/editorContentEmpty'

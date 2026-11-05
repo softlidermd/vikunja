@@ -518,7 +518,6 @@ function setLink(event: MouseEvent) {
 	color: var(--grey-700);
 	transition: all $transition;
 	background: transparent;
-	margin-inline-end: .25rem;
 
 	&:hover {
 		background: var(--grey-100);
