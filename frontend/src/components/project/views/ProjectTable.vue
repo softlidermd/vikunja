@@ -253,7 +253,7 @@
 									<th v-if="activeColumns.createdBy">
 										{{ $t('task.attributes.createdBy') }}
 									</th>
-									<th v-if="canWrite">
+									<th v-if="hasActionsColumn">
 										<span class="is-sr-only">{{ $t('misc.actions') }}</span>
 									</th>
 								</tr>
@@ -262,7 +262,7 @@
 								<tr
 									v-for="t in tasks"
 									:key="t.id"
-									:data-progress="getTaskProgress(t, statusView, statusDefaultBucketId)"
+									:data-progress="rowProgress(t)"
 								>
 									<td v-if="activeColumns.index">
 										<RouterLink :to="taskDetailRoutes[t.id]">
@@ -271,7 +271,7 @@
 									</td>
 									<td v-if="activeColumns.done">
 										<FancyCheckbox
-											v-if="canWrite"
+											v-if="canWriteTask(t)"
 											:model-value="t.done"
 											:aria-label="$t('task.detail.markAsDone', {task: t.title})"
 											@update:modelValue="v => saveTask(t, {done: v})"
@@ -302,12 +302,12 @@
 									<td v-if="showStatus">
 										<TaskStatusSelect
 											:task="t"
-											:can-write="canWrite"
+											:can-write="canWriteTask(t)"
 										/>
 									</td>
 									<td v-if="activeColumns.priority">
 										<PrioritySelect
-											v-if="canWrite"
+											v-if="canWriteTask(t)"
 											class="is-small"
 											:class="{'is-high-priority': !t.done && t.priority >= PRIORITIES.HIGH}"
 											:model-value="t.priority"
@@ -321,7 +321,7 @@
 									</td>
 									<td v-if="activeColumns.labels">
 										<BaseButton
-											v-if="canWrite"
+											v-if="canWriteTask(t)"
 											:aria-label="labelsLabel($t('task.attributes.labels'), t.labels)"
 											@click="openPicker('labels', t, $event)"
 										>
@@ -341,7 +341,7 @@
 									</td>
 									<td v-if="activeColumns.assignees">
 										<BaseButton
-											v-if="canEditAssignees"
+											v-if="canWriteTask(t) && !authStore.isLinkShareAuth"
 											:aria-label="assigneesLabel($t('task.attributes.assignees'), t.assignees)"
 											@click="openPicker('assignees', t, $event)"
 										>
@@ -377,7 +377,7 @@
 									</td>
 									<template v-if="activeColumns.dueDate">
 										<td
-											v-if="canWrite"
+											v-if="canWriteTask(t)"
 											class="due-date-cell"
 										>
 											<Datepicker
@@ -426,8 +426,9 @@
 											:user="t.created_by ?? {}"
 										/>
 									</td>
-									<td v-if="canWrite">
+									<td v-if="hasActionsColumn">
 										<TaskQuickActions
+											v-if="canWriteTask(t)"
 											:task="t"
 											can-write
 										/>
@@ -554,8 +555,15 @@ const canWrite = computed(() => !project.value?.is_archived &&
 	project.value.max_permission > Permissions.READ &&
 	project.value.id > 0)
 const authStore = useAuthStore()
-// Link shares may not search users, so they cannot pick assignees.
-const canEditAssignees = computed(() => canWrite.value && !authStore.isLinkShareAuth)
+
+// Saved filters span projects, so each row's permission and status come from the task's own project.
+const isPseudoProject = computed(() => props.projectId < 0)
+function canWriteTask(task: TaskResponse) {
+	if (!isPseudoProject.value) return canWrite.value
+	const taskProject = projectList.projects[task.project_id]
+	return Boolean(taskProject && !taskProject.is_archived && (taskProject.max_permission ?? 0) > Permissions.READ)
+}
+const hasActionsColumn = computed(() => canWrite.value || isPseudoProject.value)
 
 const columnsTrigger = ref<ComponentPublicInstance | null>(null)
 const columnsTriggerEl = computed<HTMLElement | null>(() => (columnsTrigger.value?.$el as HTMLElement) ?? null)
@@ -600,7 +608,6 @@ const taskList = useTaskList(
 	() => ['comment_count', 'is_unread', 'buckets'],
 )
 
-// Saved filters span projects and some projects have no kanban board, so there is no status to show.
 const statusView = computed(() => props.projectId > 0
 	? getStatusKanbanView(project.value?.views, props.viewId)
 	: null)
@@ -615,7 +622,15 @@ const statusBuckets = useQuery(computed(() => {
 const statusDefaultBucketId = computed(() => statusView.value
 	? getDefaultBucketId(statusView.value, statusBuckets.data.value ?? [])
 	: undefined)
-const showStatus = computed(() => hasStatus.value && activeColumns.value.status)
+const showStatus = computed(() => (hasStatus.value || isPseudoProject.value) && activeColumns.value.status)
+
+function rowProgress(task: TaskResponse) {
+	if (!isPseudoProject.value) return getTaskProgress(task, statusView.value, statusDefaultBucketId.value)
+	const view = getStatusKanbanView(projectList.projects[task.project_id]?.views, undefined)
+	// shortcut: a board whose default bucket was deleted has no default_bucket_id, so its open tasks get no
+	// in-progress colour here; load that board's buckets if it matters.
+	return getTaskProgress(task, view, view?.default_bucket_id || undefined)
+}
 
 const {
 	params,
