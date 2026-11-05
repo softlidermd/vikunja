@@ -235,6 +235,13 @@ export function useTaskList(
 	const loading = query.isFetching
 	const {tasks, totalPages} = query
 
+	// A remembered or linked page can lie past the end (fewer tasks, a larger page size). It renders empty
+	// without pagination to leave it, so move to the last page.
+	watch(query.data, data => {
+		const lastPage = Math.max(1, data?.total_pages ?? 1)
+		if (data && page.value > lastPage) page.value = lastPage
+	})
+
 	watch(query.error, cause => {
 		if (cause && !isRequestContextAbort(cause)) error(cause)
 	})

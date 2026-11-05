@@ -248,6 +248,17 @@ describe('useTaskList navigation and pagination', () => {
 		}])
 	})
 
+	it('moves a restored page past the end to the last page', async () => {
+		const {router, taskList} = await mountRoutedTaskList()
+		useViewFiltersStore().setViewQuery(21, {page: '7'})
+
+		await router.push('/projects/2/21')
+		await flushPromises()
+
+		expect(taskList.currentPage.value).toBe(5)
+		expect(lastQuery().page).toBe(5)
+	})
+
 	it('ignores a response from a project the user has left', async () => {
 		const {router, taskList} = await mountRoutedTaskList()
 		let resolveOld!: (response: unknown) => void
