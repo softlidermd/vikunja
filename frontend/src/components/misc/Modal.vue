@@ -414,8 +414,9 @@ $modal-width: 1024px;
 	max-block-size: none; // reset bulma
 	overflow: visible; // reset bulma
 
+	// Wide on big screens, but always leaves a strip of backdrop on both sides to click away.
 	@media not print {
-		max-inline-size: $modal-width;
+		max-inline-size: min(1400px, max(#{$modal-width}, calc(100vw - 16rem)));
 	}
 
 	@media screen and (min-width: $tablet) {

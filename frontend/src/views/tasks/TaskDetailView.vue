@@ -1492,6 +1492,29 @@ h2 .button {
 	@media screen and (width >= calc(#{$desktop} + 84px)) {
 		inset-block-start: 0;
 	}
+
+	// Two compact columns keep every action within a 1080p screen.
+	@media screen and (min-width: $desktop) {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: .375rem;
+		align-content: start;
+
+		.button {
+			margin-block-end: 0;
+			min-inline-size: 0;
+			block-size: auto;
+			min-block-size: 2.25rem;
+			white-space: normal;
+			text-align: start;
+		}
+
+		.button--mark-done,
+		.action-heading,
+		.created {
+			grid-column: 1 / -1;
+		}
+	}
 }
 
 .checklist-summary {
