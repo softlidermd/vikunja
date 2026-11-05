@@ -307,6 +307,24 @@ describe('task mutations', () => {
 		unsubscribe()
 	})
 
+	it('refetches an open saved filter board after a move only when done changed', async () => {
+		const client = new QueryClient()
+		const queryFn = vi.fn(() => ({buckets: [], pages: {}}))
+		const unsubscribe = new QueryObserver(client, {queryKey: kanbanKeys.board(-2, 9), queryFn}).subscribe(() => {})
+		await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1))
+		const move = (done: boolean) => {
+			sdk.taskBucketUpdate.mockResolvedValue({data: {bucket_id: 4, task: {id: 1, done}}})
+			return client.getMutationCache()
+				.build(client, moveTaskMutationOptions())
+				.execute({project: 1, view: 2, bucket: 4, task: {id: 1, done: false}})
+		}
+		await move(false)
+		expect(queryFn).toHaveBeenCalledTimes(1)
+		await move(true)
+		await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2))
+		unsubscribe()
+	})
+
 	it('reorders only cached lists for the affected view', async () => {
 		const client = new QueryClient()
 		const key = taskKeys.list({project: 1, view: 2, params: {sort_by: ['position']}})

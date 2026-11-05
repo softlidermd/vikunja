@@ -165,6 +165,12 @@ export async function refetchSavedFilterViews(client: QueryClient) {
 	])
 }
 
+// Not awaited: queued saves of the same task would otherwise wait for the refetch.
+export function settleTaskEdit(client: QueryClient, id: number) {
+	void refetchSavedFilterViews(client)
+	return invalidateTaskMembership(client, id)
+}
+
 export async function invalidateTaskMembership(
 	client: QueryClient,
 	id?: number,

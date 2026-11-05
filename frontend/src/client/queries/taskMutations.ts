@@ -35,6 +35,7 @@ import {
 	removeTaskEverywhere,
 	refetchSavedFilterViews,
 	replaceTaskEverywhere,
+	settleTaskEdit,
 	taskQueryKeys,
 } from './taskCache'
 import {getCachedProject, projectKeys} from './projects'
@@ -196,7 +197,7 @@ export function updateTaskMutationOptions(optimistic = false) {
 			replaceTaskEverywhere(client, task)
 			reconcileDoneBuckets(client, normalizeTask({...task, id: input.id}))
 		},
-		onSettled: ({id}, client) => Promise.all([invalidateTaskMembership(client, id), refetchSavedFilterViews(client)]),
+		onSettled: ({id}, client) => settleTaskEdit(client, id),
 	})
 }
 
@@ -271,7 +272,7 @@ export function favoriteTaskMutationOptions() {
 		},
 		onSuccess: (task, _input, client) => replaceTaskEverywhere(client, task),
 		onSettled: async ({id}, client) => {
-			await Promise.all([invalidateTaskMembership(client, id), refetchSavedFilterViews(client)])
+			await settleTaskEdit(client, id)
 			await client.invalidateQueries({queryKey: projectKeys.list()})
 		},
 	})
@@ -294,7 +295,7 @@ export function addTaskAssigneeMutationOptions() {
 			...task,
 			assignees: [...task.assignees.filter(item => item.id !== user.id), user],
 		})),
-		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
+		onSettled: ({taskId}, client) => settleTaskEdit(client, taskId),
 	})
 }
 export function removeTaskAssigneeMutationOptions() {
@@ -306,7 +307,7 @@ export function removeTaskAssigneeMutationOptions() {
 			...task,
 			assignees: task.assignees.filter(item => item.id !== user.id),
 		})),
-		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
+		onSettled: ({taskId}, client) => settleTaskEdit(client, taskId),
 	})
 }
 
@@ -319,7 +320,7 @@ export function addTaskLabelMutationOptions() {
 			...task,
 			labels: [...task.labels.filter(item => item.id !== label.id), label],
 		})),
-		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
+		onSettled: ({taskId}, client) => settleTaskEdit(client, taskId),
 	})
 }
 export function removeTaskLabelMutationOptions() {
@@ -331,7 +332,7 @@ export function removeTaskLabelMutationOptions() {
 			...task,
 			labels: task.labels.filter(item => item.id !== label.id),
 		})),
-		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
+		onSettled: ({taskId}, client) => settleTaskEdit(client, taskId),
 	})
 }
 
@@ -445,8 +446,10 @@ export function moveTaskMutationOptions() {
 			)
 			const id = data.task?.id ?? task.id
 			if (id !== undefined) reconcileTaskBuckets(client, {project, view, bucket: target, task: id})
+			// Only done changes saved filter membership. Refetching on every drop would race the drop's position save.
+			if (data.task && Boolean(data.task.done) !== Boolean(task.done)) void refetchSavedFilterViews(client)
 		},
-		onSettled: ({task}, client) => Promise.all([invalidateTaskMembership(client, task.id), refetchSavedFilterViews(client)]),
+		onSettled: ({task}, client) => invalidateTaskMembership(client, task.id),
 	})
 }
 
