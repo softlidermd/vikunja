@@ -135,7 +135,6 @@ import ChecklistSummary from './ChecklistSummary.vue'
 import CommentCount from './CommentCount.vue'
 
 import {getHexColor, getTaskIdentifier} from '@/helpers/task'
-import type {Task as ITask} from '@/client/generated'
 import type {TaskResponse} from '@/client/queries/tasks'
 import {SUPPORTED_IMAGE_SUFFIX} from '@/helpers/attachmentPreview'
 import {fetchAttachmentUrl, releaseAttachmentUrl} from '@/helpers/attachments'
@@ -148,15 +147,10 @@ import {playPopSound} from '@/helpers/playPop'
 import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
 import {useProjects} from '@/composables/useProjects'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
-import {TASK_REPEAT_MODES} from '@/types/IRepeatMode'
 
 const props = defineProps<{
 	task: TaskResponse,
 	projectId: number,
-}>()
-
-const emit = defineEmits<{
-	'taskCompletedRecurring': [task: ITask]
 }>()
 
 const router = useRouter()
@@ -189,9 +183,6 @@ const isOverdue = computed(() => (
 ))
 
 async function toggleTaskDone(task: TaskResponse) {
-	const isRecurringTask = task.repeat_after > 0 || task.repeat_mode === TASK_REPEAT_MODES.REPEAT_MODE_MONTH
-	const wasBeingMarkedDone = !task.done
-	
 	loadingInternal.value = true
 	try {
 		const updatedTask = await updateTask.mutateAsync({
@@ -201,11 +192,6 @@ async function toggleTaskDone(task: TaskResponse) {
 
 		if (updatedTask.done) {
 			playPopSound()
-		}
-		
-		// Emit event if this was a recurring task being marked as done
-		if (isRecurringTask && wasBeingMarkedDone && updatedTask.done) {
-			emit('taskCompletedRecurring', updatedTask)
 		}
 	} finally {
 		loadingInternal.value = false

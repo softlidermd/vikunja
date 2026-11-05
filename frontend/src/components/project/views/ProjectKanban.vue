@@ -235,7 +235,6 @@
 												class="kanban-card"
 												:task="task"
 												:project-id="projectId"
-												@taskCompletedRecurring="handleRecurringTaskCompletion"
 											/>
 										</li>
 									</template>
@@ -307,7 +306,7 @@ import {
 	useLoadBucketPageMutation,
 } from '@/client/queries/kanbanMutations'
 import {computed, nextTick, ref, watch, toRef} from 'vue'
-import {useQuery, useQueryClient} from '@tanstack/vue-query'
+import {useQueryClient} from '@tanstack/vue-query'
 import {useRouter} from 'vue-router'
 import {useRouteQuery} from '@vueuse/router'
 import {useI18n} from 'vue-i18n'
@@ -335,8 +334,7 @@ import {
 } from '@/helpers/saveCollapsedBucketState'
 import {calculateItemPosition} from '@/helpers/calculateItemPosition'
 
-import {getSavedFilterIdFromProjectId, isSavedFilterProject} from '@/client/queries/projects'
-import {savedFilterQuery} from '@/client/queries/savedFilters'
+import {isSavedFilterProject} from '@/client/queries/projects'
 import {useCurrentProject} from '@/composables/useCurrentProject'
 import {useTaskDragToProject} from '@/composables/useTaskDragToProject'
 import type {TaskFilterParams, TaskResponse} from '@/client/queries/tasks'
@@ -378,7 +376,6 @@ const {handleTaskDropToProject} = useTaskDragToProject()
 const positionMutation = useUpdateTaskPositionMutation()
 const moveMutation = useMoveTaskMutation()
 
-const savedFilter = useQuery(computed(() => savedFilterQuery(getSavedFilterIdFromProjectId(projectId.value)))).data
 
 const taskContainerRefs = ref<{ [id: number]: HTMLElement }>({})
 const bucketLimitInputRef = ref<HTMLInputElement | null>(null)
@@ -728,23 +725,6 @@ async function saveBucketTitle(bucketId: number, bucketTitle: string) {
 function updateBuckets(value: BucketResponse[]) {
 	// (1) buckets get updated in store and tasks positions get invalidated
 	board.dragBuckets.value = value
-}
-
-function handleRecurringTaskCompletion() {
-	// Only reload if we're in a saved filter and the filter contains date fields
-	if (!isSavedFilterProject(project.value)) {
-		return
-	}
-
-	const savedFilterQueryString = savedFilter.value?.filters.filter ?? ''
-	const filterContainsDateFields = savedFilterQueryString.includes('due_date') ||
-		savedFilterQueryString.includes('start_date') ||
-		savedFilterQueryString.includes('end_date')
-		
-	if (filterContainsDateFields) {
-		// Reload the kanban board to refresh tasks that now match/don't match the filter
-		board.refetch()
-	}
 }
 
 // TODO: fix type

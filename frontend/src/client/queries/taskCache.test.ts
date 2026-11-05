@@ -13,6 +13,7 @@ import {
 	cachedListTasks,
 	invalidateTaskMembership,
 	mapTaskEverywhere,
+	refetchSavedFilterViews,
 	replaceTaskEverywhere,
 	removeTaskEverywhere,
 	removeTaskFromBoard,
@@ -189,6 +190,19 @@ describe('task cache reconciliation', () => {
 		expect(client.getQueryState(board.queryKey)?.isInvalidated).toBe(true)
 		unsubscribeBoard()
 		unsubscribeList()
+	})
+	it('refetches open saved filter boards and lists but not project boards', async () => {
+		sdk.projectViewBucketsTasksList.mockResolvedValue({data: {items: [{id: 5, tasks: []}]}})
+		sdk.projectTasksList.mockResolvedValue({data: {items: [], total: 0}})
+		const client = new QueryClient()
+		const queries = [kanbanQuery(-2, 8), kanbanQuery(1, 9), tasksQuery({project: -2})] as const
+		const unsubscribes = queries.map(({queryKey, queryFn}) =>
+			new QueryObserver(client, {queryKey, queryFn} as never).subscribe(() => {}))
+		const updates = () => queries.map(({queryKey}) => client.getQueryState(queryKey)?.dataUpdateCount)
+		await vi.waitFor(() => expect(updates()).toEqual([1, 1, 1]))
+		await refetchSavedFilterViews(client)
+		expect(updates()).toEqual([2, 1, 2])
+		unsubscribes.forEach(unsubscribe => unsubscribe())
 	})
 	it('does not create queries for unmounted resources', () => {
 		const client = new QueryClient()

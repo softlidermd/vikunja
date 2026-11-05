@@ -64,14 +64,6 @@ vi.mock('@/stores/auth', () => ({
 	}),
 }))
 
-vi.mock('@/client/queries/savedFilters', () => ({
-	savedFilterQuery: (id: number) => ({
-		queryKey: ['saved-filters', 'detail', id],
-		queryFn: async () => null,
-		enabled: false,
-	}),
-}))
-
 vi.mock('@vueuse/router', () => ({
 	useRouteQuery: () => ({value: undefined}),
 }))

@@ -78,7 +78,6 @@
 								:can-edit-status="canWrite && !project?.is_archived"
 								:the-task="t"
 								:all-tasks="allTasks"
-								@taskUpdated="updateTasks"
 							>
 								<span
 									v-if="canDragTasks && isPositionSorting"
@@ -208,10 +207,6 @@ function focusNewTaskInput() {
 
 function updateTaskList() {
 	baseStore.setHasTasks(true)
-}
-
-function updateTasks() {
-	if (projectId.value < 0) void loadTasks()
 }
 
 function handleDragStart(e: { item: HTMLElement }) {

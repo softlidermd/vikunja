@@ -147,6 +147,24 @@ export function removeTaskEverywhere(client: QueryClient, id: number) {
 	)
 }
 
+// Any edit can move a task in or out of a saved filter or Favorites, which only the server can decide.
+// Their boards go back to the first page per bucket, unlike project boards which mutations patch.
+export async function refetchSavedFilterViews(client: QueryClient) {
+	const savedFilter = (project: unknown) => typeof project === 'number' && project < 0
+	await Promise.all([
+		...[taskKeys.lists, taskKeys.allLists].map(queryKey => client.refetchQueries({
+			queryKey,
+			type: 'active',
+			predicate: query => savedFilter(taskKeys.projectOf(query.queryKey)),
+		})),
+		client.refetchQueries({
+			queryKey: kanbanKeys.all,
+			type: 'active',
+			predicate: query => savedFilter(kanbanKeys.projectOf(query.queryKey)),
+		}),
+	])
+}
+
 export async function invalidateTaskMembership(
 	client: QueryClient,
 	id?: number,

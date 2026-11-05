@@ -33,6 +33,7 @@ import {
 	invalidateTaskMembership,
 	mapTaskEverywhere,
 	removeTaskEverywhere,
+	refetchSavedFilterViews,
 	replaceTaskEverywhere,
 	taskQueryKeys,
 } from './taskCache'
@@ -195,7 +196,7 @@ export function updateTaskMutationOptions(optimistic = false) {
 			replaceTaskEverywhere(client, task)
 			reconcileDoneBuckets(client, normalizeTask({...task, id: input.id}))
 		},
-		onSettled: ({id}, client) => invalidateTaskMembership(client, id),
+		onSettled: ({id}, client) => Promise.all([invalidateTaskMembership(client, id), refetchSavedFilterViews(client)]),
 	})
 }
 
@@ -270,7 +271,7 @@ export function favoriteTaskMutationOptions() {
 		},
 		onSuccess: (task, _input, client) => replaceTaskEverywhere(client, task),
 		onSettled: async ({id}, client) => {
-			await invalidateTaskMembership(client, id)
+			await Promise.all([invalidateTaskMembership(client, id), refetchSavedFilterViews(client)])
 			await client.invalidateQueries({queryKey: projectKeys.list()})
 		},
 	})
@@ -293,7 +294,7 @@ export function addTaskAssigneeMutationOptions() {
 			...task,
 			assignees: [...task.assignees.filter(item => item.id !== user.id), user],
 		})),
-		onSettled: ({taskId}, client) => invalidateTaskMembership(client, taskId),
+		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
 	})
 }
 export function removeTaskAssigneeMutationOptions() {
@@ -305,7 +306,7 @@ export function removeTaskAssigneeMutationOptions() {
 			...task,
 			assignees: task.assignees.filter(item => item.id !== user.id),
 		})),
-		onSettled: ({taskId}, client) => invalidateTaskMembership(client, taskId),
+		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
 	})
 }
 
@@ -318,7 +319,7 @@ export function addTaskLabelMutationOptions() {
 			...task,
 			labels: [...task.labels.filter(item => item.id !== label.id), label],
 		})),
-		onSettled: ({taskId}, client) => invalidateTaskMembership(client, taskId),
+		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
 	})
 }
 export function removeTaskLabelMutationOptions() {
@@ -330,7 +331,7 @@ export function removeTaskLabelMutationOptions() {
 			...task,
 			labels: task.labels.filter(item => item.id !== label.id),
 		})),
-		onSettled: ({taskId}, client) => invalidateTaskMembership(client, taskId),
+		onSettled: ({taskId}, client) => Promise.all([invalidateTaskMembership(client, taskId), refetchSavedFilterViews(client)]),
 	})
 }
 
@@ -445,7 +446,7 @@ export function moveTaskMutationOptions() {
 			const id = data.task?.id ?? task.id
 			if (id !== undefined) reconcileTaskBuckets(client, {project, view, bucket: target, task: id})
 		},
-		onSettled: ({task}, client) => invalidateTaskMembership(client, task.id),
+		onSettled: ({task}, client) => Promise.all([invalidateTaskMembership(client, task.id), refetchSavedFilterViews(client)]),
 	})
 }
 
