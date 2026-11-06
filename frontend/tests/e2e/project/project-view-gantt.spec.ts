@@ -178,7 +178,7 @@ test.describe('Project View Gantt', () => {
 		await expect(page).toHaveURL(/\/tasks\//)
 
 		// Close the modal
-		await page.locator('dialog[open] .modal-container > .close').click()
+		await page.getByRole('button', {name: 'Close task detail'}).click()
 
 		// Verify the date range query parameters are preserved
 		await expect(page).toHaveURL(/dateFrom=2022-09-25/)

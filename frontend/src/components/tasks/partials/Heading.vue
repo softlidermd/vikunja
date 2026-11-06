@@ -221,16 +221,11 @@ async function cancel(element: HTMLInputElement) {
 
 // Modal renders its own fixed close button from $tablet up
 .close {
-	display: none;
 	font-size: 2rem;
 	line-height: 1;
 	position: absolute;
 	inset-inline-end: 1.25rem;
 	inset-block-start: 1.1rem;
-
-	@media screen and (max-width: $tablet) {
-		display: block;
-	}
 }
 
 .task-properties {

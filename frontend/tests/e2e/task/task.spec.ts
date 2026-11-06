@@ -211,7 +211,7 @@ test.describe('Task', () => {
 			const refetched = page.waitForResponse(response =>
 				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
 			)
-			await page.getByRole('button', {name: 'Close dialog'}).click()
+			await page.getByRole('button', {name: 'Close task detail'}).click()
 
 			await expect(page).toHaveURL(/\/projects\/1\/1/)
 			await refetched
@@ -229,7 +229,7 @@ test.describe('Task', () => {
 			await page.locator('tbody tr').first().locator('a').first().click()
 			await expect(page.locator('dialog .task-view')).toBeVisible()
 			await expect(page.locator('tbody tr')).toHaveCount(1)
-			await page.getByRole('button', {name: 'Close dialog'}).click()
+			await page.getByRole('button', {name: 'Close task detail'}).click()
 			await expect(page).toHaveURL(/\/projects\/1\/3/)
 		})
 
@@ -796,7 +796,7 @@ test.describe('Task', () => {
 
 			await addLabelToTaskAndVerify(page, labels[0].title)
 
-			await page.locator('dialog[open] .modal-container > .close').click()
+			await page.getByRole('button', {name: 'Close task detail'}).click()
 
 			await expect(page.locator('.bucket .task')).toContainText(labels[0].title)
 		})
@@ -1455,7 +1455,7 @@ test.describe('Task', () => {
 
 			await uploadAttachmentAndVerify(page, tasks[0].id)
 
-			await page.locator('dialog[open] .modal-container > .close').click()
+			await page.getByRole('button', {name: 'Close task detail'}).click()
 
 			await expect(page.locator('.bucket .task .footer .icon svg.fa-paperclip')).toBeVisible()
 		})

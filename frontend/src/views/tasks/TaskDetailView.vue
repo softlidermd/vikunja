@@ -1288,6 +1288,8 @@ function setRelatedTasksActive() {
 }
 
 .is-modal .task-view {
+	// Anchors the heading's close button to the modal's corner.
+	position: relative;
 	border-radius: $radius;
 	padding: 1rem;
 	color: var(--text);
@@ -1475,9 +1477,9 @@ h2 .button {
 	}
 }
 
-// keep the title clear of the modal's fixed close button
+// keep the title clear of the close button in the modal's corner
 .is-modal .heading {
-	@media screen and (min-width: $tablet) and (max-width: $desktop) {
+	@media screen and (min-width: $tablet) {
 		padding-inline-end: 3.5rem;
 	}
 }

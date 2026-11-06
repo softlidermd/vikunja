@@ -159,6 +159,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
+// The task view puts its own close button inside the modal's corner. Global: the modal is teleported to body.
+:global(.task-detail-view-modal .modal-container > .close) {
+	display: none;
+}
+
 .menu-hide-button {
 	position: fixed;
 	inset-block-start: 0.5rem;
