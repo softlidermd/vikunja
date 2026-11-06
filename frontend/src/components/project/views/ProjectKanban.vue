@@ -374,7 +374,9 @@ const authStore = useAuthStore()
 
 const alwaysShowBucketTaskCount = computed(() => authStore.settings.frontend_settings.always_show_bucket_task_count)
 const {handleTaskDropToProject} = useTaskDragToProject()
-const positionMutation = useUpdateTaskPositionMutation()
+// A done change can drop the task out of a saved filter, and the API then refuses its position (403).
+let positionMayBeRefused = false
+const positionMutation = useUpdateTaskPositionMutation(() => !positionMayBeRefused)
 const moveMutation = useMoveTaskMutation()
 
 
@@ -571,6 +573,7 @@ async function updateTaskPosition(e: SortableEvent & {originalEvent?: MouseEvent
 	const project = projectId.value
 	const view = props.viewId
 	drag.value = false
+	positionMayBeRefused = false
 	try {
 		const {moved} = await handleTaskDropToProject(e, task => {
 			// A moved task stays in a pseudo-project board (favorites, saved filters) until the board is re-read.
@@ -588,8 +591,8 @@ async function updateTaskPosition(e: SortableEvent & {originalEvent?: MouseEvent
 		if (bucket.id !== sourceBucket.value) {
 			const result = await moveMutation.mutateAsync({project, view, bucket: bucket.id, task})
 			if (result.bucket_id !== undefined && result.bucket_id !== bucket.id) return
-			// A done change can drop the task out of the saved filter, and the API refuses positions for tasks outside it.
-			if (isSavedFilterProject({id: project}) && result.task && Boolean(result.task.done) !== Boolean(task.done)) return
+			const doneChanged = !!result.task && Boolean(result.task.done) !== Boolean(task.done)
+			positionMayBeRefused = doneChanged && isSavedFilterProject({id: project})
 		}
 		await positionMutation.mutateAsync({
 			taskId: task.id,

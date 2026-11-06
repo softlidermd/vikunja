@@ -358,7 +358,7 @@ export function deleteTaskRelationMutationOptions() {
 	})
 }
 
-export function updateTaskPositionMutationOptions() {
+export function updateTaskPositionMutationOptions(shouldNotify: () => boolean = () => true) {
 	return contextMutationOptions({
 		mutationFn: async ({taskId, ...body}: TaskPositionWritable & {taskId: number}) =>
 			(await tasksPositionUpdate({path: {task: taskId}, body})).data,
@@ -392,6 +392,7 @@ export function updateTaskPositionMutationOptions() {
 			}
 		},
 		onSettled: ({taskId}, client) => invalidateTaskMembership(client, taskId),
+		toastError: shouldNotify,
 	})
 }
 
@@ -505,8 +506,8 @@ export function useDeleteTaskRelationMutation() {
 	return useMutation(deleteTaskRelationMutationOptions())
 }
 
-export function useUpdateTaskPositionMutation() {
-	return useMutation(updateTaskPositionMutationOptions())
+export function useUpdateTaskPositionMutation(shouldNotify?: () => boolean) {
+	return useMutation(updateTaskPositionMutationOptions(shouldNotify))
 }
 
 export function useMoveTaskMutation() {

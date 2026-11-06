@@ -10,6 +10,8 @@ const sdk = vi.hoisted(() => ({
 	projectViewTasksList: vi.fn(),
 	bucketsUpdate: vi.fn(),
 	tasksCreate: vi.fn(),
+	taskBucketUpdate: vi.fn(),
+	tasksPositionUpdate: vi.fn(),
 }))
 const {projectViewBucketsTasksList: loadBoard, projectViewTasksList: loadBucketPage, bucketsUpdate: updateBucket} = sdk
 
@@ -78,6 +80,7 @@ vi.mock('vue-i18n', async importOriginal => ({
 	useI18n: () => ({t: (key: string) => key}),
 }))
 
+import {error} from '@/message'
 import ProjectKanban from './ProjectKanban.vue'
 
 let queryClient: QueryClient
@@ -208,6 +211,24 @@ describe('ProjectKanban', () => {
 
 		expect(cachedBoard()?.buckets[0].tasks).toEqual([])
 		expect(cachedBoard()?.buckets[0].count).toBe(0)
+	})
+
+	it.each([
+		[-2, false],
+		[1, true],
+	])('on project %i, a refused position save after a drop that marks the task done toasts: %s', async (projectId, toasts) => {
+		const wrapper = await mountKanban({BucketDraggable: DRAGGABLE_STUB, TaskDraggable: DRAGGABLE_STUB}, projectId)
+		sdk.taskBucketUpdate.mockResolvedValue({data: {bucket_id: 1, task: {id: 11, title: 'Task 11', done: true}}})
+		sdk.tasksPositionUpdate.mockClear()
+		sdk.tasksPositionUpdate.mockRejectedValue(new Error('403'))
+		vi.mocked(error).mockClear()
+
+		taskDraggable(wrapper).vm.$emit('end', taskDragEndEvent(11))
+		await flushPromises()
+
+		// The save is still tried: a saved filter that keeps done tasks accepts it and keeps the drop order.
+		expect(sdk.tasksPositionUpdate).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(error).mock.calls.length > 0).toBe(toasts)
 	})
 
 	it('leaves a real project board to the mutation when the task moved to another project', async () => {
