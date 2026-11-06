@@ -588,6 +588,8 @@ async function updateTaskPosition(e: SortableEvent & {originalEvent?: MouseEvent
 		if (bucket.id !== sourceBucket.value) {
 			const result = await moveMutation.mutateAsync({project, view, bucket: bucket.id, task})
 			if (result.bucket_id !== undefined && result.bucket_id !== bucket.id) return
+			// A done change can drop the task out of the saved filter, and the API refuses positions for tasks outside it.
+			if (isSavedFilterProject({id: project}) && result.task && Boolean(result.task.done) !== Boolean(task.done)) return
 		}
 		await positionMutation.mutateAsync({
 			taskId: task.id,
