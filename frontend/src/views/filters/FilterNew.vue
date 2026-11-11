@@ -42,6 +42,13 @@
 					:change-immediately="true"
 				/>
 			</FormField>
+			<FancyCheckbox
+				v-if="authStore.info?.is_admin"
+				v-model="filter.all_projects"
+				:disabled="showLoading"
+			>
+				{{ $t('filters.allProjects') }}
+			</FancyCheckbox>
 
 			<template #footer>
 				<XButton
@@ -63,14 +70,17 @@ import {useRouter} from 'vue-router'
 import Editor from '@/components/input/AsyncEditor'
 import FormField from '@/components/input/FormField.vue'
 import Filters from '@/components/project/partials/Filters.vue'
+import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
 
 import {getProjectIdFromSavedFilterId} from '@/client/queries/projects'
+import {useAuthStore} from '@/stores/auth'
 import {useIsAlive} from '@/composables/useIsAlive'
 import {useSavedFilterDraft} from '@/composables/useSavedFilter'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import {useCreateSavedFilterMutation} from '@/client/queries/savedFilters'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const alive = useIsAlive()
 

@@ -2,6 +2,7 @@ import {defineComponent, ref} from 'vue'
 import {flushPromises, mount, shallowMount} from '@vue/test-utils'
 import {beforeEach, describe, expect, it, vi} from 'vitest'
 import {VueQueryPlugin} from '@tanstack/vue-query'
+import {createPinia, setActivePinia} from 'pinia'
 
 import XButton from '@/components/input/Button.vue'
 import {newSavedFilterDraft, type SavedFilterResponse} from '@/client/queries/savedFilters'
@@ -65,6 +66,7 @@ import FilterEdit from './FilterEdit.vue'
 
 describe('FilterEdit', () => {
 	beforeEach(() => {
+		setActivePinia(createPinia())
 		savedFilter.validate.mockReset().mockReturnValue({...newSavedFilterDraft(), title: 'Filter', is_favorite: false})
 		savedFilter.update.mockReset()
 		router.back.mockReset()

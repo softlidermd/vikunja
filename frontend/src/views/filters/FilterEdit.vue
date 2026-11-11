@@ -45,6 +45,13 @@
 					:change-immediately="true"
 				/>
 			</FormField>
+			<FancyCheckbox
+				v-if="authStore.info?.is_admin"
+				v-model="filter.all_projects"
+				:disabled="loadingModel"
+			>
+				{{ $t('filters.allProjects') }}
+			</FancyCheckbox>
 			<button
 				type="submit"
 				class="is-hidden"
@@ -63,17 +70,20 @@ import CreateEdit from '@/components/misc/CreateEdit.vue'
 import FormField from '@/components/input/FormField.vue'
 import Filters from '@/components/project/partials/Filters.vue'
 import ErrorMessage from '@/components/misc/Error.vue'
+import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
 
 import {useIsAlive} from '@/composables/useIsAlive'
 import {useSavedFilter} from '@/composables/useSavedFilter'
 import {getSavedFilterIdFromProjectId} from '@/client/queries/projects'
 import {useUpdateSavedFilterMutation} from '@/client/queries/savedFilters'
+import {useAuthStore} from '@/stores/auth'
 
 const props = defineProps<{
 	projectId: number,
 }>()
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const alive = useIsAlive()
 

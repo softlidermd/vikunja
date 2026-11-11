@@ -77,6 +77,8 @@ type DuplicateProjectInput = {
 export const projectKeys = {
 	all: ['projects'] as const,
 	list: () => ['projects', 'list'] as const,
+	// Under list(), so every project list invalidation also marks the admin lookup stale.
+	allProjects: () => ['projects', 'list', 'all'] as const,
 	detail: (id: number) => ['projects', 'detail', id] as const,
 }
 
@@ -167,6 +169,17 @@ export function projectsQuery() {
 	})
 }
 
+// shortcut: loads every project for admins; switch to per-id lookups if an instance passes a few thousand projects.
+export function allProjectsQuery() {
+	return queryOptions({
+		queryKey: projectKeys.allProjects(),
+		queryFn: async () => partitionProjects(await fetchAllPages(async page => (await projectsList({
+			query: {all_projects: true, expand: 'permissions', page},
+		})).data)),
+		staleTime: 5 * 60 * 1000,
+	})
+}
+
 export function projectQuery(id: number) {
 	return queryOptions({
 		queryKey: projectKeys.detail(id),
@@ -207,6 +220,7 @@ export function getCachedProject(id: number, client: QueryClient = queryClient):
 
 	return client.getQueryData<ProjectResponse>(projectKeys.detail(id))
 		?? list?.projects.find(project => project.id === id)
+		?? client.getQueryData<ProjectListResult>(projectKeys.allProjects())?.projects.find(project => project.id === id)
 }
 
 export function findProjectByExactTitle(

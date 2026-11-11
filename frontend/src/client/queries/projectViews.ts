@@ -89,6 +89,8 @@ function invalidateProjectViews(client: QueryClient, projectId: number) {
 		// Refetching the list reloads every page for one project's views, so it is only marked stale.
 		client.invalidateQueries({queryKey: projectKeys.list(), refetchType: 'none'}),
 		client.invalidateQueries({queryKey: projectKeys.detail(projectId)}),
+		// The admin lookup carries the views of projects outside the list; a no-op without an admin observer.
+		client.invalidateQueries({queryKey: projectKeys.allProjects()}),
 	])
 }
 

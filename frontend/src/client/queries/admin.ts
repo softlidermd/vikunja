@@ -14,6 +14,7 @@ import {
 	adminInviteLinksCreate,
 	adminInviteLinksDelete,
 	adminTeamsList,
+	adminWorkload,
 } from '@/client/generated'
 import type {
 	AdminProjectsListData,
@@ -45,6 +46,7 @@ export const adminKeys = {
 	invites: ['admin', 'invites'] as const,
 	invitesPage: (page: number) => ['admin', 'invites', page] as const,
 	teams: (q: string) => ['admin', 'teams', q] as const,
+	workload: () => ['admin', 'workload'] as const,
 }
 
 export function adminOverviewQuery() {
@@ -58,6 +60,13 @@ export function adminUsersQuery(q = '', page = 1) {
 	return queryOptions({
 		queryKey: adminKeys.usersPage(q, page),
 		queryFn: async ({signal}) => (await adminUsersList({query: {q, page}, signal})).data,
+	})
+}
+
+export function adminWorkloadQuery() {
+	return queryOptions({
+		queryKey: adminKeys.workload(),
+		queryFn: async ({signal}) => (await adminWorkload({signal})).data,
 	})
 }
 

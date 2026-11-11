@@ -1,6 +1,7 @@
 import {defineComponent, effectScope, h} from 'vue'
 import {mount} from '@vue/test-utils'
 import {VueQueryPlugin} from '@tanstack/vue-query'
+import {createPinia, setActivePinia} from 'pinia'
 import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest'
 
 import {queryClient} from '@/client/queryClient'
@@ -51,6 +52,7 @@ function projectListWith(list: Partial<ProjectListResult>) {
 
 describe('useProjects', () => {
 	beforeEach(() => {
+		setActivePinia(createPinia())
 		queryClient.clear()
 		removeToken()
 		window.API_URL = 'https://identity-a.example'

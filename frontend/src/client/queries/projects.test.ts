@@ -110,6 +110,15 @@ describe('project queries', () => {
 		expect(getCachedProject(1)).toEqual(html)
 	})
 
+	it('falls back to the admin all-projects lookup for a project outside the own list', () => {
+		const unshared = serverProject({id: 9, title: 'Unshared'})
+		queryClient.setQueryData(projectKeys.list(), {projects: [serverProject()], favoriteProject: null, savedFilterProjects: []})
+		queryClient.setQueryData(projectKeys.allProjects(), {projects: [unshared], favoriteProject: null, savedFilterProjects: []})
+
+		expect(getCachedProject(9)).toEqual(unshared)
+		expect(getCachedProject(10)).toBeUndefined()
+	})
+
 	it('reads pseudo projects from the navigation list', () => {
 		const favorites = serverProject({id: -1, title: 'Favorites'})
 		const filter = serverProject({id: -2, title: 'Filter'})

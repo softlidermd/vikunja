@@ -481,6 +481,11 @@ const router = createRouter({
 					component: () => import('@/views/admin/ProjectsView.vue'),
 				},
 				{
+					path: 'workload',
+					name: 'admin.workload',
+					component: () => import('@/views/admin/WorkloadView.vue'),
+				},
+				{
 					path: 'invite-links',
 					name: 'admin.inviteLinks',
 					component: () => import('@/views/admin/InviteLinksView.vue'),

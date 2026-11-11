@@ -661,6 +661,7 @@
   },
   "filters": {
     "title": "Filters",
+    "allProjects": "All projects",
     "clear": "Clear Filters",
     "showResults": "Show results",
     "noResults": "No results",
@@ -1776,6 +1777,14 @@
   },
   "admin": {
     "title": "Administration",
+    "workload": {
+      "title": "Workload",
+      "companyTotal": "Company total",
+      "unassigned": "Unassigned",
+      "hours": "{hours} h",
+      "ideas": "Ideas",
+      "empty": "No open tasks"
+    },
     "labels": {
       "users": "Users",
       "tasks": "Tasks"

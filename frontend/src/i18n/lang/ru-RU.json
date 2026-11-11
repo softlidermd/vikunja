@@ -570,6 +570,7 @@
 	},
 	"filters": {
 		"title": "Фильтры",
+		"allProjects": "Все проекты",
 		"clear": "Сбросить фильтры",
 		"showResults": "Применить",
 		"noResults": "Ничего не найденo",
@@ -1574,6 +1575,14 @@
 	},
 	"admin": {
 		"title": "Администрирование",
+		"workload": {
+			"title": "Нагрузка",
+			"companyTotal": "Всего по компании",
+			"unassigned": "Без исполнителя",
+			"hours": "{hours} ч",
+			"ideas": "Идеи",
+			"empty": "Нет открытых задач"
+		},
 		"labels": {
 			"users": "Пользователи",
 			"tasks": "Задачи"

@@ -85,6 +85,30 @@ func TestSavedFilterAllProjects_AdminSeesUnsharedProjects(t *testing.T) {
 	assert.NotContains(t, taskIDsOf(readFilterTasks(t, s, admin, flagged)), int64(1))
 }
 
+func TestSavedFilterAllProjects_ExpandsUnsharedBuckets(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+	setUser2Admin(t, s, true)
+	admin := &user.User{ID: 2}
+	flagged := createAllProjectsFilter(t, s, admin, "done = false", true)
+	view := filterViewOfKind(t, s, flagged, ProjectViewKindList)
+
+	tc := &TaskCollection{ProjectID: view.ProjectID, ProjectViewID: view.ID, Expand: []TaskCollectionExpandable{TaskCollectionExpandBuckets}}
+	res, _, _, err := tc.ReadAll(s, admin, "", -1, 0)
+	require.NoError(t, err)
+	bucketIDs := []int64{}
+	for _, task := range res.([]*Task) {
+		if task.ID != 1 {
+			continue
+		}
+		for _, bucket := range task.Buckets {
+			bucketIDs = append(bucketIDs, bucket.ID)
+		}
+	}
+	assert.Contains(t, bucketIDs, int64(1), "status bucket of unshared project 1")
+}
+
 func TestSavedFilterAllProjects_ExistingSyntax(t *testing.T) {
 	db.LoadAndAssertFixtures(t)
 	s := db.NewSession()

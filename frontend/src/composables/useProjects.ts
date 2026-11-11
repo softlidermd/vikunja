@@ -3,12 +3,14 @@ import {useQuery} from '@tanstack/vue-query'
 import {createSharedComposable} from '@vueuse/core'
 
 import {
+	allProjectsQuery,
 	ensureProject,
 	findProjectByExactTitle,
 	projectsQuery,
 } from '@/client/queries/projects'
 import type {ProjectResponse} from '@/client/queries/projects'
 import {queryClient} from '@/client/queryClient'
+import {useAuthStore} from '@/stores/auth'
 
 function sortByPosition(projects: ProjectResponse[]): ProjectResponse[] {
 	return [...projects].sort((a, b) => a.position - b.position)
@@ -53,9 +55,16 @@ const useSharedProjects = createSharedComposable(() => {
 		...(favoriteProject.value ? [favoriteProject.value] : []),
 		...savedFilterProjects.value,
 	])
-	const projects = computed(() => Object.fromEntries(
-		projectsArray.value.map(project => [project.id, project]),
-	))
+	// Admins also look up projects shared with nobody, e.g. tasks in an all-projects filter. Navigation stays on the own list.
+	const authStore = useAuthStore()
+	const allProjects = useQuery(computed(() => ({
+		...allProjectsQuery(),
+		enabled: authStore.info?.is_admin === true,
+	})), queryClient)
+	const projects = computed(() => Object.fromEntries([
+		...(allProjects.data.value?.projects ?? []),
+		...projectsArray.value,
+	].map(project => [project.id, project])))
 	const rootProjects = computed(() => sortByPosition(realProjects.value.filter(project =>
 		!project.is_archived && (project.parent_project_id === 0 || isOrphaned(realProjects.value, project)),
 	)))

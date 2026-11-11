@@ -1,15 +1,16 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest'
-import {QueryClient, type MutationOptions} from '@tanstack/vue-query'
+import {QueryClient, QueryObserver, type MutationOptions} from '@tanstack/vue-query'
 
 import {queryClient} from '@/client/queryClient'
 import type {ProjectView} from '@/client/generated'
-import {normalizeProject, projectKeys, type ProjectListResult, type ProjectResponse} from './projects'
+import {allProjectsQuery, normalizeProject, projectKeys, type ProjectListResult, type ProjectResponse} from './projects'
 import {error, success} from '@/message'
 
 const sdk = vi.hoisted(() => ({
 	projectViewsCreate: vi.fn(),
 	projectViewsUpdate: vi.fn(),
 	projectViewsDelete: vi.fn(),
+	projectsList: vi.fn(),
 }))
 
 const requestContext = vi.hoisted(() => ({
@@ -276,6 +277,21 @@ describe('project view cache reconciliation', () => {
 		} finally {
 			invalidate.mockRestore()
 		}
+	})
+
+	it('refetches an open admin all-projects lookup after a view update', async () => {
+		sdk.projectsList.mockResolvedValue({data: {items: [{id: 9, title: 'Unshared', views}], total_pages: 1}})
+		const {queryKey, queryFn} = allProjectsQuery()
+		const unsubscribe = new QueryObserver(queryClient, {queryKey, queryFn}).subscribe(() => {})
+		const updates = () => queryClient.getQueryState(queryKey)?.dataUpdateCount
+		await vi.waitFor(() => expect(updates()).toBe(1))
+		sdk.projectViewsUpdate.mockResolvedValue({data: views[2]})
+
+		await updateProjectView({projectId: 9, viewId: 2, view: createProjectViewUpdate(views[2])})
+
+		await vi.waitFor(() => expect(updates()).toBe(2))
+		expect(sdk.projectsList).toHaveBeenLastCalledWith({query: {all_projects: true, expand: 'permissions', page: 1}})
+		unsubscribe()
 	})
 
 	it.each(delayedMutationCases)('does not materialize unmounted caches on $name', async ({mock, run, response}) => {

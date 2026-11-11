@@ -692,6 +692,11 @@ func addBucketsToTasks(s *xorm.Session, a web.Auth, taskIDs []int64, taskMap map
 	if err != nil {
 		return err
 	}
+	// An admin's all-projects filter lists tasks of unshared projects; their status boards must come along.
+	// Other users' saved-filter boards (negative project ids) stay hidden.
+	if isInstanceAdmin(s, a) {
+		accessible = builder.Or(accessible, builder.Gt{"project_views.project_id": 0})
+	}
 	buckets := make(map[int64]*Bucket)
 	err = s.
 		Where(builder.In("id", builder.Select("bucket_id").

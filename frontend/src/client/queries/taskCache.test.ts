@@ -9,6 +9,7 @@ import {
 	type TaskResponse,
 } from './tasks'
 import {kanbanKeys, kanbanQuery, normalizeBucket, type BoardData} from './kanban'
+import {adminWorkloadQuery} from './admin'
 import {
 	cachedListTasks,
 	invalidateTaskMembership,
@@ -27,6 +28,7 @@ const sdk = vi.hoisted(() => ({
 	projectViewTasksList: vi.fn(),
 	projectViewBucketsTasksList: vi.fn(),
 	bucketsList: vi.fn(),
+	adminWorkload: vi.fn(),
 }))
 vi.mock('@/client/generated', () => sdk)
 
@@ -217,6 +219,19 @@ describe('task cache reconciliation', () => {
 		await refetchStaleTaskLists(client)
 		expect(updates()).toEqual([2, 1])
 		unsubscribes.forEach(unsubscribe => unsubscribe())
+	})
+	it('refetches an open workload page after a task edit marked it stale', async () => {
+		sdk.adminWorkload.mockResolvedValue({data: {total: {}, people: [], unassigned: {}}})
+		const client = new QueryClient()
+		const {queryKey, queryFn} = adminWorkloadQuery()
+		const unsubscribe = new QueryObserver(client, {queryKey, queryFn}).subscribe(() => {})
+		const updates = () => client.getQueryState(queryKey)?.dataUpdateCount
+		await vi.waitFor(() => expect(updates()).toBe(1))
+		await invalidateTaskMembership(client, 1)
+		expect(updates()).toBe(1)
+		await refetchStaleTaskLists(client)
+		expect(updates()).toBe(2)
+		unsubscribe()
 	})
 	it('does not create queries for unmounted resources', () => {
 		const client = new QueryClient()

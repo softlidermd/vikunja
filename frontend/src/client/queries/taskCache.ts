@@ -4,6 +4,7 @@ import {mapTasksDeep, mergeTask, removeTask} from '@/helpers/task'
 import {normalizeTask, taskKeys, type PaginatedTaskResponse, type TaskResponse} from './tasks'
 import {kanbanKeys, type BoardData} from './kanban'
 import {totalPagesFor} from './pagination'
+import {adminKeys} from './admin'
 
 // Applies `update` to every cached copy of task `id` (detail, lists, boards, nested relations),
 // so a mutation response patches all mounted views without refetching them.
@@ -168,7 +169,7 @@ export async function refetchSavedFilterViews(client: QueryClient) {
 // Field edits only mark lists stale, so a list kept open behind the task modal is behind until this runs.
 // Lists keep showing their rows while refetching, so the page keeps its scroll position.
 export async function refetchStaleTaskLists(client: QueryClient) {
-	await Promise.all([taskKeys.lists, taskKeys.allLists].map(queryKey => client.refetchQueries({
+	await Promise.all([taskKeys.lists, taskKeys.allLists, adminKeys.workload()].map(queryKey => client.refetchQueries({
 		queryKey,
 		type: 'active',
 		predicate: query => query.state.isInvalidated,
@@ -189,6 +190,7 @@ export async function invalidateTaskMembership(
 	await Promise.all([
 		client.invalidateQueries({queryKey: taskKeys.lists, refetchType}),
 		client.invalidateQueries({queryKey: taskKeys.allLists, refetchType}),
+		client.invalidateQueries({queryKey: adminKeys.workload(), refetchType}),
 		// Refetching a board returns only the first page per bucket, so mutations patch it instead of refetching.
 		client.invalidateQueries({queryKey: kanbanKeys.all, refetchType: 'none'}),
 		...(id === undefined ? [] : [client.invalidateQueries({queryKey: [...taskKeys.details, id], refetchType})]),
