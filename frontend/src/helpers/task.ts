@@ -114,6 +114,21 @@ export function getDefaultBucketId(
 	return view.default_bucket_id || buckets[0]?.id
 }
 
+const isIdeaBucket = (bucket: Bucket | undefined) => bucket?.title?.trim().toLowerCase() === 'idea'
+
+// Mirrors the backend's plannedBucketID: reroutes like a reopen skip an Idea default for the first bucket that is
+// neither done nor Idea. Without buckets it is unknown, so callers leave the move to the server.
+export function getPlannedBucketId(
+	view: Pick<ProjectView, 'default_bucket_id' | 'done_bucket_id'>,
+	buckets: readonly Bucket[],
+): number | undefined {
+	if (!buckets.length) return undefined
+	const defaultId = getDefaultBucketId(view, buckets)
+	if (!isIdeaBucket(buckets.find(bucket => bucket.id === defaultId))) return defaultId
+	return buckets.find(bucket => bucket.id !== defaultId && bucket.id !== view.done_bucket_id && !isIdeaBucket(bucket))?.id
+		?? defaultId
+}
+
 export function moveTaskToBucket(buckets: Bucket[], task: Task, bucketId: number): Bucket[] {
 	let match: {bucket: Bucket, card: Task} | undefined
 	for (const bucket of buckets) {

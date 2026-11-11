@@ -535,8 +535,7 @@ import {useAuthStore} from '@/stores/auth'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getDisplayName} from '@/helpers/user'
 import {getStatusKanbanView} from '@/helpers/projectView'
-import {getTaskProgress} from '@/composables/useTaskStatus'
-import {getDefaultBucketId} from '@/helpers/task'
+import {getTaskProgress, needsStatusBuckets} from '@/composables/useTaskStatus'
 import {bucketsQuery} from '@/client/queries/kanban'
 import {useQueries, useQuery} from '@tanstack/vue-query'
 import {canAutoFocus} from '@/directives/focus'
@@ -616,19 +615,16 @@ const statusBuckets = useQuery(computed(() => {
 	const options = bucketsQuery(props.projectId, statusView.value?.id ?? 0)
 	return {
 		...options,
-		enabled: options.enabled && !statusView.value?.default_bucket_id,
+		enabled: options.enabled && taskList.tasks.value.some(task => needsStatusBuckets(task, statusView.value)),
 	}
 }))
-const statusDefaultBucketId = computed(() => statusView.value
-	? getDefaultBucketId(statusView.value, statusBuckets.data.value ?? [])
-	: undefined)
 const showStatus = computed(() => (hasStatus.value || isPseudoProject.value) && activeColumns.value.status)
 
 function rowProgress(task: TaskResponse) {
-	if (!isPseudoProject.value) return getTaskProgress(task, statusView.value, statusDefaultBucketId.value)
+	if (!isPseudoProject.value) return getTaskProgress(task, statusView.value, statusBuckets.data.value ?? [])
 	const view = taskStatusView(task)
-	const buckets = boardBuckets.value[boardsWithoutDefault.value.findIndex(board => board.view === view?.id)]?.data
-	return getTaskProgress(task, view, view ? getDefaultBucketId(view, buckets ?? []) : undefined)
+	const buckets = boardBuckets.value[statusBoards.value.findIndex(board => board.view === view?.id)]?.data
+	return getTaskProgress(task, view, buckets ?? [])
 }
 
 const {
@@ -643,18 +639,18 @@ const tasks: Ref<TaskResponse[]> = taskList.tasks
 function taskStatusView(task: TaskResponse) {
 	return getStatusKanbanView(projectList.projects[task.project_id]?.views, undefined)
 }
-// A board whose default bucket was deleted falls back to its first bucket, as the status chip does.
-const boardsWithoutDefault = computed(() => {
+// The boards whose bucket list a visible row needs for its progress, as the status chip loads it.
+const statusBoards = computed(() => {
 	if (!isPseudoProject.value) return []
 	const boards = new Map<number, {project: number, view: number}>()
 	for (const task of tasks.value) {
 		const view = taskStatusView(task)
-		if (view?.id && !view.default_bucket_id) boards.set(view.id, {project: task.project_id, view: view.id})
+		if (view?.id && needsStatusBuckets(task, view)) boards.set(view.id, {project: task.project_id, view: view.id})
 	}
 	return [...boards.values()]
 })
 const boardBuckets = useQueries({
-	queries: computed(() => boardsWithoutDefault.value.map(board => bucketsQuery(board.project, board.view))),
+	queries: computed(() => statusBoards.value.map(board => bucketsQuery(board.project, board.view))),
 })
 
 watch(

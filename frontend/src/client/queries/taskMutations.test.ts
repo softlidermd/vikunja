@@ -500,20 +500,21 @@ describe('task mutations', () => {
 		expect(client.getQueryData<BoardData>(manual)?.buckets[0].tasks.map(task => task.id)).toEqual([99])
 	})
 
-	it('renames the cached task bucket when toggling done moves the card', async () => {
+	it('renames the cached task bucket when toggling done moves the card, reopening past an Idea default', async () => {
 		const {projectKeys} = await import('./projects')
 		const client = new QueryClient()
 		const detail = taskKeys.detail(1, ['buckets'])
 		client.setQueryData(projectKeys.detail(1), {
 			id: 1,
-			views: [{id: 2, done_bucket_id: 4, default_bucket_id: 3}],
+			views: [{id: 2, done_bucket_id: 4, default_bucket_id: 5}],
 		})
 		client.setQueryData(kanbanKeys.board(1, 2), {
 			buckets: [
+				{id: 5, project_view_id: 2, title: 'Idea', count: 0, tasks: []},
 				{id: 3, project_view_id: 2, title: 'To-Do', count: 1, tasks: [{id: 1, done: false}]},
 				{id: 4, project_view_id: 2, title: 'Done', count: 0, tasks: []},
 			],
-			pages: {3: 1, 4: 1},
+			pages: {3: 1, 4: 1, 5: 1},
 		})
 		client.setQueryData(detail, {
 			id: 1,
@@ -534,6 +535,8 @@ describe('task mutations', () => {
 		expect(client.getQueryData<Task>(detail)?.buckets).toMatchObject([
 			{id: 3, project_view_id: 2, title: 'To-Do'},
 		])
+		expect(client.getQueryData<BoardData>(kanbanKeys.board(1, 2))?.buckets.map(bucket => bucket.tasks.length))
+			.toEqual([0, 1, 0])
 	})
 
 	it('renames the done bucket on a detail opened without a board from the cached bucket list', async () => {

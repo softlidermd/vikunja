@@ -1,28 +1,43 @@
 import {computed, toValue, type MaybeRefOrGetter} from 'vue'
 import {useQuery} from '@tanstack/vue-query'
 
-import type {ProjectView, Task} from '@/client/generated'
+import type {Bucket, ProjectView, Task} from '@/client/generated'
 import {bucketsQuery} from '@/client/queries/kanban'
 import {useMoveTaskMutation} from '@/client/queries/taskMutations'
 import {useProjects} from '@/composables/useProjects'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {getStatusKanbanView} from '@/helpers/projectView'
-import {getDefaultBucketId} from '@/helpers/task'
+import {getDefaultBucketId, getPlannedBucketId} from '@/helpers/task'
 import {useBaseStore} from '@/stores/base'
 
 export type TaskProgress = 'in-progress' | 'done' | undefined
 
-// Bucket names are free text, so "in progress" is any bucket besides the default and the done one.
+// Bucket names are free text, so "in progress" is any bucket besides the default, the planned and the done one.
 export function getTaskProgress(
 	task: Task,
 	view: ProjectView | null | undefined,
-	defaultBucketId: number | undefined,
+	buckets: readonly Bucket[],
 ): TaskProgress {
 	const bucket = task.buckets?.find(b => b.project_view_id === view?.id)
 	if (task.done || (bucket && bucket.id === view?.done_bucket_id)) {
 		return 'done'
 	}
-	return bucket && defaultBucketId && bucket.id !== defaultBucketId ? 'in-progress' : undefined
+	if (!bucket || !view) {
+		return undefined
+	}
+	const defaultBucketId = getDefaultBucketId(view, buckets)
+	const plannedBucketId = getPlannedBucketId(view, buckets)
+	return defaultBucketId && plannedBucketId && bucket.id !== defaultBucketId && bucket.id !== plannedBucketId
+		? 'in-progress'
+		: undefined
+}
+
+// Only a task outside the default and done buckets needs the bucket list for its progress.
+// Deleting the default bucket leaves its id at 0; then the leftmost bucket is the default.
+export function needsStatusBuckets(task: Task, view: ProjectView | null | undefined) {
+	const bucket = task.buckets?.find(b => b.project_view_id === view?.id)
+	return Boolean(view && (!view.default_bucket_id
+		|| (bucket && bucket.id !== view.default_bucket_id && bucket.id !== view.done_bucket_id)))
 }
 
 // A task's status is its bucket in the project's Kanban view (see getStatusKanbanView).
@@ -41,8 +56,7 @@ export function useTaskStatus(task: MaybeRefOrGetter<Task>, loadBuckets: MaybeRe
 		const options = bucketsQuery(toValue(task).project_id ?? 0, kanbanView.value?.id ?? 0)
 		return {
 			...options,
-			// Deleting the default bucket leaves its id at 0; then the leftmost bucket is the default.
-			enabled: (toValue(loadBuckets) || !kanbanView.value?.default_bucket_id) && options.enabled,
+			enabled: (toValue(loadBuckets) || needsStatusBuckets(toValue(task), kanbanView.value)) && options.enabled,
 		}
 	}))
 	const buckets = computed(() => bucketsResult.data.value ?? [])
@@ -52,7 +66,7 @@ export function useTaskStatus(task: MaybeRefOrGetter<Task>, loadBuckets: MaybeRe
 	const defaultBucketId = computed(() => kanbanView.value
 		? getDefaultBucketId(kanbanView.value, buckets.value)
 		: undefined)
-	const progress = computed(() => getTaskProgress(toValue(task), kanbanView.value, defaultBucketId.value))
+	const progress = computed(() => getTaskProgress(toValue(task), kanbanView.value, buckets.value))
 
 	// Resolves to the bucket the task really landed in: a repeating task moved to done is reopened in its old one.
 	async function moveToBucket(bucket: number) {

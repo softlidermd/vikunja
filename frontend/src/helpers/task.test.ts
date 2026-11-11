@@ -12,6 +12,7 @@ import {
 	removeTask,
 	moveTaskToBucket,
 	getDefaultBucketId,
+	getPlannedBucketId,
 	buildDefaultRemindersForQuickAdd,
 	buildQuickAddTask,
 } from './task'
@@ -107,6 +108,21 @@ describe('task domain helpers', () => {
 		expect(buckets[0].count).toBe(10)
 		expect(getDefaultBucketId({default_bucket_id: 2}, buckets)).toBe(2)
 		expect(getDefaultBucketId({}, buckets)).toBe(1)
+	})
+	it('plans reroutes like the backend: past an Idea default to the first bucket that is neither done nor Idea', () => {
+		const ideaBoard: Bucket[] = [
+			{id: 1, title: ' Idea '},
+			{id: 2, title: 'To-Do'},
+			{id: 3, title: 'Doing'},
+			{id: 4, title: 'Done'},
+		]
+		expect(getPlannedBucketId({default_bucket_id: 1, done_bucket_id: 4}, ideaBoard)).toBe(2)
+		expect(getPlannedBucketId({default_bucket_id: 1, done_bucket_id: 2}, ideaBoard)).toBe(3)
+		expect(getPlannedBucketId({default_bucket_id: 3, done_bucket_id: 4}, ideaBoard)).toBe(3)
+		expect(getPlannedBucketId({default_bucket_id: 0, done_bucket_id: 4}, ideaBoard)).toBe(2)
+		expect(getPlannedBucketId({done_bucket_id: 4}, ideaBoard.slice(1))).toBe(2)
+		expect(getPlannedBucketId({default_bucket_id: 1}, [{id: 1, title: 'Idea'}])).toBe(1)
+		expect(getPlannedBucketId({default_bucket_id: 1, done_bucket_id: 4}, [])).toBeUndefined()
 	})
 	it('keeps cached view data and sibling relations when moving a task to another bucket', () => {
 		const buckets: Bucket[] = [

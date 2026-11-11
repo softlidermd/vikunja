@@ -40,7 +40,7 @@ import {
 } from './taskCache'
 import {getCachedProject, projectKeys} from './projects'
 import {colorFromHex} from '@/helpers/color/colorFromHex'
-import {getDefaultBucketId, moveTaskToBucket} from '@/helpers/task'
+import {getDefaultBucketId, getPlannedBucketId, moveTaskToBucket} from '@/helpers/task'
 import {translatedError} from '@/message'
 
 const API_ZERO_DATE = '0001-01-01T00:00:00Z'
@@ -100,7 +100,7 @@ function reconcileDoneBuckets(client: QueryClient, task: TaskResponse) {
 		const target = task.done
 			? view.done_bucket_id
 			: source.id === view.done_bucket_id
-				? getDefaultBucketId(view, board.buckets)
+				? getPlannedBucketId(view, board.buckets)
 				: source.id
 		if (target === undefined) continue
 		const buckets = moveTaskToBucket(board.buckets, task, target)
@@ -120,7 +120,7 @@ function reconcileDoneBucketsWithoutBoard(client: QueryClient, task: TaskRespons
 		const target = task.done
 			? view.done_bucket_id
 			: source === view.done_bucket_id
-				? getDefaultBucketId(view, cachedViewBuckets(client, task.project_id, view.id) ?? [])
+				? getPlannedBucketId(view, cachedViewBuckets(client, task.project_id, view.id) ?? [])
 				: undefined
 		if (target === undefined || target === source) continue
 		reconcileTaskBuckets(client, {
