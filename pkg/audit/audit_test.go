@@ -199,17 +199,6 @@ func TestAuditLicenseGating(t *testing.T) {
 	registerTestEvents()
 	startEventRouter(t)
 
-	// Without the licensed feature nothing must be written. The license check
-	// happens per event at handle time, so give the async handler a settle
-	// window before flipping the license back on.
-	license.ResetForTests()
-	require.NoError(t, events.Dispatch(&licenseGateEvent{Marker: "unlicensed"}))
-	require.Never(t, func() bool {
-		content, err := os.ReadFile(logfile)
-		return err == nil && len(content) > 0
-	}, 500*time.Millisecond, 10*time.Millisecond, "unlicensed event must not be written")
-	events.WaitForPendingHandlers()
-
 	license.SetForTests([]license.Feature{license.FeatureAuditLogs})
 	t.Cleanup(license.ResetForTests)
 	require.NoError(t, events.Dispatch(&licenseGateEvent{Marker: "licensed"}))

@@ -79,20 +79,15 @@ func TestHumaInviteLinkAdmin(t *testing.T) {
 }
 
 func TestHumaInviteLinkAdminDenied(t *testing.T) {
-	for _, mode := range []string{"non-admin", "no invites", "no admin panel"} {
+	for _, mode := range []string{"non-admin"} {
 		t.Run(mode, func(t *testing.T) {
 			e, err := setupTestEnv()
 			require.NoError(t, err)
 			license.SetForTests([]license.Feature{license.FeatureAdminPanel, license.FeatureUserInvites})
 			defer license.ResetForTests()
 			admin := promoteToAdmin(t, 1)
-			switch mode {
-			case "non-admin":
+			if mode == "non-admin" {
 				admin = &user.User{ID: 2, Username: "user2"}
-			case "no invites":
-				license.SetForTests([]license.Feature{license.FeatureAdminPanel})
-			case "no admin panel":
-				license.SetForTests([]license.Feature{license.FeatureUserInvites})
 			}
 			for _, req := range []struct{ method, path, body string }{
 				{http.MethodGet, "/api/v2/admin/invite-links", ""},
@@ -128,11 +123,6 @@ func TestHumaInviteLinkPublic(t *testing.T) {
 		res = adminReq(t, e, http.MethodPost, "/api/v2/register", nil, fmt.Sprintf(`{"invite_token":%q,"username":"invalid-invite","email":"invalid@example.com","password":"12345678"}`, token))
 		require.Equal(t, http.StatusNotFound, res.Code, res.Body.String())
 	}
-	license.ResetForTests()
-	res = adminReq(t, e, http.MethodPost, "/api/v2/invite-links/check", nil, `{"token":"unlimited"}`)
-	require.Equal(t, http.StatusNotFound, res.Code)
-	res = adminReq(t, e, http.MethodPost, "/api/v2/register", nil, `{"invite_token":"unlimited","username":"invalid-invite","email":"invalid@example.com","password":"12345678"}`)
-	require.Equal(t, http.StatusNotFound, res.Code)
 }
 
 func TestHumaInviteLinkRegistrationDisabled(t *testing.T) {
@@ -161,29 +151,24 @@ func TestHumaInviteLinkTokenScopes(t *testing.T) {
 	_, err := setupTestEnv()
 	require.NoError(t, err)
 	defer license.ResetForTests()
-	for _, enabled := range []bool{false, true} {
-		features := []license.Feature{license.FeatureAdminPanel}
-		if enabled {
-			features = append(features, license.FeatureUserInvites)
-		}
-		license.SetForTests(features)
-		found, existingAdmin := false, false
-		for _, group := range models.GetAPITokenRoutes() {
-			for _, route := range group {
-				if route.Path == "/api/v2/admin/invite-links" {
-					found = true
-				}
-				if route.Path == "/api/v2/admin/teams" {
-					require.True(t, enabled)
-				}
-				if route.Path == "/api/v1/admin/users" || route.Path == "/api/v2/admin/users" {
-					existingAdmin = true
-				}
+	license.SetForTests([]license.Feature{license.FeatureAdminPanel, license.FeatureUserInvites})
+	found, teams, existingAdmin := false, false, false
+	for _, group := range models.GetAPITokenRoutes() {
+		for _, route := range group {
+			if route.Path == "/api/v2/admin/invite-links" {
+				found = true
+			}
+			if route.Path == "/api/v2/admin/teams" {
+				teams = true
+			}
+			if route.Path == "/api/v1/admin/users" || route.Path == "/api/v2/admin/users" {
+				existingAdmin = true
 			}
 		}
-		require.Equal(t, enabled, found)
-		require.True(t, existingAdmin)
 	}
+	require.True(t, found)
+	require.True(t, teams)
+	require.True(t, existingAdmin)
 }
 
 func TestHumaInviteLinkRejectsEmptyToken(t *testing.T) {

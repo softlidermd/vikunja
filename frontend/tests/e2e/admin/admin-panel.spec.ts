@@ -42,7 +42,7 @@ test.describe('Admin panel', () => {
 			await expect(page).toHaveURL(/\/admin\/projects/)
 		})
 
-		test('admin user changes persist and license removal rejects new requests', async ({page, apiContext}) => {
+		test('admin user changes persist', async ({page, apiContext}) => {
 			const [admin] = await UserFactory.create(1, {is_admin: true}, false)
 			const {token} = await login(page, apiContext, admin)
 			await page.goto('/admin/users')
@@ -73,24 +73,6 @@ test.describe('Admin panel', () => {
 			const users = await apiContext.get('/api/v2/admin/users?q=managed-user', {headers})
 			expect(users.ok()).toBe(true)
 			expect((await users.json()).items ?? []).toEqual([])
-			await LicenseFactory.disable()
-			const blocked = await apiContext.get('/api/v2/admin/users', {headers})
-			expect(blocked.status()).toBe(404)
-		})
-	})
-
-	test.describe('without license', () => {
-		test.beforeEach(async () => {
-			await LicenseFactory.disable()
-		})
-
-		test('even an admin user cannot access /admin', async ({page, apiContext}) => {
-			const [admin] = await UserFactory.create(1, {is_admin: true}, false)
-			await login(page, apiContext, admin)
-
-			await page.goto('/admin')
-
-			await expect(page.locator('.side-nav-shell')).not.toBeVisible()
 		})
 	})
 })

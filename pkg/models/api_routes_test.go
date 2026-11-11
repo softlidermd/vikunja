@@ -195,23 +195,6 @@ func TestGetAPITokenRoutes_LicenseFilter(t *testing.T) {
 	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v2/time-entries"}, true)
 	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v2/tasks/:task_id/time-entries"}, true)
 
-	t.Run("unlicensed", func(t *testing.T) {
-		license.ResetForTests()
-		routes := GetAPITokenRoutes()
-
-		assert.Contains(t, routes, "labels")
-		assert.NotContains(t, routes, "admin")
-		assert.NotContains(t, routes, "time_entries")
-		require.Contains(t, routes, "tasks")
-		assert.Contains(t, routes["tasks"], "read_all")
-		assert.NotContains(t, routes["tasks"], "time_entries")
-
-		// Existing tokens with gated scopes must keep validating — the
-		// request-time gates already make them inert.
-		perms := APIPermissions{"time_entries": []string{"read_all"}}
-		assert.NoError(t, PermissionsAreValid(perms))
-	})
-
 	t.Run("licensed", func(t *testing.T) {
 		license.SetForTests([]license.Feature{license.FeatureTimeTracking, license.FeatureAdminPanel})
 		defer license.ResetForTests()

@@ -256,13 +256,9 @@ func TestInviteLinkRegistration(t *testing.T) {
 }
 
 func TestInviteLinkUnavailable(t *testing.T) {
-	for _, token := range []string{"unknown", "expired", "exhausted", "feature-off"} {
+	for _, token := range []string{"unknown", "expired", "exhausted"} {
 		t.Run(token, func(t *testing.T) {
 			s, _ := inviteLinkSetup(t)
-			if token == "feature-off" {
-				license.ResetForTests()
-				token = "unlimited"
-			}
 			_, err := GetInviteLinkByToken(s, token)
 			require.ErrorIs(t, err, ErrInviteLinkInvalid{})
 			_, err = RegisterUserViaInviteLink(s, token, &user.User{Username: "blocked", Email: "blocked@example.com", Password: "12345678"})

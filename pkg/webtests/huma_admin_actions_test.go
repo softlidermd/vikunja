@@ -53,18 +53,6 @@ func TestHumaAdminOverview(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, res.Code)
 	})
 
-	t.Run("admin without the feature gets 404", func(t *testing.T) {
-		e, err := setupTestEnv()
-		require.NoError(t, err)
-		license.SetForTests([]license.Feature{})
-		defer license.ResetForTests()
-
-		admin := promoteToAdmin(t, 1)
-
-		res := adminReq(t, e, http.MethodGet, "/api/v2/admin/overview", admin, "")
-		assert.Equal(t, http.StatusNotFound, res.Code)
-	})
-
 	t.Run("unauthenticated caller gets 401", func(t *testing.T) {
 		e, err := setupTestEnv()
 		require.NoError(t, err)

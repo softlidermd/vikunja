@@ -86,18 +86,6 @@ func TestTimeEntryListener(t *testing.T) {
 		assert.Equal(t, int64(4), te.ID)
 	})
 
-	t.Run("does not push when the feature is disabled", func(t *testing.T) {
-		InitHub()
-		conn := timerConn(1)
-		GetHub().Register(conn)
-		license.ResetForTests() // free mode
-
-		ev := &models.TimeEntryUpdatedEvent{TimeEntry: &models.TimeEntry{ID: 4, UserID: 1}}
-		events.TestListener(t, ev, &TimeEntryListener{wsEvent: "timer.updated"})
-
-		assert.Empty(t, conn.send)
-	})
-
 	t.Run("only pushes to the entry owner", func(t *testing.T) {
 		InitHub()
 		other := timerConn(2)

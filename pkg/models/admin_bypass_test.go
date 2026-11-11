@@ -65,38 +65,6 @@ func TestAdminBypass_Project(t *testing.T) {
 	})
 }
 
-// Without the admin-panel license, flipping is_admin must not recover the paid bypass.
-func TestAdminBypass_Project_LicenseInactive(t *testing.T) {
-	db.LoadAndAssertFixtures(t)
-	license.ResetForTests()
-	s := db.NewSession()
-	defer s.Close()
-
-	_, err := s.ID(int64(2)).Cols("is_admin").Update(&user.User{IsAdmin: true})
-	require.NoError(t, err)
-
-	admin := &user.User{ID: 2, IsAdmin: true}
-	p := &Project{ID: 1}
-
-	t.Run("CanRead", func(t *testing.T) {
-		can, _, err := p.CanRead(s, admin)
-		require.NoError(t, err)
-		assert.False(t, can, "unlicensed admin must not read another user's project")
-	})
-
-	t.Run("CanWrite", func(t *testing.T) {
-		can, err := p.CanWrite(s, admin)
-		require.NoError(t, err)
-		assert.False(t, can)
-	})
-
-	t.Run("CanDelete", func(t *testing.T) {
-		can, err := p.CanDelete(s, admin)
-		require.NoError(t, err)
-		assert.False(t, can)
-	})
-}
-
 // A stale JWT admin claim must not grant the bypass after DB demotion.
 func TestAdminBypass_StaleJWT_Demoted(t *testing.T) {
 	db.LoadAndAssertFixtures(t)

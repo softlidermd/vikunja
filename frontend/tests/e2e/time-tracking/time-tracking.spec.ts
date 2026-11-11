@@ -404,18 +404,4 @@ test.describe('Time tracking', () => {
 			await expect(userMultiselect.locator('.search-results')).toHaveCount(0)
 		})
 	})
-
-	test.describe('without the feature licensed', () => {
-		test.beforeEach(async () => {
-			await LicenseFactory.disable()
-		})
-
-		test('hides the sidebar entry and blocks the route', async ({authenticatedPage: page}) => {
-			await page.goto('/')
-			await expect(page.locator('.menu-container').getByRole('link', {name: 'Time tracking'})).toHaveCount(0)
-
-			await page.goto('/time-tracking')
-			await expect(page.locator('[data-cy="addTimeEntry"]')).not.toBeVisible()
-		})
-	})
 })

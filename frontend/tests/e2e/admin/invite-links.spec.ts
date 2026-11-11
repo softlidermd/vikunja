@@ -137,15 +137,4 @@ test.describe('Invite links', () => {
 		expect(await (await firstResponse).json()).toMatchObject({teams: [{id: teams[0].id, name: 'Team 1'}]})
 		await expect(page.getByText('You will join: Team 2')).toBeVisible()
 	})
-
-	test('tab and direct route are unavailable without user_invites', async ({page, apiContext}) => {
-		await LicenseFactory.enable(['admin_panel'])
-		const [admin] = await UserFactory.create(1, {is_admin: true}, false)
-		await login(page, apiContext, admin)
-		await page.goto('/admin')
-		await expect(page.getByRole('link', {name: 'Invite links', exact: true})).not.toBeVisible()
-		await page.goto('/admin/invite-links')
-		await expect(page.getByRole('heading', {name: 'Not found', exact: true})).toBeVisible()
-		await expect(page.getByRole('button', {name: 'Create invite link', exact: true})).not.toBeVisible()
-	})
 })

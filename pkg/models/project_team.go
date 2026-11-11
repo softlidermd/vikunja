@@ -222,12 +222,13 @@ func (tl *TeamProject) ReadAll(s *xorm.Session, a web.Auth, search string, page 
 
 	// Get the teams
 	all := []*TeamWithPermission{}
+	// Computed before the query builder starts: isInstanceAdmin runs a query on the same session and would reset its state.
+	searchReadableTeamsOnly := search != "" && !isInstanceAdmin(s, a)
 	query := s.
 		Table("teams").
 		Join("INNER", "team_projects", "team_id = teams.id").
 		Where("team_projects.project_id = ?", tl.ProjectID).
 		Where(db.ILIKE("teams.name", search))
-	searchReadableTeamsOnly := search != "" && !isInstanceAdmin(s, a)
 	if searchReadableTeamsOnly {
 		query = query.Where(readableTeamSearchCond(a))
 	}
