@@ -81,6 +81,12 @@ describe('LabelBoardTask', () => {
 		expect(mountRow({priority: PRIORITIES.HIGH}).wrapper.find('.board-task__priority').exists()).toBe(true)
 	})
 
+	it('gives DO NOW its own chip, so the marker never sits white on the card', () => {
+		const marker = mountRow({priority: PRIORITIES.DO_NOW}).wrapper.get('.board-task__priority')
+		expect(marker.classes()).toContain('priority-chip')
+		expect(marker.attributes('data-priority')).toBe('5')
+	})
+
 	it('opens the task when the row is clicked', async () => {
 		const {wrapper, router} = mountRow()
 		await wrapper.get('.board-task__meta').trigger('click')

@@ -1,12 +1,8 @@
 <template>
 	<span
 		v-if="!done && (showAll || priority >= minimumPriority)"
-		:class="{
-			'negligible': priority <= priorities.LOW,
-			'not-so-high': priority > priorities.LOW && priority < priorities.HIGH,
-			'high-priority': priority >= priorities.HIGH
-		}"
-		class="priority-label"
+		class="priority-label priority-chip"
+		:data-priority="priority"
 	>
 		<span class="icon">
 			<Icon
@@ -51,17 +47,9 @@ const minimumPriority = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-.high-priority {
-	color: var(--danger-text);
+.priority-label {
+	padding-inline: .375rem;
 	inline-size: auto !important; // To override the width set in tasks
-}
-
-.not-so-high {
-	color: var(--warning);
-}
-
-.negligible {
-	color: var(--info);
 }
 
 .icon {

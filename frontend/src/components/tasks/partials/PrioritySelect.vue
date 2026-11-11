@@ -1,7 +1,10 @@
 <template>
 	<div class="select">
+		<!-- Colored on the select itself: Bulma paints the select, not its wrapper. -->
 		<select
 			v-model="priority"
+			class="priority-chip"
+			:data-priority="priority"
 			:disabled="disabled || undefined"
 			:aria-label="$t('task.attributes.priority')"
 		>

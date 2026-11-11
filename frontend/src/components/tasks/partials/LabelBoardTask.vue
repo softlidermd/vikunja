@@ -30,7 +30,8 @@
 						<span
 							v-if="priorityName"
 							v-tooltip="priorityName"
-							class="board-task__priority"
+							class="board-task__priority priority-chip"
+							:data-priority="task.priority"
 							role="img"
 							:aria-label="priorityName"
 						>!</span>
@@ -245,7 +246,7 @@ function openTaskDetail(e: MouseEvent) {
 
 .board-task__priority {
 	margin-inline-end: .25rem;
-	color: var(--danger-text);
+	padding-inline: .3rem;
 	font-weight: 700;
 }
 

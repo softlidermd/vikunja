@@ -338,8 +338,7 @@ $task-background: var(--white);
 	}
 
 	.footer .icon,
-	.due-date,
-	.priority-label {
+	.due-date {
 		background: var(--grey-100);
 		border-radius: $radius;
 		padding: 0 .5rem;
@@ -364,8 +363,7 @@ $task-background: var(--white);
 		color: #000000; // pure black, not grey-800: guarantees 4.5:1 at the luminance flip point
 
 		.footer .icon,
-		.due-date,
-		.priority-label {
+		.due-date {
 			background: hsl(220, 13%, 91%);
 		}
 
@@ -384,8 +382,7 @@ $task-background: var(--white);
 		color: var(--white);
 
 		.footer .icon,
-		.due-date,
-		.priority-label {
+		.due-date {
 			background: hsl(215, 27.9%, 16.9%); // grey-800
 		}
 
@@ -404,9 +401,8 @@ $task-background: var(--white);
 			color: inherit;
 		}
 
-		// var(--danger-text)/PriorityLabel's --danger-text fail on the dark grey-800 chip bg; brightened red keeps hue/sat, hits >= 4.5:1
-		&[data-is-overdue] .due-date,
-		.priority-label.high-priority {
+		// var(--danger-text) fails on the dark grey-800 chip bg; brightened red keeps hue/sat, hits >= 4.5:1
+		&[data-is-overdue] .due-date {
 			color: hsl(var(--danger-h), var(--danger-s), 68%);
 		}
 	}

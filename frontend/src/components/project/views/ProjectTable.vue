@@ -323,7 +323,6 @@
 										<PrioritySelect
 											v-if="canWriteTask(t)"
 											class="is-small"
-											:class="{'is-high-priority': !t.done && t.priority >= PRIORITIES.HIGH}"
 											:model-value="t.priority"
 											@update:modelValue="p => saveTask(t, {priority: p})"
 										/>
@@ -549,7 +548,6 @@ import {useDelayedLoading} from '@/composables/useDelayedLoading'
 import AddTask from '@/components/tasks/AddTask.vue'
 import {useCurrentProject} from '@/composables/useCurrentProject'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
-import {PRIORITIES} from '@/constants/priorities'
 import {taskSizeLabelKey} from '@/constants/taskSizes'
 import {getTaskIdentifier} from '@/helpers/task'
 import { camelCase } from 'change-case'
@@ -806,19 +804,6 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 <style lang="scss" scoped>
 .table-view__add-task {
 	padding: 1rem;
-}
-
-// Same emphasis as PriorityLabel, which the editable select replaced.
-.is-high-priority :deep(select) {
-	color: var(--danger-text);
-	font-weight: 700;
-}
-
-// Options inherit the select's color; keep the opened list plain except the chosen one, which some engines
-// (Chromium on Linux) use to paint the closed select.
-.is-high-priority :deep(option:not(:checked)) {
-	color: var(--text);
-	font-weight: 400;
 }
 
 .table {

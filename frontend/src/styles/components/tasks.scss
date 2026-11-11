@@ -1,3 +1,26 @@
+// One color per priority level, shared by labels, pickers and board markers. Medium (2) stays plain text.
+.priority-chip {
+	@each $level in 0, 1, 3, 4, 5 {
+		&[data-priority="#{$level}"] {
+			color: var(--priority-#{$level}-text);
+			background-color: var(--priority-#{$level}-bg);
+			border-radius: $radius;
+		}
+	}
+
+	&[data-priority="5"] {
+		font-weight: 700;
+	}
+
+	// The open list of a native select stays plain; the chosen option keeps the chip colors, which some engines
+	// (Chromium on Linux) use to paint the closed select.
+	option:not(:checked) {
+		color: var(--text);
+		background-color: var(--scheme-main);
+		font-weight: 400;
+	}
+}
+
 // FIXME: These classes are used all over.
 // very hard to untangle
 // they have many overwrites at different positions

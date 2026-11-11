@@ -274,6 +274,18 @@
   --code-section: #3a86ff;
   --code-keyword: #8338ec;
 
+  // Priority chips (text on background, each pair >= 6.1:1). Medium (2) has none: it stays plain text.
+  --priority-0-text: #4b5563;
+  --priority-0-bg: #e5e7eb;
+  --priority-1-text: #1e40af;
+  --priority-1-bg: #eff6ff;
+  --priority-3-text: #9a3412;
+  --priority-3-bg: #ffedd5;
+  --priority-4-text: #991b1b;
+  --priority-4-bg: #fee2e2;
+  --priority-5-text: #fff;
+  --priority-5-bg: #b91c1c;
+
   &.dark {
     @media screen {
       // Light mode colours reversed for dark mode
@@ -346,6 +358,16 @@
       --code-symbol: #b9f18d;
       --code-section: #faf594;
       --code-keyword: #70cff8;
+
+      // DO NOW (5) keeps its light-theme pair
+      --priority-0-text: #d1d5db;
+      --priority-0-bg: #374151;
+      --priority-1-text: #bfdbfe;
+      --priority-1-bg: #172554;
+      --priority-3-text: #fdba74;
+      --priority-3-bg: #431407;
+      --priority-4-text: #fecaca;
+      --priority-4-bg: #450a0a;
     }
   }
 }
