@@ -22,6 +22,13 @@
 					class="bottom-sheet__panel"
 				>
 					<div class="bottom-sheet__handle" />
+					<BaseButton
+						:aria-label="$t('misc.closeDialog')"
+						class="close d-print-none"
+						@click="$emit('close')"
+					>
+						<Icon icon="times" />
+					</BaseButton>
 					<div
 						v-if="title || $slots['header-action']"
 						class="bottom-sheet__header"
@@ -34,13 +41,6 @@
 					</div>
 				</div>
 				<template v-else>
-					<BaseButton
-						:aria-label="$t('misc.closeDialog')"
-						class="close d-print-none"
-						@click="$emit('close')"
-					>
-						<Icon icon="times" />
-					</BaseButton>
 					<div
 						class="modal-content"
 						:class="{
@@ -48,6 +48,15 @@
 							'is-wide': wide
 						}"
 					>
+						<div class="modal-close-anchor d-print-none">
+							<BaseButton
+								:aria-label="$t('misc.closeDialog')"
+								class="close"
+								@click="$emit('close')"
+							>
+								<Icon icon="times" />
+							</BaseButton>
+						</div>
 						<slot>
 							<div
 								:id="headerId"
@@ -448,9 +457,39 @@ $modal-width: 1024px;
 	justify-content: center;
 }
 
-// .modal-content would otherwise paint over the fixed .close
+// Zero-height sticky row: the X stays in the card's corner while the content scrolls under it.
+.modal-close-anchor {
+	position: sticky;
+	inset-block-start: 0;
+	block-size: 0;
+	z-index: 2;
+}
+
+.close {
+	position: absolute;
+	inset-block-start: .5rem;
+	inset-inline-end: .5rem;
+	padding: .25rem;
+	color: var(--text);
+	font-size: 1.5rem;
+	line-height: 1;
+}
+
+// Out of the centering flex, so the X sits in the viewport corner over the lightbox.
+.fullscreen .modal-close-anchor {
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-end: 0;
+}
+
+// Not var(--white): it turns dark in dark mode, and the lightbox scrim is dark in both themes.
 .fullscreen .close {
-	z-index: 1;
+	color: #ffffff;
+}
+
+// Card-less confirm modals draw white text straight on the scrim.
+.modal-content:has(.modal-header) .close {
+	color: inherit;
 }
 
 .hint-modal {
@@ -479,6 +518,7 @@ $modal-width: 1024px;
 }
 
 .bottom-sheet__panel {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	inline-size: 100%;
@@ -489,6 +529,11 @@ $modal-width: 1024px;
 	border-radius: 18px 18px 0 0;
 	box-shadow: 0 -8px 30px hsla(var(--grey-500-hsl), .18);
 	padding-block-end: env(safe-area-inset-bottom);
+
+	// keep the body clear of the X when there is no header row to hold it
+	&:not(:has(.bottom-sheet__header)) {
+		padding-block-start: 2.5rem;
+	}
 }
 
 .bottom-sheet__handle {
@@ -504,7 +549,8 @@ $modal-width: 1024px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: .5rem 1rem .75rem;
+	padding-block: .5rem .75rem;
+	padding-inline: 1rem 2.5rem;
 	flex-shrink: 0;
 }
 
@@ -523,33 +569,6 @@ $modal-width: 1024px;
 	// The mobile :deep(.card) rule below stretches every card to viewport height; a card inside the sheet must not be.
 	:deep(.card) {
 		min-block-size: 0 !important;
-	}
-}
-
-.close {
-	$close-button-padding: 26px;
-	position: fixed;
-	inset-block-start: .5rem;
-	inset-inline-end: $close-button-padding;
-	color: var(--white);
-	font-size: 2rem;
-
-	@media screen and (min-width: $desktop) and (width <= calc(#{$desktop	} + #{$close-button-min-space})) {
-		inset-block-start: calc(5px + $modal-margin);
-		inset-inline-end: 50%;
-		// we align the close button to the modal until there is enough space outside for it
-		transform: translateX(calc((#{$modal-width} / 2) - #{$close-button-padding}));
-
-		// fullscreen has no card to hug — keep the corner position instead
-		.fullscreen & {
-			inset-block-start: .5rem;
-			inset-inline-end: $close-button-padding;
-			transform: none;
-		}
-	}
-
-	@media screen and (min-width: $tablet) and (max-width: #{$desktop + $close-button-min-space}) {
-		inset-block-start: .75rem;
 	}
 }
 
@@ -573,15 +592,6 @@ $modal-width: 1024px;
 	.modal-content {
 		position: static;
 		max-block-size: none;
-	}
-
-	.close {
-		display: none;
-	}
-
-	// no card-header close icon to fall back on
-	.fullscreen .close {
-		display: block;
 	}
 
 	:deep(.card) {
@@ -629,21 +639,17 @@ $modal-width: 1024px;
 	min-block-size: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
+// the modal's own X replaces the card's
 .modal-content :deep(.card .card-header-icon.close) {
 	display: none;
+}
 
-	@media screen and (max-width: $tablet) {
-		display: block;
-	}
+.modal-content :deep(.card .card-header) {
+	padding-inline-end: 2.5rem;
 }
 </style>
 
 <style lang="scss">
-// Close icon SVG uses currentColor, change the color to keep it visible
-.dark .modal-dialog .close {
-	color: var(--grey-900);
-}
-
 @media print, screen and (max-width: $tablet) {
   body:has(dialog[open].modal-dialog:not(.bottom-sheet)) #app {
 	display: none;

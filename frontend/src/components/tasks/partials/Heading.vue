@@ -15,14 +15,6 @@
 			<Done
 				:is-done="task.done"
 			/>
-			<BaseButton
-				v-if="hasClose"
-				:aria-label="$t('task.detail.closeTaskDetail')"
-				class="close d-print-none"
-				@click="$emit('close')"
-			>
-				<Icon icon="times" />
-			</BaseButton>
 		</div>
 		<h1
 			class="title input"
@@ -81,12 +73,10 @@ import {getHexColor, getTaskIdentifier} from '@/helpers/task'
 const props = defineProps<{
 	task: ITask,
 	canWrite: boolean,
-	hasClose: boolean,
 }>()
 
 const emit = defineEmits<{
 	'update:task': [task: ITask],
-	'close': [],
 }>()
 
 const router = useRouter()
@@ -217,15 +207,6 @@ async function cancel(element: HTMLInputElement) {
 .color-bubble {
 	block-size: .75rem;
 	inline-size: .75rem;
-}
-
-// Modal renders its own fixed close button from $tablet up
-.close {
-	font-size: 2rem;
-	line-height: 1;
-	position: absolute;
-	inset-inline-end: 1.25rem;
-	inset-block-start: 1.1rem;
 }
 
 .task-properties {

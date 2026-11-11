@@ -38,13 +38,6 @@
 				<QuickAddMagic
 					v-if="isNewTaskCommand"
 				/>
-				<BaseButton
-					:aria-label="$t('misc.closeQuickActions')"
-					class="close"
-					@click="closeQuickActions"
-				>
-					<Icon icon="times" />
-				</BaseButton>
 			</div>
 
 			<div
@@ -776,23 +769,12 @@ onBeforeUnmount(() => {
 	.input {
 		border: 0;
 		font-size: 1.5rem;
-
-		@media screen and (max-width: $tablet) {
-			padding-inline-end: .25rem;
-		}
+		// room for the modal's close button
+		padding-inline-end: 2.5rem;
 	}
 
 	&.has-active-cmd .input {
 		padding-inline-start: .5rem;
-	}
-
-	.close {
-		padding: 0 1rem 0 .5rem;
-		font-size: 1.5rem;
-
-		@media screen and (min-width: $tablet + 1) {
-			display: none;
-		}
 	}
 }
 

@@ -253,6 +253,91 @@ describe('Modal.vue — accessible name derivation', () => {
 	})
 })
 
+describe('Modal.vue — close button', () => {
+	const closeButtons = () => document.querySelectorAll('[aria-label="misc.closeDialog"]')
+
+	it('renders the X inside the content and emits close on click', async () => {
+		const wrapper = mount(Modal, {
+			...globalMocks,
+			attachTo: document.body,
+			props: {enabled: true},
+			slots: {default: '<p class="test-body">hi</p>'},
+		})
+		await flushPromises()
+
+		expect(closeButtons()).toHaveLength(1)
+		const button = document.querySelector('.modal-content > .modal-close-anchor > [aria-label="misc.closeDialog"]')
+		expect(button).not.toBeNull()
+		;(button as HTMLElement).click()
+		expect(wrapper.emitted('close')).toHaveLength(1)
+
+		wrapper.unmount()
+	})
+
+	it('renders the fullscreen X in the anchor', async () => {
+		const wrapper = mount(Modal, {
+			...globalMocks,
+			attachTo: document.body,
+			props: {
+				enabled: true,
+				variant: 'fullscreen',
+			},
+			slots: {default: '<img alt="">'},
+		})
+		await flushPromises()
+
+		expect(closeButtons()).toHaveLength(1)
+		expect(document.querySelector('.fullscreen .modal-close-anchor [aria-label="misc.closeDialog"]')).not.toBeNull()
+
+		wrapper.unmount()
+	})
+
+	it('gives a title-less sheet an X in the panel', async () => {
+		const wrapper = mount(Modal, {
+			...globalMocks,
+			attachTo: document.body,
+			props: {
+				enabled: true,
+				variant: 'sheet',
+			},
+			slots: {default: '<p class="test-body">hi</p>'},
+		})
+		await flushPromises()
+
+		expect(document.querySelector('.bottom-sheet__header')).toBeNull()
+		expect(closeButtons()).toHaveLength(1)
+		const button = document.querySelector('.bottom-sheet__panel > [aria-label="misc.closeDialog"]')
+		expect(button).not.toBeNull()
+		;(button as HTMLElement).click()
+		expect(wrapper.emitted('close')).toHaveLength(1)
+
+		wrapper.unmount()
+	})
+
+	it('renders exactly one X in a titled sheet with a header action', async () => {
+		const wrapper = mount(Modal, {
+			...globalMocks,
+			attachTo: document.body,
+			props: {
+				enabled: true,
+				variant: 'sheet',
+				title: 'Due date',
+			},
+			slots: {
+				'header-action': '<button class="test-action">Clear</button>',
+				default: '<p class="test-body">hi</p>',
+			},
+		})
+		await flushPromises()
+
+		expect(document.querySelector('.bottom-sheet__header .test-action')).not.toBeNull()
+		expect(closeButtons()).toHaveLength(1)
+		expect(document.querySelector('.bottom-sheet__panel > [aria-label="misc.closeDialog"]')).not.toBeNull()
+
+		wrapper.unmount()
+	})
+})
+
 describe('Modal.vue — focus restoration', () => {
 	it('restores focus to the trigger when the modal is unmounted without a close transition', async () => {
 		const trigger = document.createElement('button')

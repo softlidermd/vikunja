@@ -24,8 +24,6 @@
 				ref="heading"
 				:task="task"
 				:can-write="canWrite"
-				:has-close="isModal"
-				@close="$emit('close')"
 			/>
 			<nav
 				v-if="project?.id"
@@ -758,10 +756,6 @@ const props = defineProps<{
 	backdropView?: RouteLocation['fullPath'],
 }>()
 
-defineEmits<{
-	'close': [],
-}>()
-
 const router = useRouter()
 const route = useRoute()
 const {t} = useI18n({useScope: 'global'})
@@ -1331,8 +1325,6 @@ function setRelatedTasksActive() {
 }
 
 .is-modal .task-view {
-	// Anchors the heading's close button to the modal's corner.
-	position: relative;
 	border-radius: $radius;
 	padding: 1rem;
 	color: var(--text);
@@ -1522,20 +1514,13 @@ h2 .button {
 
 // keep the title clear of the close button in the modal's corner
 .is-modal .heading {
-	@media screen and (min-width: $tablet) {
-		padding-inline-end: 3.5rem;
-	}
+	padding-inline-end: 2.5rem;
 }
 
 .is-modal .action-buttons {
-	// we need same top margin for the modal close button 
+	// stick below the modal's close button
 	@media screen and (min-width: $tablet) {
-		inset-block-start: 6.5rem;
-	}
-	// this is the moment when the fixed close button is outside the modal
-	// => we can fill up the space again
-	@media screen and (width >= calc(#{$desktop} + 84px)) {
-		inset-block-start: 0;
+		inset-block-start: 3rem;
 	}
 
 	// Two compact columns keep every action within a 1080p screen.
@@ -1625,12 +1610,5 @@ h2 .button {
 .modal-content .scroll-to-comments-button {
 	inset-block-end: .75rem;
 	inset-inline-end: 1rem;
-}
-
-// the task card spans the full width here, so the modal's white close button sits on it instead of the scrim
-@media screen and (min-width: $tablet) and (max-width: $desktop) {
-	.modal-dialog:has(.task-view-container.is-modal) .modal-container > .close {
-		color: var(--text);
-	}
 }
 </style>
