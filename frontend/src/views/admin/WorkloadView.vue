@@ -13,8 +13,8 @@
 				</h2>
 				<ul class="workload__stats">
 					<li
-						v-for="stat in stats(data.total)"
-						:key="stat"
+						v-for="(stat, index) in stats(data.total)"
+						:key="index"
 					>
 						{{ stat }}
 					</li>
@@ -31,8 +31,8 @@
 				</h2>
 				<ul class="workload__stats">
 					<li
-						v-for="stat in stats(block.person)"
-						:key="stat"
+						v-for="(stat, index) in stats(block.person)"
+						:key="index"
 					>
 						{{ stat }}
 					</li>

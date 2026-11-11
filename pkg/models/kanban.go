@@ -449,7 +449,6 @@ func (b *Bucket) Delete(s *xorm.Session, a web.Auth) (err error) {
 		return err
 	}
 
-	// Move all tasks of that bucket to the planned bucket
 	_, err = s.
 		Where("bucket_id = ?", b.ID).
 		Cols("bucket_id").

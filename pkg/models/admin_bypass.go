@@ -24,8 +24,8 @@ import (
 	"xorm.io/xorm"
 )
 
-// isInstanceAdmin gates cross-user access on both is_admin and the admin-panel
-// license so flipping is_admin on a free instance cannot recover the paid bypass.
+// isInstanceAdmin gates cross-user access on is_admin. The admin-panel feature check
+// always passes now that every feature is enabled without a license key.
 // is_admin is re-read from the DB because the auth's flag is claim-derived and
 // stale until the JWT expires.
 func isInstanceAdmin(s *xorm.Session, a web.Auth) bool {

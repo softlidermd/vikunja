@@ -204,6 +204,7 @@ func Init() {
 }
 
 // SetForTests enables the given features. Pair with ResetForTests to avoid bleeding state between tests.
+// It no longer restricts features: IsFeatureEnabled ignores the license, so "unlicensed" tests run with all features on.
 func SetForTests(features []Feature) {
 	feats := make([]Feature, 0, len(features))
 	feats = append(feats, features...)
