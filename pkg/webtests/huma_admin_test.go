@@ -224,3 +224,33 @@ func TestHumaAdminProjects(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
 }
+
+func TestWorkload_AdminEndpoint(t *testing.T) {
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+
+		s := db.NewSession()
+		defer s.Close()
+		u, err := user.GetUserByID(s, 1)
+		require.NoError(t, err)
+
+		res := adminReq(t, e, http.MethodGet, "/api/v2/admin/workload", u, "")
+		assert.Equal(t, http.StatusNotFound, res.Code)
+	})
+
+	t.Run("admin gets the workload", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+		admin := promoteToAdmin(t, 1)
+
+		res := adminReq(t, e, http.MethodGet, "/api/v2/admin/workload", admin, "")
+		require.Equal(t, http.StatusOK, res.Code, res.Body.String())
+
+		var body map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &body))
+		assert.Contains(t, body, "total")
+		assert.Contains(t, body, "people")
+		assert.Contains(t, body, "unassigned")
+	})
+}

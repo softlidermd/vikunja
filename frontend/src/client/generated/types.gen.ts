@@ -3524,6 +3524,114 @@ export type Webhook = {
     readonly user_id?: number;
 };
 
+export type Workload = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    /**
+     * One block per user with at least one open non-idea task, ordered by display name.
+     */
+    people?: Array<WorkloadPerson> | null;
+    /**
+     * Instance-wide totals; each task counts once, whatever its number of assignees.
+     */
+    total?: WorkloadTotals;
+    /**
+     * Open non-idea tasks without an assignee, plus the count of unassigned ideas.
+     */
+    unassigned?: WorkloadPerson;
+};
+
+export type WorkloadPerson = {
+    /**
+     * Sum of the sizes 1, 4, 8, 20 and 40. Unestimated and long-running tasks are not summed.
+     */
+    hours?: number;
+    /**
+     * Number of open tasks in the Idea status.
+     */
+    ideas?: number;
+    /**
+     * Number of long-running tasks (size 999).
+     */
+    long?: number;
+    /**
+     * Number of open tasks that are not ideas.
+     */
+    task_count?: number;
+    /**
+     * Open non-idea tasks, ordered by due date (unset last), priority descending, then id.
+     */
+    tasks?: Array<WorkloadTask> | null;
+    /**
+     * Number of tasks with size 0.
+     */
+    unestimated?: number;
+    /**
+     * The assignee; null for the unassigned block.
+     */
+    user?: User;
+};
+
+export type WorkloadTask = {
+    /**
+     * The task due date; zero when unset.
+     */
+    due_date?: string;
+    /**
+     * The task id.
+     */
+    id?: number;
+    /**
+     * The task priority.
+     */
+    priority?: number;
+    /**
+     * The id of the task's project.
+     */
+    project_id?: number;
+    /**
+     * The title of the task's project.
+     */
+    project_title?: string;
+    /**
+     * Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running.
+     */
+    size?: number;
+    /**
+     * The title of the task's bucket in its project's status board (the single manual Kanban view). Empty when the project has no status board.
+     */
+    status?: string;
+    /**
+     * The task title.
+     */
+    title?: string;
+};
+
+export type WorkloadTotals = {
+    /**
+     * Sum of the sizes 1, 4, 8, 20 and 40. Unestimated and long-running tasks are not summed.
+     */
+    hours?: number;
+    /**
+     * Number of open tasks in the Idea status.
+     */
+    ideas?: number;
+    /**
+     * Number of long-running tasks (size 999).
+     */
+    long?: number;
+    /**
+     * Number of open tasks that are not ideas.
+     */
+    task_count?: number;
+    /**
+     * Number of tasks with size 0.
+     */
+    unestimated?: number;
+};
+
 export type ApiTokenWritable = {
     /**
      * The date when this key expires.
@@ -5107,6 +5215,52 @@ export type WebhookWritable = {
     target_url?: string;
 };
 
+export type WorkloadWritable = {
+    /**
+     * One block per user with at least one open non-idea task, ordered by display name.
+     */
+    people?: Array<WorkloadPersonWritable> | null;
+    /**
+     * Instance-wide totals; each task counts once, whatever its number of assignees.
+     */
+    total?: WorkloadTotals;
+    /**
+     * Open non-idea tasks without an assignee, plus the count of unassigned ideas.
+     */
+    unassigned?: WorkloadPersonWritable;
+};
+
+export type WorkloadPersonWritable = {
+    /**
+     * Sum of the sizes 1, 4, 8, 20 and 40. Unestimated and long-running tasks are not summed.
+     */
+    hours?: number;
+    /**
+     * Number of open tasks in the Idea status.
+     */
+    ideas?: number;
+    /**
+     * Number of long-running tasks (size 999).
+     */
+    long?: number;
+    /**
+     * Number of open tasks that are not ideas.
+     */
+    task_count?: number;
+    /**
+     * Open non-idea tasks, ordered by due date (unset last), priority descending, then id.
+     */
+    tasks?: Array<WorkloadTask> | null;
+    /**
+     * Number of tasks with size 0.
+     */
+    unestimated?: number;
+    /**
+     * The assignee; null for the unassigned block.
+     */
+    user?: UserWritable;
+};
+
 export type AdminInviteLinksListData = {
     body?: never;
     path?: never;
@@ -5564,6 +5718,31 @@ export type AdminUsersPatchStatusResponses = {
 };
 
 export type AdminUsersPatchStatusResponse = AdminUsersPatchStatusResponses[keyof AdminUsersPatchStatusResponses];
+
+export type AdminWorkloadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/workload';
+};
+
+export type AdminWorkloadErrors = {
+    /**
+     * Error
+     */
+    default: VikunjaErrorModel;
+};
+
+export type AdminWorkloadError = AdminWorkloadErrors[keyof AdminWorkloadErrors];
+
+export type AdminWorkloadResponses = {
+    /**
+     * OK
+     */
+    200: Workload;
+};
+
+export type AdminWorkloadResponse = AdminWorkloadResponses[keyof AdminWorkloadResponses];
 
 export type AuthOpenidCallbackData = {
     /**

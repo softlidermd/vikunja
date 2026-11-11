@@ -110,6 +110,33 @@ func loadMirrorTargets(s *xorm.Session, tasks []*Task, viewIDs []int64) (targets
 		return targets, nil
 	}
 
+	titleByTask, err := loadStatusTitles(s, tasks)
+	if err != nil {
+		return nil, err
+	}
+	if len(titleByTask) == 0 {
+		return targets, nil
+	}
+
+	columns, err := getFirstBucketIDsByTitle(s, viewIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, viewID := range viewIDs {
+		for taskID, title := range titleByTask {
+			if columnID, has := columns[viewID][normalizeBucketTitle(title)]; has {
+				targets[viewTask{viewID: viewID, taskID: taskID}] = columnID
+			}
+		}
+	}
+	return targets, nil
+}
+
+// loadStatusTitles maps each task to the title of its bucket in its project's status view.
+// Tasks of projects without a status view are absent.
+func loadStatusTitles(s *xorm.Session, tasks []*Task) (titleByTask map[int64]string, err error) {
+	titleByTask = map[int64]string{}
 	projectIDs := []int64{}
 	for _, t := range tasks {
 		if t.ProjectID > 0 {
@@ -121,7 +148,7 @@ func loadMirrorTargets(s *xorm.Session, tasks []*Task, viewIDs []int64) (targets
 
 	statusViewIDs, err := getStatusViewIDsByProject(s, projectIDs)
 	if err != nil || len(statusViewIDs) == 0 {
-		return targets, err
+		return titleByTask, err
 	}
 
 	type statusTitle struct {
@@ -130,7 +157,6 @@ func loadMirrorTargets(s *xorm.Session, tasks []*Task, viewIDs []int64) (targets
 		Title         string
 	}
 	statusViewByTask := map[int64]int64{}
-	titleByTask := map[int64]string{}
 	for chunk := range slices.Chunk(tasks, idChunkSize) {
 		taskIDs := []int64{}
 		chunkViewIDs := []int64{}
@@ -167,23 +193,7 @@ func loadMirrorTargets(s *xorm.Session, tasks []*Task, viewIDs []int64) (targets
 			}
 		}
 	}
-	if len(titleByTask) == 0 {
-		return targets, nil
-	}
-
-	columns, err := getFirstBucketIDsByTitle(s, viewIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, viewID := range viewIDs {
-		for taskID, title := range titleByTask {
-			if columnID, has := columns[viewID][normalizeBucketTitle(title)]; has {
-				targets[viewTask{viewID: viewID, taskID: taskID}] = columnID
-			}
-		}
-	}
-	return targets, nil
+	return titleByTask, nil
 }
 
 // findStatusBucketByTitle returns the bucket in the project's status view with the given title, or zeros.
