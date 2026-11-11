@@ -18,6 +18,7 @@ package models
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -79,6 +80,25 @@ func TestTask_Create(t *testing.T) {
 
 		events.DispatchPending(context.Background(), s)
 		events.AssertDispatched(t, &TaskCreatedEvent{})
+	})
+	t.Run("with size", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		task := &Task{Title: "Lorem", ProjectID: 1, Size: 8}
+		require.NoError(t, task.Create(s, usr))
+		require.NoError(t, s.Commit())
+
+		db.AssertExists(t, "tasks", map[string]interface{}{"id": task.ID, "size": 8}, false)
+	})
+	t.Run("with invalid size", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		task := &Task{Title: "Lorem", ProjectID: 1, Size: 5}
+		requireInvalidTaskSize(t, task.Create(s, usr))
 	})
 	t.Run("already subscribed to the project", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
@@ -712,6 +732,66 @@ func TestTask_Update(t *testing.T) {
 		assert.Equal(t, "updated with a field list", updatedTask.Title)
 		assert.Equal(t, int64(100), updatedTask.Priority, "priority must survive since it wasn't in the fields list")
 	})
+	t.Run("size via fields changes only size", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		task := &Task{ID: 3, Title: "must not be written", Size: 8}
+		require.NoError(t, task.updateSingleTask(s, u, []string{"size"}))
+		require.NoError(t, s.Commit())
+
+		db.AssertExists(t, "tasks", map[string]interface{}{
+			"id":       3,
+			"title":    "task #3 high prio",
+			"priority": 100,
+			"size":     8,
+		}, false)
+	})
+	t.Run("size on a field-less update is kept, set and cleared", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		_, err := s.ID(1).Cols("size").Update(&Task{Size: 8})
+		require.NoError(t, err)
+		task, err := GetTaskByIDSimple(s, 1)
+		require.NoError(t, err)
+
+		task.Title = "only the title changed"
+		require.NoError(t, task.Update(s, u))
+		stored, err := GetTaskByIDSimple(s, 1)
+		require.NoError(t, err)
+		assert.Equal(t, int64(8), stored.Size)
+		assert.Equal(t, "only the title changed", stored.Title)
+
+		task.Size = 20
+		require.NoError(t, task.Update(s, u))
+		stored, err = GetTaskByIDSimple(s, 1)
+		require.NoError(t, err)
+		assert.Equal(t, int64(20), stored.Size)
+
+		task.Size = 0
+		require.NoError(t, task.Update(s, u))
+		require.NoError(t, s.Commit())
+		db.AssertExists(t, "tasks", map[string]interface{}{"id": 1, "size": 0}, false)
+	})
+	t.Run("invalid size", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		task := &Task{ID: 1, Title: "task #1", Size: 5}
+		requireInvalidTaskSize(t, task.Update(s, u))
+	})
+}
+
+func requireInvalidTaskSize(t *testing.T, err error) {
+	t.Helper()
+	var validation ValidationHTTPError
+	require.ErrorAs(t, err, &validation)
+	assert.Equal(t, http.StatusPreconditionFailed, validation.GetHTTPCode())
+	assert.Equal(t, []string{"size"}, validation.InvalidFields)
 }
 
 func TestTask_Delete(t *testing.T) {

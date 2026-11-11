@@ -71,7 +71,21 @@ func validateTaskForCreation(t *Task) error {
 		return ErrTaskCannotBeEmpty{}
 	}
 
-	return validateRepeatAfter(t.RepeatAfter)
+	if err := validateRepeatAfter(t.RepeatAfter); err != nil {
+		return err
+	}
+	return validateTaskSize(t.Size)
+}
+
+// TaskSizeLong marks a long-running task (more than a week); it is never summed as hours.
+const TaskSizeLong int64 = 999
+
+func validateTaskSize(size int64) error {
+	switch size {
+	case 0, 1, 4, 8, 20, 40, TaskSizeLong:
+		return nil
+	}
+	return InvalidFieldErrorWithMessage([]string{"size"}, "The size must be one of 0, 1, 4, 8, 20, 40 or 999.")
 }
 
 // Task represents a task in a project
@@ -99,6 +113,7 @@ type Task struct {
 	RepeatMode TaskRepeatMode `xorm:"not null default 0" json:"repeat_mode" doc:"How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date."`
 	// The task priority. Can be anything you want, it is possible to sort by this later.
 	Priority int64 `xorm:"bigint null" json:"priority"`
+	Size     int64 `xorm:"bigint not null default 0" json:"size" enum:"0,1,4,8,20,40,999" doc:"Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed."`
 	// When this task starts.
 	StartDate time.Time `xorm:"DATETIME INDEX null 'start_date'" json:"start_date" query:"-"`
 	// When this task ends.
@@ -1323,6 +1338,7 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 		"due_date",
 		"repeat_after",
 		"priority",
+		"size",
 		"start_date",
 		"end_date",
 		"hex_color",
@@ -1369,6 +1385,9 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 		if !fieldSet["priority"] {
 			t.Priority = ot.Priority
 		}
+		if !fieldSet["size"] {
+			t.Size = ot.Size
+		}
 		if !fieldSet["start_date"] {
 			t.StartDate = ot.StartDate
 		}
@@ -1396,6 +1415,9 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	}
 
 	if err := validateRepeatAfter(t.RepeatAfter); err != nil {
+		return err
+	}
+	if err := validateTaskSize(t.Size); err != nil {
 		return err
 	}
 
@@ -1607,6 +1629,10 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	// Priority
 	if t.Priority == 0 {
 		ot.Priority = 0
+	}
+	// Size
+	if t.Size == 0 {
+		ot.Size = 0
 	}
 	// Description
 	if t.Description == "" {

@@ -2206,6 +2206,10 @@ export type Task = {
      * How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date.
      */
     repeat_mode?: number;
+    /**
+     * Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed.
+     */
+    size?: 0 | 1 | 4 | 8 | 20 | 40 | 999;
     start_date?: string;
     /**
      * The requesting user's subscription to this task. Read-only here; use the subscription endpoints to change it. Only present when reading a single task.
@@ -2543,6 +2547,10 @@ export type TaskReadOneBody = {
      * How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date.
      */
     repeat_mode?: number;
+    /**
+     * Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed.
+     */
+    size?: 0 | 1 | 4 | 8 | 20 | 40 | 999;
     start_date?: string;
     /**
      * The requesting user's subscription to this task. Read-only here; use the subscription endpoints to change it. Only present when reading a single task.
@@ -4480,6 +4488,10 @@ export type TaskWritable = {
      * How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date.
      */
     repeat_mode?: number;
+    /**
+     * Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed.
+     */
+    size?: 0 | 1 | 4 | 8 | 20 | 40 | 999;
     start_date?: string;
     /**
      * The task title. This is what you'll see in the project.
@@ -4581,6 +4593,10 @@ export type TaskReadOneBodyWritable = {
      * How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date.
      */
     repeat_mode?: number;
+    /**
+     * Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed.
+     */
+    size?: 0 | 1 | 4 | 8 | 20 | 40 | 999;
     start_date?: string;
     /**
      * The task title. This is what you'll see in the project.

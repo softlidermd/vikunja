@@ -1868,6 +1868,29 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 		})
 	}
 
+	t.Run("size filter and sort", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		for id, size := range map[int64]int64{1: 4, 2: 8, 3: TaskSizeLong} {
+			_, err := s.ID(id).Cols("size").Update(&Task{Size: size})
+			require.NoError(t, err)
+		}
+		readIDs := func(tc *TaskCollection) []int64 {
+			got, _, _, err := tc.ReadAll(s, &user.User{ID: 1}, "", 0, 50)
+			require.NoError(t, err)
+			ids := []int64{}
+			for _, task := range got.([]*Task) {
+				ids = append(ids, task.ID)
+			}
+			return ids
+		}
+
+		assert.Equal(t, []int64{2, 3}, readIDs(&TaskCollection{Filter: "size >= 8", SortBy: []string{"id"}}))
+		assert.Equal(t, []int64{3, 2, 1}, readIDs(&TaskCollection{Filter: "size > 0", SortBy: []string{"size"}, OrderBy: []string{"desc"}}))
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)

@@ -92,6 +92,24 @@ func TestBulkTask_Update(t *testing.T) {
 		assert.ErrorAs(t, err, &expectedErr)
 	})
 
+	t.Run("invalid size", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		bt := &BulkTask{
+			TaskIDs: []int64{1, 3},
+			Fields:  []string{"size"},
+			Values:  &Task{Size: 5},
+		}
+
+		allowed, err := bt.CanUpdate(s, u)
+		require.NoError(t, err)
+		require.True(t, allowed)
+
+		requireInvalidTaskSize(t, bt.Update(s, u))
+	})
+
 	t.Run("update done_at when bulk marking tasks done", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 		s := db.NewSession()

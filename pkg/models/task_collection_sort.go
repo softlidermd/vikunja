@@ -37,6 +37,7 @@ const (
 	taskPropertyProjectID     string = "project_id"
 	taskPropertyRepeatAfter   string = "repeat_after"
 	taskPropertyPriority      string = "priority"
+	taskPropertySize          string = "size"
 	taskPropertyStartDate     string = "start_date"
 	taskPropertyEndDate       string = "end_date"
 	taskPropertyHexColor      string = "hex_color"
@@ -108,6 +109,7 @@ func validateTaskFieldForSorting(fieldName string) error {
 		taskPropertyProjectID,
 		taskPropertyRepeatAfter,
 		taskPropertyPriority,
+		taskPropertySize,
 		taskPropertyStartDate,
 		taskPropertyEndDate,
 		taskPropertyHexColor,

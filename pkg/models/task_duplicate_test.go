@@ -71,6 +71,28 @@ func TestTaskDuplicate(t *testing.T) {
 		assert.Equal(t, int64(1), relationCount)
 	})
 
+	t.Run("keeps the size", func(t *testing.T) {
+		files.InitTestFileFixtures(t)
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		u := &user.User{ID: 1}
+		_, err := s.ID(1).Cols("size").Update(&Task{Size: 40})
+		require.NoError(t, err)
+
+		td := &TaskDuplicate{TaskID: 1}
+		can, err := td.CanCreate(s, u)
+		require.NoError(t, err)
+		require.True(t, can)
+		require.NoError(t, td.Create(s, u))
+		assert.Equal(t, int64(40), td.Task.Size)
+
+		stored, err := GetTaskByIDSimple(s, td.Task.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(40), stored.Size)
+	})
+
 	t.Run("no permission", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 		s := db.NewSession()
