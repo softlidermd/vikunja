@@ -70,6 +70,7 @@ function serverSavedFilter(overrides: Partial<SavedFilterResponse> = {}): SavedF
 			s: '',
 		},
 		is_favorite: false,
+		all_projects: false,
 		...overrides,
 	}
 }
@@ -127,6 +128,7 @@ describe('saved filter queries', () => {
 				s: '',
 			},
 			is_favorite: false,
+			all_projects: false,
 		})
 	})
 
@@ -141,6 +143,7 @@ describe('saved filter queries', () => {
 				filter_include_nulls: true,
 				s: '',
 			},
+			all_projects: false,
 		})
 	})
 
@@ -177,6 +180,7 @@ describe('saved filter queries', () => {
 				filter_include_nulls: true,
 				s: '',
 			},
+			all_projects: false,
 			is_favorite: false,
 		}
 		await expect(updateSavedFilter({id: 8, ...writable})).resolves.toMatchObject({

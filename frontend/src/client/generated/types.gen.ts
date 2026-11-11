@@ -1900,6 +1900,10 @@ export type SavedFilter = {
      */
     readonly $schema?: string;
     /**
+     * Instance admins only: evaluate this filter over every non-archived project. Dropped on save for non-admins; ignored once the owner is no longer an admin.
+     */
+    all_projects?: boolean;
+    /**
      * A timestamp when this filter was created. You cannot change this value.
      */
     readonly created?: string;
@@ -1938,6 +1942,10 @@ export type SavedFilterReadBody = {
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    /**
+     * Instance admins only: evaluate this filter over every non-archived project. Dropped on save for non-admins; ignored once the owner is no longer an admin.
+     */
+    all_projects?: boolean;
     /**
      * A timestamp when this filter was created. You cannot change this value.
      */
@@ -4413,6 +4421,10 @@ export type RegisterUserRequestWritable = {
 
 export type SavedFilterWritable = {
     /**
+     * Instance admins only: evaluate this filter over every non-archived project. Dropped on save for non-admins; ignored once the owner is no longer an admin.
+     */
+    all_projects?: boolean;
+    /**
      * The description of the filter.
      */
     description?: string;
@@ -4431,6 +4443,10 @@ export type SavedFilterWritable = {
 };
 
 export type SavedFilterReadBodyWritable = {
+    /**
+     * Instance admins only: evaluate this filter over every non-archived project. Dropped on save for non-admins; ignored once the owner is no longer an admin.
+     */
+    all_projects?: boolean;
     /**
      * The description of the filter.
      */
@@ -7012,6 +7028,10 @@ export type ProjectsListData = {
          * If true, also returns archived projects.
          */
         is_archived?: boolean;
+        /**
+         * Instance admins only: include every project. Ignored for other users.
+         */
+        all_projects?: boolean;
         /**
          * How rich-text fields are exchanged. See the API description.
          */

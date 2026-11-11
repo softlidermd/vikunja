@@ -58,6 +58,8 @@ type TaskCollection struct {
 	Expand []TaskCollectionExpandable `query:"expand" json:"-"`
 
 	isSavedFilter bool
+	// Set from SavedFilter.seesAllProjects: the filter runs over every non-archived project.
+	allProjects bool
 	// Request filter on a saved filter which includes nulls. Kept apart so
 	// include-nulls doesn't leak into the saved filter's own conditions.
 	nullableFilter string
@@ -231,8 +233,9 @@ func getRelevantProjectsFromCollection(s *xorm.Session, a web.Auth, tf *TaskColl
 		projects, _, _, err = getRawProjectsForUser(
 			s,
 			&projectOptions{
-				user: &user.User{ID: a.GetID()},
-				page: -1,
+				user:        &user.User{ID: a.GetID()},
+				page:        -1,
+				allProjects: tf.allProjects,
 			},
 		)
 		return projects, err
@@ -343,6 +346,7 @@ func (tf *TaskCollection) ReadAll(s *xorm.Session, a web.Auth, search string, pa
 		tc.ProjectViewID = tf.ProjectViewID
 		tc.ProjectID = tf.ProjectID
 		tc.isSavedFilter = true
+		tc.allProjects = sf.seesAllProjects(s)
 		tc.Expand = tf.Expand
 		tc.forceFlatTasks = tf.forceFlatTasks
 

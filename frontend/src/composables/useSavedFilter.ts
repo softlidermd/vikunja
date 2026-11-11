@@ -24,6 +24,7 @@ function toDraft(value: SavedFilterForm): SavedFilterForm {
 			sort_by: [...value.filters.sort_by],
 			order_by: [...value.filters.order_by],
 		},
+		all_projects: value.all_projects,
 	}
 }
 

@@ -387,6 +387,7 @@ func RecalculateTaskPositions(s *xorm.Session, view *ProjectView, a web.Auth) (e
 			return err
 		}
 
+		tc.allProjects = sf.seesAllProjects(s)
 		opts.filterIncludeNulls = sf.Filters.FilterIncludeNulls
 		opts.filterTimezone = sf.Filters.FilterTimezone
 		opts.filter = sf.Filters.Filter

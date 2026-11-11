@@ -1098,8 +1098,23 @@ func updateTasksInSavedFilterViews(tasks []*Task) (err error) {
 	}
 
 	accessByProject, userIDs, err := getProjectAccessForTasks(s, tasks)
-	if err != nil || len(userIDs) == 0 {
+	if err != nil {
 		return err
+	}
+
+	// All-projects filters can match tasks their owner has no share on; seesAllProjects re-checks the owner is an admin.
+	allProjectsOwnerIDs := []int64{}
+	err = s.Table(&SavedFilter{}).Where("all_projects = ?", true).Distinct("owner_id").Find(&allProjectsOwnerIDs)
+	if err != nil {
+		return err
+	}
+	for _, id := range allProjectsOwnerIDs {
+		if !slices.Contains(userIDs, id) {
+			userIDs = append(userIDs, id)
+		}
+	}
+	if len(userIDs) == 0 {
+		return nil
 	}
 
 	filters, timezoneByOwner, err := getActiveSavedFiltersOwnedBy(s, userIDs)

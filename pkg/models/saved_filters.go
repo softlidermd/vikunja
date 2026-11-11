@@ -48,6 +48,9 @@ type SavedFilter struct {
 	// True if the filter is a favorite. Favorite filters show up in a separate parent project together with favorite projects.
 	IsFavorite bool `xorm:"default false" json:"is_favorite" doc:"If true, the filter shows up in the Favorites pseudo-project alongside favorite projects."`
 
+	// Instance admins only: evaluate this filter over every non-archived project.
+	AllProjects bool `xorm:"default false" json:"all_projects" doc:"Instance admins only: evaluate this filter over every non-archived project. Dropped on save for non-admins; ignored once the owner is no longer an admin."`
+
 	// A timestamp when this filter was created. You cannot change this value.
 	Created time.Time `xorm:"created not null" json:"created" readOnly:"true" doc:"A timestamp when this filter was created. You cannot change this value."`
 	// A timestamp when this filter was last updated. You cannot change this value.
@@ -66,6 +69,11 @@ func (sf *SavedFilter) getTaskCollection() *TaskCollection {
 	// We're resetting the projectID to return tasks from all projects
 	sf.Filters.ProjectID = 0
 	return sf.Filters
+}
+
+// The owner's admin flag is re-read, so a demoted admin's filter falls back to their own projects.
+func (sf *SavedFilter) seesAllProjects(s *xorm.Session) bool {
+	return sf.AllProjects && isInstanceAdmin(s, &user.User{ID: sf.OwnerID})
 }
 
 // GetSavedFilterIDFromProjectID returns the saved filter ID from a project ID. Will not check if the filter actually exists.
@@ -135,6 +143,7 @@ func (sf *SavedFilter) Create(s *xorm.Session, auth web.Auth) (err error) {
 
 	sf.OwnerID = auth.GetID()
 	sf.ID = 0
+	sf.AllProjects = sf.AllProjects && isInstanceAdmin(s, auth)
 	_, err = s.Insert(sf)
 	if err != nil {
 		return
@@ -196,13 +205,14 @@ func (sf *SavedFilter) ReadAll(_ *xorm.Session, _ web.Auth, _ string, _ int, _ i
 // @Failure 404 {object} web.HTTPError "The saved filter does not exist."
 // @Failure 500 {object} models.Message "Internal error"
 // @Router /filters/{id} [post]
-func (sf *SavedFilter) Update(s *xorm.Session, _ web.Auth) error {
+func (sf *SavedFilter) Update(s *xorm.Session, a web.Auth) error {
 	origFilter, err := GetSavedFilterSimpleByID(s, sf.ID)
 	if err != nil {
 		return err
 	}
 
 	sf.OwnerID = origFilter.OwnerID
+	sf.AllProjects = sf.AllProjects && isInstanceAdmin(s, a)
 
 	if sf.Filters == nil {
 		sf.Filters = origFilter.Filters
@@ -220,6 +230,7 @@ func (sf *SavedFilter) Update(s *xorm.Session, _ web.Auth) error {
 			"description",
 			"filters",
 			"is_favorite",
+			"all_projects",
 		).
 		Update(sf)
 	if err != nil {
@@ -575,9 +586,10 @@ func matchTasksToViewsOfFilter(s *xorm.Session, tasks []*Task, filter *SavedFilt
 		return viewsByTask, nil
 	}
 
+	allProjects := filter.seesAllProjects(s)
 	candidateIDs := []int64{}
 	for _, task := range tasks {
-		if accessByProject[task.ProjectID][filter.OwnerID] {
+		if allProjects || accessByProject[task.ProjectID][filter.OwnerID] {
 			candidateIDs = append(candidateIDs, task.ID)
 		}
 	}

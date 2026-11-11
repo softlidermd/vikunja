@@ -24,13 +24,15 @@ export type SavedFilterResponse = Omit<SavedFilterReadBody,
 	'title' |
 	'description' |
 	'filters' |
-	'is_favorite'
+	'is_favorite' |
+	'all_projects'
 > & {
 	id: number
 	title: string
 	description: string
 	filters: EditableTaskCollection
 	is_favorite: boolean
+	all_projects: boolean
 }
 
 // Not a form field. PUT replaces every field, so update callers pass the cached value.
@@ -55,6 +57,7 @@ export function newSavedFilterDraft(): SavedFilterDraft {
 			filter_include_nulls: true,
 			s: '',
 		},
+		all_projects: false,
 	}
 }
 
@@ -81,6 +84,7 @@ function normalizeSavedFilter(filter: SavedFilterReadBody): SavedFilterResponse 
 		description: filter.description ?? '',
 		filters: normalizeSavedFilterCollection(filter.filters),
 		is_favorite: filter.is_favorite ?? false,
+		all_projects: filter.all_projects ?? false,
 	}
 }
 

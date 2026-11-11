@@ -599,7 +599,7 @@ func filteredTasksWithoutBucketInView(s *xorm.Session, viewID int64, sf *SavedFi
 
 	// The filter alone matches tasks across the whole instance, restrict it to
 	// what its owner can actually see.
-	projects, err := getRelevantProjectsFromCollection(s, &user.User{ID: sf.OwnerID}, &TaskCollection{})
+	projects, err := getRelevantProjectsFromCollection(s, &user.User{ID: sf.OwnerID}, &TaskCollection{allProjects: sf.seesAllProjects(s)})
 	if err != nil {
 		return nil, err
 	}

@@ -79,6 +79,7 @@ type Project struct {
 	Views []*ProjectView `xorm:"-" json:"views" readOnly:"true" doc:"The views configured for this project. Managed through the project view endpoints."`
 
 	Expand        ProjectExpandable `xorm:"-" json:"-" query:"expand"`
+	AllProjects   bool              `xorm:"-" json:"-"`
 	MaxPermission *Permission       `xorm:"-" json:"max_permission" readOnly:"true" doc:"The maximum permission the requesting user has on this project (0 = read, 1 = read/write, 2 = admin), or null when the permission was not computed for this response."`
 
 	// A timestamp when this project was created. You cannot change this value.
@@ -213,7 +214,7 @@ var FavoritesPseudoProject = Project{
 // @Failure 500 {object} models.Message "Internal error"
 // @Router /projects [get]
 func (p *Project) ReadAll(s *xorm.Session, a web.Auth, search string, page int, perPage int) (result interface{}, resultCount int, totalItems int64, err error) {
-	prs, resultCount, totalItems, err := getAllRawProjects(s, a, search, page, perPage, p.IsArchived)
+	prs, resultCount, totalItems, err := getAllRawProjects(s, a, search, page, perPage, p.IsArchived, p.AllProjects && isInstanceAdmin(s, a))
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -250,7 +251,7 @@ func (p *Project) ReadAll(s *xorm.Session, a web.Auth, search string, page int, 
 	return prs, resultCount, totalItems, err
 }
 
-func getAllRawProjects(s *xorm.Session, a web.Auth, search string, page int, perPage int, isArchived bool) (projects []*Project, resultCount int, totalItems int64, err error) {
+func getAllRawProjects(s *xorm.Session, a web.Auth, search string, page int, perPage int, isArchived bool, allProjects bool) (projects []*Project, resultCount int, totalItems int64, err error) {
 	// Check if we're dealing with a share auth
 	shareAuth, is := a.(*LinkSharing)
 	if is {
@@ -279,6 +280,7 @@ func getAllRawProjects(s *xorm.Session, a web.Auth, search string, page int, per
 			page:        page,
 			perPage:     perPage,
 			getArchived: isArchived,
+			allProjects: allProjects,
 		})
 	if err != nil {
 		return nil, 0, 0, err
@@ -618,6 +620,8 @@ type projectOptions struct {
 	page        int
 	perPage     int
 	getArchived bool
+	// Every project regardless of access; callers must have checked isInstanceAdmin.
+	allProjects bool
 }
 
 // Matches a comma-separated id list, or title/description/identifier when not numeric.
@@ -638,15 +642,19 @@ func projectSearchCond(search string) builder.Cond {
 }
 
 func getAllProjectsForUser(s *xorm.Session, userID int64, opts *projectOptions) (projects []*Project, totalCount int64, err error) {
-	access, err := getProjectAccessForUser(s, userID)
-	if err != nil {
-		return nil, 0, err
-	}
-	if len(access.permissions) == 0 {
-		return nil, 0, nil
+	conds := []builder.Cond{}
+	// shortcut: with allProjects, the project-id IN list callers build grows with every project; switch callers to a subquery if an instance passes ~30k projects.
+	if !opts.allProjects {
+		access, err := getProjectAccessForUser(s, userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(access.permissions) == 0 {
+			return nil, 0, nil
+		}
+		conds = append(conds, access.cond("id"))
 	}
 
-	conds := []builder.Cond{access.cond("id")}
 	if !opts.getArchived {
 		conds = append(conds, builder.Eq{"is_archived": false})
 	}
@@ -852,6 +860,8 @@ func addProjectDetails(s *xorm.Session, projects []*Project, a web.Auth) (err er
 }
 
 func addMaxPermissionToProjects(s *xorm.Session, projects []*Project, u *user.User) (err error) {
+	// Matches the instance-admin bypass in the project Can* methods.
+	isAdmin := isInstanceAdmin(s, u)
 	projectIDs := make([]int64, 0, len(projects))
 	for _, project := range projects {
 		// No row to look up; must agree with checkReadPermissionsForProjects.
@@ -859,7 +869,7 @@ func addMaxPermissionToProjects(s *xorm.Session, projects []*Project, u *user.Us
 			project.MaxPermission = Ptr(PermissionRead)
 			continue
 		}
-		if GetSavedFilterIDFromProjectID(project.ID) > 0 {
+		if isAdmin || GetSavedFilterIDFromProjectID(project.ID) > 0 {
 			project.MaxPermission = Ptr(PermissionAdmin)
 			continue
 		}
