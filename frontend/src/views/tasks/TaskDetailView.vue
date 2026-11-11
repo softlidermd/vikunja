@@ -119,6 +119,26 @@
 							appear
 						>
 							<div
+								v-if="activeFields.size"
+								class="column"
+							>
+								<div class="detail-title">
+									<Icon icon="ruler-horizontal" />
+									{{ $t('task.attributes.size') }}
+								</div>
+								<SizeSelect
+									:ref="e => setFieldRef('size', e)"
+									v-model="task.size"
+									:disabled="!canWrite"
+									@update:modelValue="setSize"
+								/>
+							</div>
+						</CustomTransition>
+						<CustomTransition
+							name="flash-background"
+							appear
+						>
+							<div
 								v-if="activeFields.dueDate"
 								class="column"
 							>
@@ -489,6 +509,13 @@
 						</XButton>
 						<XButton
 							variant="secondary"
+							icon="ruler-horizontal"
+							@click="setFieldActive('size')"
+						>
+							{{ $t('task.detail.actions.size') }}
+						</XButton>
+						<XButton
+							variant="secondary"
 							icon="percent"
 							@click="setFieldActive('percentDone')"
 						>
@@ -687,6 +714,8 @@ import Heading from '@/components/tasks/partials/Heading.vue'
 import ProjectSearch from '@/components/tasks/partials/ProjectSearch.vue'
 import PercentDoneSelect from '@/components/tasks/partials/PercentDoneSelect.vue'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
+import SizeSelect from '@/components/tasks/partials/SizeSelect.vue'
+import type {TaskSize} from '@/constants/taskSizes'
 import RelatedTasks from '@/components/tasks/partials/RelatedTasks.vue'
 import Reminders from '@/components/tasks/partials/Reminders.vue'
 import RepeatAfter from '@/components/tasks/partials/RepeatAfter.vue'
@@ -770,10 +799,11 @@ const task = ref(createTaskDraft())
 
 // Only fields edited here stay local; the rest follows the cache.
 function followServerFields(loaded: ITask) {
-	const {priority, percent_done, due_date, start_date, end_date, reminders, repeat_after, repeat_mode} = task.value
+	const {priority, size, percent_done, due_date, start_date, end_date, reminders, repeat_after, repeat_mode} = task.value
 	task.value = {
 		...createTaskDraft(klona(loaded)),
 		priority,
+		size,
 		percent_done,
 		due_date,
 		start_date,
@@ -991,6 +1021,7 @@ type FieldType =
 	| 'relatedTasks'
 	| 'reminders'
 	| 'repeatAfter'
+	| 'size'
 	| 'startDate'
 	| 'timeTracking'
 
@@ -1007,6 +1038,7 @@ const activeFields: { [type in FieldType]: boolean } = reactive({
 	relatedTasks: false,
 	reminders: false,
 	repeatAfter: false,
+	size: false,
 	startDate: false,
 	timeTracking: false,
 })
@@ -1025,6 +1057,7 @@ function setActiveFields() {
 	activeFields.reminders = (task.value.reminders?.length ?? 0) > 0
 	activeFields.repeatAfter = (task.value.repeat_after ?? 0) > 0
 		|| task.value.repeat_mode !== TASK_REPEAT_MODES.REPEAT_MODE_DEFAULT
+	activeFields.size = task.value.size !== 0
 	activeFields.startDate = Boolean(parseDateOrNull(task.value.start_date))
 }
 
@@ -1070,6 +1103,7 @@ const activeFieldElements: { [id in FieldType]: HTMLElement | null } = reactive(
 	relatedTasks: null,
 	reminders: null,
 	repeatAfter: null,
+	size: null,
 	startDate: null,
 	timeTracking: null,
 })
@@ -1229,6 +1263,15 @@ async function setPriority(priority: number) {
 	const newTask: ITask = {
 		...task.value,
 		priority,
+	}
+
+	return saveTask(newTask)
+}
+
+async function setSize(size: TaskSize) {
+	const newTask: ITask = {
+		...task.value,
+		size,
 	}
 
 	return saveTask(newTask)

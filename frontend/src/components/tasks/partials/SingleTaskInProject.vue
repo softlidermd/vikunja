@@ -85,6 +85,14 @@
 					:inline="true"
 				/>
 
+				<span
+					v-if="task.size"
+					class="tag mis-1"
+					:title="$t('task.attributes.size')"
+				>
+					{{ $t(taskSizeLabelKey(task.size)) }}
+				</span>
+
 				<Popup
 					v-if="task.due_date && +new Date(task.due_date) > 0"
 					placement="bottom-start"
@@ -226,6 +234,7 @@ import {getHexColor} from '@/helpers/task'
 import type {Task as ITask} from '@/client/generated'
 
 import PriorityLabel from '@/components/tasks/partials/PriorityLabel.vue'
+import {taskSizeLabelKey} from '@/constants/taskSizes'
 import Labels from '@/components/tasks/partials/Labels.vue'
 import TaskGlanceTooltip from '@/components/tasks/partials/TaskGlanceTooltip.vue'
 import TaskQuickActions from '@/components/tasks/partials/TaskQuickActions.vue'

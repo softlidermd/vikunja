@@ -53,6 +53,7 @@ const writableFields = [
 	'start_date',
 	'end_date',
 	'priority',
+	'size',
 	'hex_color',
 	'percent_done',
 	'repeat_after',

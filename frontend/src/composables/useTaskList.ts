@@ -25,6 +25,7 @@ export interface SortBy {
 	done?: Order
 	title?: Order
 	priority?: Order
+	size?: Order
 	due_date?: Order
 	start_date?: Order
 	end_date?: Order
@@ -36,7 +37,7 @@ export interface SortBy {
 }
 
 const VALID_SORT_FIELDS = new Set<string>(
-	['id', 'index', 'done', 'title', 'priority', 'due_date', 'start_date',
+	['id', 'index', 'done', 'title', 'priority', 'size', 'due_date', 'start_date',
 		'end_date', 'percent_done', 'created', 'updated', 'done_at', 'position'],
 )
 

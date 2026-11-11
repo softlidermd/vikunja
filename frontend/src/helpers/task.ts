@@ -13,6 +13,7 @@ export function createTaskDraft(data: Partial<Task> = {}) {
 		description: data.description ?? '',
 		done: data.done ?? false,
 		priority: data.priority ?? 0,
+		size: data.size ?? 0,
 		labels: data.labels ?? [],
 		assignees: data.assignees ?? [],
 		reminders: data.reminders ?? [],

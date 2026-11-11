@@ -373,6 +373,11 @@ describe('task mutations', () => {
 		})
 	})
 
+	it('sends the size, including a cleared one', () => {
+		expect(taskWriteBody({size: 8})).toEqual({size: 8})
+		expect(taskWriteBody({size: 0})).toEqual({size: 0})
+	})
+
 	it('leaves boards without the completed task untouched and unfetched', async () => {
 		const {projectKeys} = await import('./projects')
 		const client = new QueryClient()

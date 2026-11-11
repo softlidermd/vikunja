@@ -1405,6 +1405,45 @@ test.describe('Task', () => {
 			await expect(page.locator('.task-view .columns.details .column').filter({hasText: 'Priority'}).locator('.select select')).toHaveValue('4')
 		})
 
+		test('Can set a size for a task and see it in the table and on the card', async ({authenticatedPage: page, apiContext, userToken}) => {
+			const [task] = await TaskFactory.create(1, {
+				id: 1,
+				project_id: projects[0].id,
+			}) as Task[]
+			await TaskBucketFactory.create(1, {
+				task_id: task.id,
+				bucket_id: buckets[0].id,
+				project_view_id: buckets[0].project_view_id,
+			})
+			await page.goto(`/tasks/${task.id}`)
+
+			await page.locator('.task-view .action-buttons .button').filter({hasText: 'Set Effort'}).click()
+			const sizeSelect = page.locator('.task-view .columns.details .column').filter({hasText: 'Effort'}).locator('.select select')
+			await sizeSelect.selectOption('1 day')
+			await expect(page.locator('.global-notification')).toContainText('Success')
+
+			await page.reload()
+			await expect(sizeSelect).toHaveValue('8')
+			const stored = await apiContext.get(`tasks/${task.id}`, {
+				headers: {Authorization: `Bearer ${userToken}`},
+			})
+			expect(stored.ok()).toBe(true)
+			expect((await stored.json()).size).toBe(8)
+
+			await page.goto(`/projects/${projects[0].id}/3`)
+			const columns = page.getByRole('button', {
+				name: 'Columns',
+				exact: true,
+			})
+			await columns.click()
+			await page.locator('.columns-filter').getByText('Effort', {exact: true}).click()
+			await columns.click()
+			await expect(page.locator('.project-table tbody td select[aria-label="Effort"] option:checked')).toHaveText('1 day')
+
+			await page.goto(`/projects/${projects[0].id}/4`)
+			await expect(page.locator('.kanban .bucket .tasks .task .footer .tag')).toHaveText('1 day')
+		})
+
 		test('Can set the progress for a task', async ({authenticatedPage: page}) => {
 			const tasks = await TaskFactory.create(1, {
 				id: 1,

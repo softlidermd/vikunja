@@ -7,6 +7,7 @@ import {createPinia} from 'pinia'
 import type {Task} from '@/client/generated'
 import {removeToken} from '@/helpers/auth'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
+import SizeSelect from '@/components/tasks/partials/SizeSelect.vue'
 import EditLabels from '@/components/tasks/partials/EditLabels.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 
@@ -172,6 +173,26 @@ describe('ProjectTable inline saves', () => {
 		// A label still being created in the first picker must not be added to task 2.
 		expect(firstPicker.props('taskId')).toBe(1)
 		expect(wrapper.findComponent(EditLabels).props('taskId')).toBe(2)
+	})
+
+	it('saves the size picked in the size column', async () => {
+		localStorage.setItem('tableViewColumns', JSON.stringify({
+			size: true,
+		}))
+		const wrapper = await mountTable()
+		const resolve = deferPatch()
+
+		wrapper.findComponent(SizeSelect).vm.$emit('update:modelValue', 8)
+		await flushPromises()
+		resolve()
+		await flushPromises()
+
+		expect(sdk.patchTasksRead.mock.calls[0]![0].body).toEqual([{
+			op: 'add',
+			path: '/size',
+			value: 8,
+		}])
+		expect(wrapper.findComponent(SizeSelect).props('modelValue')).toBe(8)
 	})
 
 	it('drops a queued save once the user logged out', async () => {

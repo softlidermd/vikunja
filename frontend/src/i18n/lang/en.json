@@ -731,6 +731,7 @@
         "fields": {
           "done": "Whether the task is completed or not",
           "priority": "The priority level of the task (1-5)",
+          "size": "The estimated effort in hours: 0 (not estimated), 1, 4, 8, 20, 40, or 999 (long-running)",
           "percentDone": "The percentage of completion for the task (0-100)",
           "dueDate": "The due date of the task",
           "startDate": "The start date of the task",
@@ -1192,6 +1193,7 @@
         "assign": "Assign to User",
         "label": "Add Labels",
         "priority": "Set Priority",
+        "size": "Set Effort",
         "dueDate": "Set Due Date",
         "startDate": "Set Start Date",
         "endDate": "Set End Date",
@@ -1232,7 +1234,8 @@
       "title": "Title",
       "updated": "Updated",
       "doneAt": "Done At",
-      "status": "Status"
+      "status": "Status",
+      "size": "Effort"
     },
     "subscription": {
       "subscribedTaskThroughProject": "You are subscribed to this task through its project. Unsubscribing here only stops notifications for this task.",
@@ -1325,6 +1328,15 @@
       "high": "High",
       "urgent": "Urgent",
       "doNow": "DO NOW"
+    },
+    "size": {
+      "unset": "Not estimated",
+      "hour": "≤ 1 h",
+      "halfDay": "Half a day",
+      "day": "1 day",
+      "days": "2–3 days",
+      "week": "1 week",
+      "long": "Long-running"
     },
     "relation": {
       "add": "Add a New Task Relation",

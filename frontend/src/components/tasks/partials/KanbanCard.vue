@@ -84,6 +84,13 @@
 					class="is-inline-flex is-align-items-center"
 				/>
 				<span
+					v-if="task.size"
+					class="tag"
+					:title="$t('task.attributes.size')"
+				>
+					{{ $t(taskSizeLabelKey(task.size)) }}
+				</span>
+				<span
 					v-if="task.attachments.length > 0"
 					class="icon"
 					role="img"
@@ -128,6 +135,7 @@ import {useRouter} from 'vue-router'
 import {useGlobalNow} from '@/composables/useGlobalNow'
 
 import PriorityLabel from '@/components/tasks/partials/PriorityLabel.vue'
+import {taskSizeLabelKey} from '@/constants/taskSizes'
 import ProgressBar from '@/components/misc/ProgressBar.vue'
 import Done from '@/components/misc/Done.vue'
 import Labels from '@/components/tasks/partials/Labels.vue'

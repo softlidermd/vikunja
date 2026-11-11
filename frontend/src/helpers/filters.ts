@@ -52,6 +52,7 @@ export const AVAILABLE_FILTER_FIELDS = [
 	...PROJECT_FIELDS,
 	'done',
 	'priority',
+	'size',
 	'percentDone',
 	'bucketId',
 ]

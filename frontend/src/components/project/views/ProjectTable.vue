@@ -48,6 +48,9 @@
 							<FancyCheckbox v-model="activeColumns.priority">
 								{{ $t('task.attributes.priority') }}
 							</FancyCheckbox>
+							<FancyCheckbox v-model="activeColumns.size">
+								{{ $t('task.attributes.size') }}
+							</FancyCheckbox>
 							<FancyCheckbox v-model="activeColumns.labels">
 								{{ $t('task.attributes.labels') }}
 							</FancyCheckbox>
@@ -162,6 +165,17 @@
 											:order="sortBy.priority"
 											:label="$t('task.attributes.priority')"
 											@click="sort('priority', $event)"
+										/>
+									</th>
+									<th
+										v-if="activeColumns.size"
+										:aria-sort="ariaSort('size')"
+									>
+										{{ $t('task.attributes.size') }}
+										<Sort
+											:order="sortBy.size"
+											:label="$t('task.attributes.size')"
+											@click="sort('size', $event)"
 										/>
 									</th>
 									<th v-if="activeColumns.labels">
@@ -318,6 +332,17 @@
 											:priority="t.priority"
 											:show-all="true"
 										/>
+									</td>
+									<td v-if="activeColumns.size">
+										<SizeSelect
+											v-if="canWriteTask(t)"
+											class="is-small"
+											:model-value="t.size"
+											@update:modelValue="s => saveTask(t, {size: s})"
+										/>
+										<template v-else>
+											{{ $t(taskSizeLabelKey(t.size)) }}
+										</template>
 									</td>
 									<td v-if="activeColumns.labels">
 										<BaseButton
@@ -508,6 +533,7 @@ import FilterPopup from '@/components/project/partials/FilterPopup.vue'
 import Pagination from '@/components/misc/Pagination.vue'
 import Popup from '@/components/misc/Popup.vue'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
+import SizeSelect from '@/components/tasks/partials/SizeSelect.vue'
 import EditAssignees from '@/components/tasks/partials/EditAssignees.vue'
 import EditLabels from '@/components/tasks/partials/EditLabels.vue'
 import Datepicker from '@/components/input/Datepicker.vue'
@@ -524,6 +550,7 @@ import AddTask from '@/components/tasks/AddTask.vue'
 import {useCurrentProject} from '@/composables/useCurrentProject'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
 import {PRIORITIES} from '@/constants/priorities'
+import {taskSizeLabelKey} from '@/constants/taskSizes'
 import {getTaskIdentifier} from '@/helpers/task'
 import { camelCase } from 'change-case'
 import {isSavedFilterProject} from '@/client/queries/projects'
@@ -574,6 +601,7 @@ const ACTIVE_COLUMNS_DEFAULT = {
 	title: true,
 	status: true,
 	priority: false,
+	size: false,
 	labels: true,
 	assignees: true,
 	dueDate: true,
