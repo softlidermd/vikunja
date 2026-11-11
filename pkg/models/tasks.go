@@ -1459,7 +1459,7 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 		for _, view := range views {
 			var bucketID = view.DoneBucketID
 			if bucketID == 0 || !t.Done {
-				bucketID, err = getDefaultBucketID(s, view)
+				bucketID, err = plannedBucketID(s, view, 0)
 				if err != nil {
 					return err
 				}
@@ -1497,7 +1497,7 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	}
 
 	// Repeating tasks don't stay in the done bucket — route them back
-	// to the default bucket so the next iteration shows up in the
+	// to the planned bucket so the next iteration shows up in the
 	// "To-Do" column. See #2573.
 	if t.ProjectID == ot.ProjectID && t.isRepeating() && !ot.Done && t.Done {
 		err = t.moveTaskToDefaultBuckets(s, a, views)
@@ -1734,9 +1734,9 @@ func (t *Task) moveTaskToDoneBuckets(s *xorm.Session, a web.Auth, views []*Proje
 			bucketID = view.DoneBucketID
 		}
 
-		// Task not done, currently in done bucket? Move to default
+		// Task not done, currently in done bucket? Move to the planned bucket
 		if !t.Done && bucketID == view.DoneBucketID {
-			bucketID, err = getDefaultBucketID(s, view)
+			bucketID, err = plannedBucketID(s, view, 0)
 			if err != nil {
 				return err
 			}
@@ -1770,14 +1770,18 @@ func (t *Task) moveTaskToDoneBuckets(s *xorm.Session, a web.Auth, views []*Proje
 // every provided view. It's the counterpart to moveTaskToDoneBuckets
 // and is used when a repeating task is marked done: repeating tasks
 // don't stay in the done bucket, so they should be routed back to
-// the default ("To-Do") bucket so the next iteration is visible there.
+// the planned bucket (normally "To-Do") so the next iteration is visible there.
 // When no explicit default bucket is configured, the task stays in its
 // current bucket — no update needed.
 func (t *Task) moveTaskToDefaultBuckets(s *xorm.Session, a web.Auth, views []*ProjectView) error {
 	for _, view := range views {
 		if view.DefaultBucketID != 0 {
+			plannedID, err := plannedBucketID(s, view, 0)
+			if err != nil {
+				return err
+			}
 			tb := &TaskBucket{
-				BucketID:      view.DefaultBucketID,
+				BucketID:      plannedID,
 				TaskID:        t.ID,
 				ProjectViewID: view.ID,
 				ProjectID:     t.ProjectID,

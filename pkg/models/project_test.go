@@ -123,7 +123,7 @@ func TestProject_CreateOrUpdate(t *testing.T) {
 				"permission": PermissionAdmin,
 			}, false)
 		})
-		t.Run("kanban view creates To-Do, doing, done buckets", func(t *testing.T) {
+		t.Run("kanban view creates Idea, To-Do, doing, done buckets", func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)
 			s := db.NewSession()
 			defer s.Close()
@@ -141,26 +141,29 @@ func TestProject_CreateOrUpdate(t *testing.T) {
 			_, err = s.Where("project_id = ? AND view_kind = ?", project.ID, ProjectViewKindKanban).Get(kanbanView)
 			require.NoError(t, err)
 
-			// Check that three buckets were created
+			// Check that four buckets were created
 			var bucketCount int64
 			bucketCount, err = s.Where("project_view_id = ?", kanbanView.ID).Count(&Bucket{})
 			require.NoError(t, err)
-			assert.Equal(t, int64(3), bucketCount, "Should have created three buckets")
+			assert.Equal(t, int64(4), bucketCount, "Should have created four buckets")
 
 			// Check that the buckets are named correctly
 			var buckets []*Bucket
 			err = s.Where("project_view_id = ?", kanbanView.ID).OrderBy("position ASC").Find(&buckets)
 			require.NoError(t, err)
-			require.Len(t, buckets, 3, "Should have three buckets")
-			assert.Equal(t, "To-Do", buckets[0].Title)
-			assert.Equal(t, "Doing", buckets[1].Title)
-			assert.Equal(t, "Done", buckets[2].Title)
+			require.Len(t, buckets, 4, "Should have four buckets")
+			assert.Equal(t, "Idea", buckets[0].Title)
+			assert.Equal(t, "To-Do", buckets[1].Title)
+			assert.Equal(t, "Doing", buckets[2].Title)
+			assert.Equal(t, "Done", buckets[3].Title)
+			assert.InDelta(t, 50, buckets[0].Position, 0)
+			assert.InDelta(t, 100, buckets[1].Position, 0)
 
-			// Check that Backlog is the default bucket
-			assert.Equal(t, buckets[0].ID, kanbanView.DefaultBucketID, "To-Do should be the default bucket")
+			// Check that Idea is the default bucket
+			assert.Equal(t, buckets[0].ID, kanbanView.DefaultBucketID, "Idea should be the default bucket")
 
 			// Check that Done is the done bucket
-			assert.Equal(t, buckets[2].ID, kanbanView.DoneBucketID, "Done should be the done bucket")
+			assert.Equal(t, buckets[3].ID, kanbanView.DoneBucketID, "Done should be the done bucket")
 		})
 		t.Run("nonexistent parent", func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)

@@ -458,6 +458,16 @@ func createProjectView(s *xorm.Session, p *ProjectView, a web.Auth, createBacklo
 }
 
 func createDefaultKanbanBuckets(s *xorm.Session, a web.Auth, p *ProjectView, addExistingTasksToView bool) (err error) {
+	idea := &Bucket{
+		ProjectViewID: p.ID,
+		Title:         "Idea",
+		Position:      50,
+	}
+	err = idea.Create(s, a)
+	if err != nil {
+		return
+	}
+
 	backlog := &Bucket{
 		ProjectViewID: p.ID,
 		Title:         "To-Do",
@@ -488,13 +498,18 @@ func createDefaultKanbanBuckets(s *xorm.Session, a web.Auth, p *ProjectView, add
 		return
 	}
 
+	// Saved-filter boards keep To-Do as default, so unmatched tasks don't land in Idea.
 	p.DefaultBucketID = backlog.ID
+	if p.ProjectID > 0 {
+		p.DefaultBucketID = idea.ID
+	}
 	p.DoneBucketID = done.ID
 	_, err = s.ID(p.ID).Cols("default_bucket_id", "done_bucket_id").Update(p)
 	if err != nil {
 		return
 	}
 
+	// Tasks that exist before the board are planned work, not ideas.
 	if addExistingTasksToView {
 		_, err = addTasksToView(s, p, backlog.ID)
 		if err != nil {
@@ -723,7 +738,11 @@ func syncManualKanbanBuckets(s *xorm.Session, a web.Auth, pv, oldView *ProjectVi
 	}
 
 	// Tasks created while the view was not a kanban view are not in any bucket yet
-	added, err := addTasksToView(s, pv, pv.DefaultBucketID)
+	plannedID, err := plannedBucketID(s, pv, 0)
+	if err != nil {
+		return err
+	}
+	added, err := addTasksToView(s, pv, plannedID)
 	if err != nil || added == 0 {
 		return err
 	}

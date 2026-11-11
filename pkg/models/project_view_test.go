@@ -53,20 +53,21 @@ func TestProjectView_Update(t *testing.T) {
 		buckets := []*Bucket{}
 		err = s2.Where("project_view_id = ?", view.ID).OrderBy("position asc").Find(&buckets)
 		require.NoError(t, err)
-		require.Len(t, buckets, 3)
+		require.Len(t, buckets, 4)
 
-		assert.Equal(t, "To-Do", buckets[0].Title)
-		assert.Equal(t, "Doing", buckets[1].Title)
-		assert.Equal(t, "Done", buckets[2].Title)
+		assert.Equal(t, "Idea", buckets[0].Title)
+		assert.Equal(t, "To-Do", buckets[1].Title)
+		assert.Equal(t, "Doing", buckets[2].Title)
+		assert.Equal(t, "Done", buckets[3].Title)
 
 		assert.Equal(t, buckets[0].ID, view.DefaultBucketID)
-		assert.Equal(t, buckets[2].ID, view.DoneBucketID)
+		assert.Equal(t, buckets[3].ID, view.DoneBucketID)
 		db.AssertExists(t, "project_views", map[string]interface{}{
 			"id":                        1,
 			"view_kind":                 ProjectViewKindKanban,
 			"bucket_configuration_mode": BucketConfigurationModeManual,
 			"default_bucket_id":         buckets[0].ID,
-			"done_bucket_id":            buckets[2].ID,
+			"done_bucket_id":            buckets[3].ID,
 		}, false)
 
 		taskCount, err := s2.Where("project_id = ?", view.ProjectID).Count(&Task{})
@@ -77,8 +78,9 @@ func TestProjectView_Update(t *testing.T) {
 		err = s2.Where("project_view_id = ?", view.ID).Find(&taskBuckets)
 		require.NoError(t, err)
 		assert.Len(t, taskBuckets, int(taskCount))
+		// Existing tasks are planned work: To-Do, not the Idea default.
 		for _, tb := range taskBuckets {
-			assert.Equal(t, buckets[0].ID, tb.BucketID)
+			assert.Equal(t, buckets[1].ID, tb.BucketID)
 		}
 	})
 
@@ -583,9 +585,10 @@ func TestProjectView_Create(t *testing.T) {
 		buckets := []*Bucket{}
 		err = s2.Where("project_view_id = ?", view.ID).OrderBy("position asc").Find(&buckets)
 		require.NoError(t, err)
-		require.Len(t, buckets, 3)
+		require.Len(t, buckets, 4)
+		assert.Equal(t, "Idea", buckets[0].Title)
 		assert.Equal(t, buckets[0].ID, view.DefaultBucketID)
-		assert.Equal(t, buckets[2].ID, view.DoneBucketID)
+		assert.Equal(t, buckets[3].ID, view.DoneBucketID)
 	})
 
 	t.Run("bucket ids of another view are discarded", func(t *testing.T) {

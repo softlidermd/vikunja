@@ -404,3 +404,27 @@ func TestSavedFilterMirror_T14_NoOpDropDispatchesNoEvent(t *testing.T) {
 	assert.Nil(t, tb.Task)
 	assert.Zero(t, events.CountDispatchedEvents((&TaskUpdatedEvent{}).Name()))
 }
+
+func TestSavedFilterMirror_B5_NewProjectIdeaColumn(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+	u := &user.User{ID: 1}
+
+	project, _, _ := newIdeaBoard(t, s, u)
+	// Filter rows are backfilled when the filter is created; later tasks arrive via the async listener.
+	id := newBoardTask(t, s, u, project.ID, &Task{})
+	view, todoID := createMirrorFilter(t, s, u, "project = "+strconv.FormatInt(project.ID, 10))
+
+	// A new filter board has an Idea column, but keeps To-Do as its default.
+	buckets := []*Bucket{}
+	require.NoError(t, s.Where("project_view_id = ?", view.ID).OrderBy("position asc, id asc").Find(&buckets))
+	require.Len(t, buckets, 4)
+	assert.Equal(t, "Idea", buckets[0].Title)
+	assert.Equal(t, "To-Do", buckets[1].Title)
+	assert.Equal(t, buckets[1].ID, todoID)
+
+	board := readMirrorBoard(t, s, u, view)
+	assert.Equal(t, []int64{id}, mirrorTaskIDs(board[buckets[0].ID]))
+	assert.Empty(t, mirrorTaskIDs(board[todoID]))
+}

@@ -82,6 +82,7 @@ func getBucketByID(s *xorm.Session, id int64) (b *Bucket, err error) {
 	return
 }
 
+// Creation only; reroutes use plannedBucketID.
 func getDefaultBucketID(s *xorm.Session, view *ProjectView) (bucketID int64, err error) {
 	if view.DefaultBucketID != 0 {
 		return view.DefaultBucketID, nil
@@ -97,6 +98,43 @@ func getDefaultBucketID(s *xorm.Session, view *ProjectView) (bucketID int64, err
 	}
 
 	return bucket.ID, nil
+}
+
+// plannedBucketID returns where an automatic non-creation reroute (repeat, reopen, project move,
+// bucket delete, view switch) puts a task: the effective default, unless that is an Idea column,
+// then the first other bucket that is neither done nor Idea. skipBucketID is treated as gone.
+func plannedBucketID(s *xorm.Session, view *ProjectView, skipBucketID int64) (int64, error) {
+	buckets := []*Bucket{}
+	err := s.
+		Where("project_view_id = ? AND id != ?", view.ID, skipBucketID).
+		OrderBy("position asc, id asc").
+		Cols("id", "title").
+		Find(&buckets)
+	if err != nil {
+		return 0, err
+	}
+
+	defaultID := view.DefaultBucketID
+	if (defaultID == 0 || defaultID == skipBucketID) && len(buckets) > 0 {
+		defaultID = buckets[0].ID
+	}
+
+	defaultIsIdea := false
+	for _, b := range buckets {
+		if b.ID == defaultID {
+			defaultIsIdea = normalizeBucketTitle(b.Title) == "idea"
+		}
+	}
+	if !defaultIsIdea {
+		return defaultID, nil
+	}
+
+	for _, b := range buckets {
+		if b.ID != defaultID && b.ID != view.DoneBucketID && normalizeBucketTitle(b.Title) != "idea" {
+			return b.ID, nil
+		}
+	}
+	return defaultID, nil
 }
 
 // ReadAll returns all manual buckets for a certain project
@@ -406,16 +444,16 @@ func (b *Bucket) Delete(s *xorm.Session, a web.Auth) (err error) {
 		}
 	}
 
-	defaultBucketID, err := getDefaultBucketID(s, pv)
+	plannedID, err := plannedBucketID(s, pv, b.ID)
 	if err != nil {
 		return err
 	}
 
-	// Remove all associations of tasks to that bucket
+	// Move all tasks of that bucket to the planned bucket
 	_, err = s.
 		Where("bucket_id = ?", b.ID).
 		Cols("bucket_id").
-		Update(&TaskBucket{BucketID: defaultBucketID})
+		Update(&TaskBucket{BucketID: plannedID})
 	if err != nil {
 		return
 	}
