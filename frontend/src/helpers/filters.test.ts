@@ -626,6 +626,13 @@ describe('per-project label titles', () => {
 		expect(forApi('labels in 5, Срочно')).toBe('labels in 5, 7')
 	})
 
+	it('shows a label with an all-digit title by its id, so a save keeps the id', () => {
+		const title = (id: number) => labels.find(label => label.id === id)?.title
+		const shown = transformFilterStringFromApi('labels = 9', title, nullIdToTitleResolver)
+		expect(shown).toBe('labels = 9')
+		expect(forApi(shown)).toBe('labels = 9')
+	})
+
 	it('keeps a single id for a non-strict operator', () => {
 		expect(forApi('labels like Bug')).toBe('labels like 5')
 	})

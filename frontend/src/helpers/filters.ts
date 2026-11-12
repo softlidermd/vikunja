@@ -284,7 +284,11 @@ export function transformFilterStringFromApi(
 	}
 
 	// Transform labels to their titles
-	transformFieldsToTitles(LABEL_FIELDS, labelResolver)
+	// An all-digit title would be read back as an id on save, so keep showing the id.
+	transformFieldsToTitles(LABEL_FIELDS, id => {
+		const title = labelResolver(id)
+		return title && /^\d+$/.test(title) ? null : title
+	})
 
 	// Transform projects to their titles
 	transformFieldsToTitles(PROJECT_FIELDS, projectResolver)

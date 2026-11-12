@@ -157,7 +157,7 @@ const baseStore = useBaseStore()
 const projectList = useProjects()
 const createProjectMutation = useCreateProjectMutation()
 const {currentProject: selectedProject} = useCurrentProject()
-const {filterLabelsByQuery, getLabelIdsByTitle} = useLabels()
+const {labels: allLabels, filterLabelsByQuery} = useLabels()
 const {createNewTask} = useQuickAddTask()
 const authStore = useAuthStore()
 
@@ -468,7 +468,10 @@ function searchTasks() {
 	}
 
 	if (labels.length > 0) {
-		const labelIds = [...new Set(labels.flatMap(title => getLabelIdsByTitle(title) ?? []))]
+		// These are typed titles, never ids, so all-digit titles must still match.
+		const labelIds = [...new Set(labels.flatMap(title => allLabels.value
+			.filter(label => (label.title ?? '').toLowerCase() === title.toLowerCase())
+			.map(label => label.id)))]
 		if (labelIds.length > 0) {
 			filter += 'labels in ' + labelIds.join(', ')
 		}

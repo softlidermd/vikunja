@@ -203,7 +203,7 @@ func runUpdate(ctx context.Context, rt *runtime, id int64, f *updateFlags) (*cli
 	// can't clobber freshly-attached labels.
 	for _, raw := range f.addLabels {
 		title := normalizeLabelTitle(raw)
-		l, err := getOrCreateLabelByTitle(ctx, rt.client, rt.cfg.ProjectID, title)
+		l, err := getOrCreateLabelByTitle(ctx, rt.client, current.ProjectID, title)
 		if err != nil {
 			return nil, err
 		}

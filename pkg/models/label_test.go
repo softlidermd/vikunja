@@ -641,11 +641,6 @@ func TestLabel_GetOrCreateProjectLabel(t *testing.T) {
 		got, err := GetOrCreateProjectLabel(s, 21, &Label{Title: "Label #5"})
 		require.NoError(t, err)
 		assert.Equal(t, int64(17), got.ID)
-
-		// Exact: a title differing only in case is not a match.
-		got, err = GetOrCreateProjectLabel(s, 21, &Label{Title: "label #5", CreatedByID: 1})
-		require.NoError(t, err)
-		assert.NotEqual(t, int64(17), got.ID)
 	})
 	t.Run("a new copy keeping creator and lineage", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)

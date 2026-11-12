@@ -150,8 +150,8 @@ function save() {
 	const transformFilterForApi = (filterInput: ViewFilter): EditableTaskCollection => {
 		if (isUntouched(filterInput)) {
 			return {
-				sort_by: filterInput.sort_by,
-				order_by: filterInput.order_by,
+				sort_by: filterInput.sort_by ?? [],
+				order_by: filterInput.order_by ?? [],
 				filter: filterInput.apiFilter.filter ?? '',
 				filter_include_nulls: filterInput.filter_include_nulls,
 				s: filterInput.apiFilter.s ?? '',
