@@ -24,7 +24,8 @@ import (
 )
 
 // ListLabels paginates GET /labels and returns every label visible to the
-// authenticated user (labels are global per user, not scoped to a project).
+// authenticated user (every label belongs to one project; filter on
+// Label.ProjectID to scope).
 func (c *Client) ListLabels(ctx context.Context, search string) ([]*Label, error) {
 	var all []*Label
 	page := 1

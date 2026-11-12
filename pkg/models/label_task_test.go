@@ -34,6 +34,7 @@ func TestLabelTask_ReadAll(t *testing.T) {
 	label := Label{
 		ID:          4,
 		Title:       "Label #4 - visible via other task",
+		ProjectID:   1,
 		Created:     testCreatedTime,
 		Updated:     testUpdatedTime,
 		CreatedByID: 2,
@@ -206,9 +207,8 @@ func TestLabelTask_Create(t *testing.T) {
 			args: args{
 				a: &user.User{ID: 1},
 			},
-			wantForbidden: true,
-			wantErr:       true,
-			errType:       IsErrLabelDoesNotExist,
+			wantErr: true,
+			errType: IsErrLabelDoesNotExist,
 		},
 		{
 			name: "nonexisting task",
@@ -224,22 +224,8 @@ func TestLabelTask_Create(t *testing.T) {
 			errType:       IsErrTaskDoesNotExist,
 		},
 		{
-			// Label 10 is attached only to task 25 in project 16, a child of the
-			// team-shared project 33. Task 26 lives in project 17, a child of the
-			// team-shared project 34. User 1 has no direct share on either child —
-			// both label access and task write are inherited through the parents.
-			name: "label and task access inherited via parent project",
-			fields: fields{
-				TaskID:  26,
-				LabelID: 10,
-			},
-			args: args{
-				a: &user.User{ID: 1},
-			},
-		},
-		{
-			// Task 1 is writable by user 1, but label 6 is user 13's private
-			// label — write access to the task must not grant label access.
+			// Task 1 is writable by user 1, but label 6 is in user 13's private
+			// project 20 — write access to the task must not grant the label.
 			name: "writable task but inaccessible label",
 			fields: fields{
 				TaskID:  1,
@@ -248,12 +234,25 @@ func TestLabelTask_Create(t *testing.T) {
 			args: args{
 				a: &user.User{ID: 1},
 			},
-			wantForbidden: true,
+			wantErr: true,
+			errType: IsErrUserHasNoAccessToLabel,
 		},
 		{
-			// Label 11 has no label_tasks row, so only the owner branch can
-			// grant this (#3592).
-			name: "bot can attach a never-used label created by its owner",
+			// User 1 owns both projects, but label 14 belongs to project 21.
+			name: "label of another project the user can write",
+			fields: fields{
+				TaskID:  1,
+				LabelID: 14,
+			},
+			args: args{
+				a: &user.User{ID: 1},
+			},
+			wantErr: true,
+			errType: IsErrUserHasNoAccessToLabel,
+		},
+		{
+			// Task 52 and label 11 are both in project 44, where bot 23 is admin.
+			name: "bot can attach a label of its project",
 			fields: fields{
 				TaskID:  52,
 				LabelID: 11,
@@ -263,9 +262,8 @@ func TestLabelTask_Create(t *testing.T) {
 			},
 		},
 		{
-			// Same writable task, but label 6 belongs to user 13 — inheriting the
-			// owner's labels must not widen access to anyone else's.
-			name: "bot cannot attach a label unrelated to its owner",
+			// Same writable task, but label 6 belongs to project 20.
+			name: "bot cannot attach a label of another project",
 			fields: fields{
 				TaskID:  52,
 				LabelID: 6,
@@ -273,11 +271,11 @@ func TestLabelTask_Create(t *testing.T) {
 			args: args{
 				a: &user.User{ID: 23},
 			},
-			wantForbidden: true,
+			wantErr: true,
+			errType: IsErrUserHasNoAccessToLabel,
 		},
 		{
-			// Bot 23 can see label 11 (owned by its owner, user 21), but has no
-			// share on task 1's project, isolating the task-write conjunct.
+			// Bot 23 has no share on task 1's project, isolating the task-write check.
 			name: "bot cannot attach its owner's label to an unwritable task",
 			fields: fields{
 				TaskID:  1,
@@ -289,6 +287,7 @@ func TestLabelTask_Create(t *testing.T) {
 			wantForbidden: true,
 		},
 		{
+			// Label 12 was created by bot 25 and lives in project 44 with task 52.
 			name: "bot can attach a label created by a sibling bot",
 			fields: fields{
 				TaskID:  52,
@@ -492,9 +491,60 @@ func TestLabelTaskUpdatedTimestamps(t *testing.T) {
 	})
 }
 
+// Label 10 is in project 16, a child of team-shared project 33; user 1 can
+// write it only through that parent.
+func TestLabelTask_Create_InheritedProject(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	_, err := s.Where("task_id = ? AND label_id = ?", 25, 10).Delete(&LabelTask{})
+	require.NoError(t, err)
+
+	lt := &LabelTask{TaskID: 25, LabelID: 10}
+	allowed, err := lt.CanCreate(s, &user.User{ID: 1})
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.NoError(t, lt.Create(s, &user.User{ID: 1}))
+	require.NoError(t, s.Commit())
+	db.AssertExists(t, "label_tasks", map[string]interface{}{
+		"task_id":  25,
+		"label_id": 10,
+	}, false)
+}
+
+func TestLabelTaskBulk_Create(t *testing.T) {
+	t.Run("same-project add and remove", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		ltb := &LabelTaskBulk{TaskID: 1, Labels: []*Label{{ID: 1}}}
+		allowed, err := ltb.CanCreate(s, &user.User{ID: 1})
+		require.NoError(t, err)
+		require.True(t, allowed)
+		require.NoError(t, ltb.Create(s, &user.User{ID: 1}))
+		require.NoError(t, s.Commit())
+
+		db.AssertExists(t, "label_tasks", map[string]interface{}{"task_id": 1, "label_id": 1}, false)
+		db.AssertMissing(t, "label_tasks", map[string]interface{}{"task_id": 1, "label_id": 4})
+	})
+	t.Run("label of another project", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// User 1 owns task 1 and project 21, but label 14 belongs to project 21.
+		ltb := &LabelTaskBulk{TaskID: 1, Labels: []*Label{{ID: 4}, {ID: 14}}}
+		err := ltb.Create(s, &user.User{ID: 1})
+		require.Error(t, err)
+		require.True(t, IsErrUserHasNoAccessToLabel(err), "got %#v", err)
+	})
+}
+
 func TestLabelTaskBulk_CreateLinkShare(t *testing.T) {
 	// Link share 2 has write on project 2, so it clears the task check and
-	// reaches the per-label access check. Label 1 is on no task it can see.
+	// reaches the per-label check. Label 1 belongs to project 1.
 	db.LoadAndAssertFixtures(t)
 
 	s := db.NewSession()

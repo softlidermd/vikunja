@@ -3,9 +3,8 @@ import {useQuery} from '@tanstack/vue-query'
 
 import {
 	filterLabelsByQuery as filterLabels,
-	getLabelByExactTitle as findLabelByExactTitle,
-	getLabelsByExactTitles as findLabelsByExactTitles,
 	getLabelById as findLabelById,
+	getLabelIdsByTitle as findLabelIdsByTitle,
 	getLabelsByIds as findLabelsByIds,
 	labelsQuery,
 } from '@/client/queries/labels'
@@ -21,7 +20,6 @@ export function useLabels() {
 		filterLabelsByQuery: (hidden: Label[], value: string) => filterLabels(labels.value, hidden, value),
 		getLabelById: (id: number) => findLabelById(labels.value, id),
 		getLabelsByIds: (ids: number[]) => findLabelsByIds(labels.value, ids),
-		getLabelByExactTitle: (title: string) => findLabelByExactTitle(labels.value, title),
-		getLabelsByExactTitles: (titles: string[]) => findLabelsByExactTitles(labels.value, titles),
+		getLabelIdsByTitle: (title: string) => findLabelIdsByTitle(labels.value, title),
 	}
 }

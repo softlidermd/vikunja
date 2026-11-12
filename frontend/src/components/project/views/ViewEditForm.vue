@@ -36,16 +36,19 @@ const emit = defineEmits<{
 }>()
 
 type ProjectViewFormValue = ProjectViewWritable & Pick<ProjectView, 'id' | 'project_id'>
+// apiFilter is the stored filter and shownText the text built from it: while the text is unchanged, the stored
+// filter is saved verbatim, because re-resolving titles would widen it to every same-title label.
+type ViewFilter = EditableTaskCollection & {apiFilter?: TaskCollection, shownText?: string}
 type LoadedProjectView = Omit<ProjectViewDraft, 'filter' | 'bucket_configuration'> &
 	Pick<ProjectView, 'id' | 'project_id'> & {
-		filter: EditableTaskCollection
-		bucket_configuration: Array<{title: string, filter: EditableTaskCollection}>
+		filter: ViewFilter
+		bucket_configuration: Array<{title: string, filter: ViewFilter}>
 	}
 
-const {isPending, getLabelByExactTitle, getLabelById} = useLabels()
+const {isPending, getLabelIdsByTitle, getLabelById} = useLabels()
 const projectList = useProjects()
 
-const transformFilterFromApi = (filterInput?: TaskCollection): EditableTaskCollection => {
+const transformFilterFromApi = (filterInput?: TaskCollection): ViewFilter => {
 	const filterString = transformFilterStringFromApi(
 		filterInput?.filter ?? '',
 		labelId => getLabelById(labelId)?.title || null,
@@ -75,7 +78,15 @@ const transformFilterFromApi = (filterInput?: TaskCollection): EditableTaskColle
 
 	filter.filter_include_nulls = filterInput?.filter_include_nulls ?? false
 
-	return filter
+	return {
+		...filter,
+		apiFilter: filterInput,
+		shownText: filter.filter,
+	}
+}
+
+function isUntouched(filter: ViewFilter): filter is ViewFilter & {apiFilter: TaskCollection} {
+	return filter.apiFilter !== undefined && filter.filter === filter.shownText
 }
 
 function transformViewFromApi(modelValue: ProjectViewFormValue): LoadedProjectView {
@@ -100,45 +111,28 @@ onBeforeMount(() => {
 		view.value = transformed
 	}
 
-	const initialFilter = transformed.filter.filter
-	const initialBuckets = transformed.bucket_configuration.map(bucket => ({
-		title: bucket.title,
-		filter: bucket.filter.filter,
-	}))
+	const resolveTitles = (filter: ViewFilter): ViewFilter => {
+		if (!isUntouched(filter)) {
+			return filter
+		}
+		const shownText = transformFilterFromApi(filter.apiFilter).filter
+		return {
+			...filter,
+			filter: shownText,
+			shownText,
+		}
+	}
 
 	watch(isPending, pending => {
 		if (pending || !view.value) {
 			return
 		}
 
-		const resolved = transformViewFromApi(props.modelValue)
-		if (view.value.filter.filter === initialFilter) {
-			view.value.filter = {
-				...view.value.filter,
-				filter: resolved.filter.filter,
-			}
-		}
-
-		view.value.bucket_configuration = view.value.bucket_configuration.map((bucket, index) => {
-			const initial = initialBuckets[index]
-			const resolvedBucket = resolved.bucket_configuration[index]
-			if (
-				!initial ||
-				!resolvedBucket ||
-				bucket.title !== initial.title ||
-				bucket.filter.filter !== initial.filter
-			) {
-				return bucket
-			}
-
-			return {
-				...bucket,
-				filter: {
-					...bucket.filter,
-					filter: resolvedBucket.filter.filter,
-				},
-			}
-		})
+		view.value.filter = resolveTitles(view.value.filter)
+		view.value.bucket_configuration = view.value.bucket_configuration.map(bucket => ({
+			...bucket,
+			filter: resolveTitles(bucket.filter),
+		}))
 	}, {immediate: true})
 
 	watch(() => view.value?.view_kind, kind => {
@@ -153,20 +147,30 @@ function save() {
 		return
 	}
 
-	const transformFilterForApi = (filterInput?: EditableTaskCollection): EditableTaskCollection => {
+	const transformFilterForApi = (filterInput: ViewFilter): EditableTaskCollection => {
+		if (isUntouched(filterInput)) {
+			return {
+				sort_by: filterInput.sort_by,
+				order_by: filterInput.order_by,
+				filter: filterInput.apiFilter.filter ?? '',
+				filter_include_nulls: filterInput.filter_include_nulls,
+				s: filterInput.apiFilter.s ?? '',
+			}
+		}
+
 		const filterString = transformFilterStringForApi(
-			filterInput?.filter || '',
-			labelTitle => getLabelByExactTitle(labelTitle)?.id || null,
+			filterInput.filter || '',
+			labelTitle => getLabelIdsByTitle(labelTitle),
 			projectTitle => {
 				const found = projectList.findProjectByExactname(projectTitle)
 				return found?.id || null
 			},
 		)
 		const filter: EditableTaskCollection = {
-			sort_by: filterInput?.sort_by ?? [],
-			order_by: filterInput?.order_by ?? [],
+			sort_by: filterInput.sort_by ?? [],
+			order_by: filterInput.order_by ?? [],
 			filter: '',
-			filter_include_nulls: filterInput?.filter_include_nulls ?? false,
+			filter_include_nulls: filterInput.filter_include_nulls ?? false,
 			s: '',
 		}
 		if (hasFilterQuery(filterString)) {

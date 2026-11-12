@@ -249,14 +249,28 @@ func convertFiltersToDBFilterCondWithAlias(rawFilters []*taskFilter, includeNull
 					comparator = taskFilterComparatorIn
 				}
 
-				innerFilter, err := getFilterCond(&taskFilter{
-					field:      subTableFilterParams.FilterableField,
-					value:      gf.value,
-					comparator: comparator,
-					isNumeric:  gf.isNumeric,
-				}, false)
-				if err != nil {
-					return nil, err
+				var innerFilter builder.Cond
+				if isStrict && subTableFilterParams.FilterableField == "label_id" {
+					// Per-project clones split one label into several ids; stored filters hold one of them.
+					roots := builder.Select("cloned_from_id").From("labels").
+						Where(builder.And(builder.In("id", gf.value), builder.Gt{"cloned_from_id": 0}))
+					family := builder.Select("id").From("labels").Where(builder.Or(
+						builder.In("id", gf.value),
+						builder.And(builder.Gt{"cloned_from_id": 0}, builder.In("cloned_from_id", gf.value)), // 0 never matches roots
+						builder.In("id", roots),
+						builder.In("cloned_from_id", roots),
+					))
+					innerFilter = builder.In("label_id", family)
+				} else {
+					innerFilter, err = getFilterCond(&taskFilter{
+						field:      subTableFilterParams.FilterableField,
+						value:      gf.value,
+						comparator: comparator,
+						isNumeric:  gf.isNumeric,
+					}, false)
+					if err != nil {
+						return nil, err
+					}
 				}
 
 				if combinedInnerCond == nil {

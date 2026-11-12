@@ -169,6 +169,7 @@ func init() {
 		"GetLinkShareByID":                                 reflect.ValueOf(models.GetLinkShareByID),
 		"GetLinkShareFromClaims":                           reflect.ValueOf(models.GetLinkShareFromClaims),
 		"GetLinkSharesByIDs":                               reflect.ValueOf(models.GetLinkSharesByIDs),
+		"GetOrCreateProjectLabel":                          reflect.ValueOf(models.GetOrCreateProjectLabel),
 		"GetPreviewSizeFromString":                         reflect.ValueOf(models.GetPreviewSizeFromString),
 		"GetProjectByShareHash":                            reflect.ValueOf(models.GetProjectByShareHash),
 		"GetProjectSimpleByID":                             reflect.ValueOf(models.GetProjectSimpleByID),
@@ -207,6 +208,7 @@ func init() {
 		"GetUserDataExportStatus":                          reflect.ValueOf(models.GetUserDataExportStatus),
 		"GetUserDirectedWebhookEvents":                     reflect.ValueOf(models.GetUserDirectedWebhookEvents),
 		"GetUserOrLinkShareUser":                           reflect.ValueOf(models.GetUserOrLinkShareUser),
+		"GetWorkload":                                      reflect.ValueOf(models.GetWorkload),
 		"HashAPIToken":                                     reflect.ValueOf(models.HashAPIToken),
 		"HashSessionToken":                                 reflect.ValueOf(models.HashSessionToken),
 		"HashToken":                                        reflect.ValueOf(models.HashToken),
@@ -410,6 +412,7 @@ func init() {
 		"TaskRepeatModeDefault":                            reflect.ValueOf(models.TaskRepeatModeDefault),
 		"TaskRepeatModeFromCurrentDate":                    reflect.ValueOf(models.TaskRepeatModeFromCurrentDate),
 		"TaskRepeatModeMonth":                              reflect.ValueOf(models.TaskRepeatModeMonth),
+		"TaskSizeLong":                                     reflect.ValueOf(models.TaskSizeLong),
 		"UpdateProject":                                    reflect.ValueOf(models.UpdateProject),
 		"UpdateSessionLastActive":                          reflect.ValueOf(models.UpdateSessionLastActive),
 		"UpdateUserAvatarProvider":                         reflect.ValueOf(models.UpdateUserAvatarProvider),
@@ -695,5 +698,9 @@ func init() {
 		"WebhookDeliveryListener":                      reflect.ValueOf((*models.WebhookDeliveryListener)(nil)),
 		"WebhookListener":                              reflect.ValueOf((*models.WebhookListener)(nil)),
 		"WebhookPayload":                               reflect.ValueOf((*models.WebhookPayload)(nil)),
+		"Workload":                                     reflect.ValueOf((*models.Workload)(nil)),
+		"WorkloadPerson":                               reflect.ValueOf((*models.WorkloadPerson)(nil)),
+		"WorkloadTask":                                 reflect.ValueOf((*models.WorkloadTask)(nil)),
+		"WorkloadTotals":                               reflect.ValueOf((*models.WorkloadTotals)(nil)),
 	}
 }

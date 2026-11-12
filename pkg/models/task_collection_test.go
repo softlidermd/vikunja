@@ -85,6 +85,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	label4 := &Label{
 		ID:          4,
 		Title:       "Label #4 - visible via other task",
+		ProjectID:   1,
 		CreatedByID: 2,
 		CreatedBy:   user2,
 		Created:     testCreatedTime,
@@ -93,6 +94,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	label10 := &Label{
 		ID:          10,
 		Title:       "Label #10 - attached in child project only",
+		ProjectID:   16,
 		CreatedByID: 6,
 		CreatedBy:   user6,
 		Created:     testCreatedTime,

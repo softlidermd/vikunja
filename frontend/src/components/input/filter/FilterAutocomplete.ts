@@ -16,6 +16,7 @@ import {
 } from '@/helpers/filters'
 
 import {useLabels} from '@/composables/useLabels'
+import {uniqueLabelsByTitle} from '@/client/queries/labels'
 import {useProjects} from '@/composables/useProjects'
 import {searchProjectUsers, searchUsers} from '@/client/queries/userSearch'
 import type {User as IUser} from '@/client/generated'
@@ -217,7 +218,7 @@ export default Extension.create<FilterAutocompleteOptions>({
 		const fetchSuggestions = async (autocompleteContext: AutocompleteContext, fieldType: AutocompleteField): Promise<SuggestionItem[]> => {
 			try {
 				if (fieldType === 'labels') {
-					return filterLabelsByQuery([], autocompleteContext.search) as SuggestionItem[]
+					return uniqueLabelsByTitle(filterLabelsByQuery([], autocompleteContext.search)) as SuggestionItem[]
 				}
 
 				if (fieldType === 'users') {

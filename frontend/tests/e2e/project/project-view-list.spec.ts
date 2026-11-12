@@ -327,6 +327,42 @@ test.describe('Project View List', () => {
 			await expect(page.locator('.tasks .task')).toContainText('Nothing to pick')
 		})
 
+		test('Creates a quick add label in the project of the task, not reusing the same title elsewhere', async ({
+			authenticatedPage: page,
+			apiContext,
+			userToken,
+		}) => {
+			await createProjects(2)
+			const [otherLabel] = await LabelFactory.create(1, {
+				title: 'новая',
+				project_id: 1,
+			})
+			await page.goto('/projects/2/5')
+			const input = page.locator('.task-add textarea')
+			const list = page.locator('.quick-add-suggestions')
+
+			await input.pressSequentially('Задача с меткой *новая')
+			await expect(list.getByRole('option')).toHaveText(['New label «новая» will be created'])
+			await input.press('Enter')
+			await expect(input).toHaveValue('Задача с меткой *новая ')
+			await input.press('Enter')
+			await expect(page.locator('.tasks .task')).toContainText('Задача с меткой')
+
+			await page.reload()
+			await expect(page.locator('.tasks .task')).toContainText('новая')
+			const response = await apiContext.get('/api/v2/labels', {headers: {Authorization: `Bearer ${userToken}`}})
+			expect(response.ok()).toBe(true)
+			const labels = (await response.json()).items as {id: number, title: string, project_id: number}[]
+			expect(labels.filter(label => label.title === 'новая')).toEqual(expect.arrayContaining([
+				expect.objectContaining({
+					id: otherLabel.id,
+					project_id: 1,
+				}),
+				expect.objectContaining({project_id: 2}),
+			]))
+			expect(labels.filter(label => label.title === 'новая')).toHaveLength(2)
+		})
+
 		test('Shows Me first for assignees and projects for the project prefix', async ({
 			authenticatedPage: page,
 			currentUser,

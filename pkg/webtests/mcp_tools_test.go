@@ -320,10 +320,14 @@ func TestMCP_Tools_ProjectAndLabelLifecycle(t *testing.T) {
 		t.Run(resource, func(t *testing.T) {
 			c := newMCPClient(t, mcpFullToken)
 			var item map[string]any
-			toolResultJSON(t, c.callTool(resource+"_create", map[string]any{
+			create := map[string]any{
 				"title":     "mcp item",
 				"hex_color": "ff8800",
-			}), &item)
+			}
+			if resource == "labels" {
+				create["project_id"] = 1
+			}
+			toolResultJSON(t, c.callTool(resource+"_create", create), &item)
 			id := item["id"]
 			updated := c.callTool(resource+"_update", map[string]any{
 				"id":    id,

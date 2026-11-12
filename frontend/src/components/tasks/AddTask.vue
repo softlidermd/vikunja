@@ -142,17 +142,6 @@ async function addTask() {
 	const createdTasks = new Map<ITask['title'], ITask>()
 	const tasksToCreate = parseSubtasksViaIndention(newTaskTitle.value, authStore.settings.frontend_settings.quick_add_magic_mode)
 
-	// We ensure all labels exist prior to passing them down to the create task method
-	// In the store it will only ever see one task at a time so there's no way to reliably 
-	// check if a new label was created before (because everything happens async).
-	const allLabels = tasksToCreate.map(({title}) => getLabelsFromPrefix(title, authStore.settings.frontend_settings.quick_add_magic_mode) ?? [])
-	const requestedLabels = [...new Set(allLabels.flat())]
-	const {skipped} = await ensureLabelsExist(requestedLabels, context)
-	assertClientRequestContext(context)
-
-	// Skipped labels (e.g. link shares may not create them) don't block task creation; just tell the user.
-	reportSkippedLabels(skipped)
-
 	let currentProjectId = authStore.settings.default_project_id
 	if (typeof router.currentRoute.value.params.projectId !== 'undefined') {
 		currentProjectId = Number(router.currentRoute.value.params.projectId)
@@ -176,6 +165,25 @@ async function addTask() {
 			errorMessage.value = t('project.create.addTitleRequired')
 			return
 		}
+
+		// We ensure all labels exist prior to passing them down to the create task method.
+		// It handles the tasks in parallel, so it can't reliably tell whether another task just created a label.
+		// Labels belong to a project, so ensure them per project, one project after the other.
+		const skipped: string[] = []
+		for (const projectId of new Set(entries.map(entry => entry.project_id))) {
+			// Pseudo projects (saved filters, favorites) can't own labels.
+			if (projectId < 1) {
+				continue
+			}
+			const titles = entries
+				.filter(entry => entry.project_id === projectId)
+				.flatMap(({title}) => getLabelsFromPrefix(title, authStore.settings.frontend_settings.quick_add_magic_mode) ?? [])
+			skipped.push(...(await ensureLabelsExist(projectId, titles, context)).skipped)
+			assertClientRequestContext(context)
+		}
+
+		// Skipped labels (e.g. link shares may not create them) don't block task creation; just tell the user.
+		reportSkippedLabels(skipped)
 
 		// Separate from createdTasks: duplicate lines create two tasks but collapse
 		// into a single map entry.

@@ -134,6 +134,7 @@ import {useCurrentProject} from '@/composables/useCurrentProject'
 import {useQuickAddTask} from '@/composables/useQuickAddTask'
 import {useAuthStore} from '@/stores/auth'
 import {useLabels} from '@/composables/useLabels'
+import {uniqueLabelsByTitle} from '@/client/queries/labels'
 import {useDelayedLoading} from '@/composables/useDelayedLoading'
 
 import {getHistory} from '@/modules/projectHistory'
@@ -156,7 +157,7 @@ const baseStore = useBaseStore()
 const projectList = useProjects()
 const createProjectMutation = useCreateProjectMutation()
 const {currentProject: selectedProject} = useCurrentProject()
-const {filterLabelsByQuery, getLabelsByExactTitles} = useLabels()
+const {filterLabelsByQuery, getLabelIdsByTitle} = useLabels()
 const {createNewTask} = useQuickAddTask()
 const authStore = useAuthStore()
 
@@ -276,10 +277,10 @@ const foundLabels = computed(() => {
 	}
 
 	if (labels.length > 0) {
-		return filterLabelsByQuery([], labels[0])
+		return uniqueLabelsByTitle(filterLabelsByQuery([], labels[0]))
 	}
 
-	return filterLabelsByQuery([], text)
+	return uniqueLabelsByTitle(filterLabelsByQuery([], text))
 })
 
 // FIXME: use fuzzysearch
@@ -467,9 +468,7 @@ function searchTasks() {
 	}
 
 	if (labels.length > 0) {
-		const labelIds = getLabelsByExactTitles(labels)
-			.map(label => label.id)
-			.filter((id): id is number => typeof id === 'number')
+		const labelIds = [...new Set(labels.flatMap(title => getLabelIdsByTitle(title) ?? []))]
 		if (labelIds.length > 0) {
 			filter += 'labels in ' + labelIds.join(', ')
 		}

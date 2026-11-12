@@ -603,3 +603,70 @@ func TestTaskSearchMultipleTermsSubtaskParentMirror(t *testing.T) {
 	assert.Equal(t, 1, ids[sub.ID], "child rides along nested, not as a second root")
 	assert.Len(t, tasks, 2)
 }
+
+// TestLabelFilterFamily checks that strict label filters match the whole lineage
+// family (root 4 -> copies 14, 15, 16; root 5 -> copy 17), without permissions.
+func TestLabelFilterFamily(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	matching := func(t *testing.T, filter string) []int64 {
+		filters, err := getTaskFiltersFromFilterString(filter, "UTC")
+		require.NoError(t, err)
+		cond, err := convertFiltersToDBFilterCond(filters, false)
+		require.NoError(t, err)
+		tasks := []*Task{}
+		require.NoError(t, s.Where(cond).Cols("id").OrderBy("id").Find(&tasks))
+		ids := make([]int64, 0, len(tasks))
+		for _, tsk := range tasks {
+			ids = append(ids, tsk.ID)
+		}
+		return ids
+	}
+	family4 := []int64{1, 2, 35, 36, 40}
+
+	t.Run("root id matches its copies", func(t *testing.T) {
+		assert.Equal(t, family4, matching(t, "labels in 4"))
+		assert.Equal(t, family4, matching(t, "labels = 4"))
+	})
+	t.Run("copy id matches root and siblings", func(t *testing.T) {
+		assert.Equal(t, family4, matching(t, "labels in 14"))
+		assert.Equal(t, family4, matching(t, "labels = 16"))
+	})
+	t.Run("ids from two families", func(t *testing.T) {
+		assert.Equal(t, []int64{1, 2, 34, 35, 36, 40}, matching(t, "labels in 16, 6"))
+	})
+	t.Run("zero matches nothing", func(t *testing.T) {
+		assert.Empty(t, matching(t, "labels = 0"))
+	})
+	t.Run("negations exclude the whole family", func(t *testing.T) {
+		for _, filter := range []string{"labels != 15", "labels not in 4"} {
+			ids := matching(t, filter)
+			assert.Contains(t, ids, int64(3), filter)
+			for _, id := range family4 {
+				assert.NotContains(t, ids, id, filter)
+			}
+		}
+	})
+	t.Run("same title outside the family is not matched", func(t *testing.T) {
+		own := &Label{Title: "Label #6 - private, attached only to private task", ProjectID: 1, CreatedByID: 1}
+		_, err := s.Insert(own)
+		require.NoError(t, err)
+		_, err = s.Insert(&LabelTask{TaskID: 1, LabelID: own.ID})
+		require.NoError(t, err)
+
+		assert.Equal(t, []int64{34}, matching(t, "labels in 6"))
+		assert.Equal(t, []int64{1}, matching(t, fmt.Sprintf("labels in %d", own.ID)))
+	})
+	t.Run("deleted root still matches its copies", func(t *testing.T) {
+		_, err := s.Where("id = ?", 4).Delete(&Label{})
+		require.NoError(t, err)
+		assert.Equal(t, []int64{35, 36, 40}, matching(t, "labels in 4"))
+	})
+	t.Run("deleted copy alone matches nothing", func(t *testing.T) {
+		_, err := s.Where("id = ?", 17).Delete(&Label{})
+		require.NoError(t, err)
+		assert.Empty(t, matching(t, "labels in 17"))
+	})
+}

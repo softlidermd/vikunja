@@ -101,7 +101,12 @@ func (pd *ProjectDuplicate) Create(s *xorm.Session, doer web.Auth) (err error) {
 
 	log.Debugf("Duplicated project %d into new project %d", pd.ProjectID, pd.Project.ID)
 
-	newTaskIDs, err := duplicateTasks(s, doer, pd)
+	newLabelIDs, err := duplicateLabels(s, pd)
+	if err != nil {
+		return
+	}
+
+	newTaskIDs, err := duplicateTasks(s, doer, pd, newLabelIDs)
 	if err != nil {
 		return
 	}
@@ -343,7 +348,35 @@ func duplicateProjectBackground(s *xorm.Session, pd *ProjectDuplicate, doer web.
 	return nil
 }
 
-func duplicateTasks(s *xorm.Session, doer web.Auth, ld *ProjectDuplicate) (newTaskIDs map[int64]int64, err error) {
+// duplicateLabels copies every label of the source project into the new one and
+// returns old label id -> new label id.
+func duplicateLabels(s *xorm.Session, pd *ProjectDuplicate) (map[int64]int64, error) {
+	labels := []*Label{}
+	err := s.Where("project_id = ?", pd.ProjectID).OrderBy("id ASC").Find(&labels)
+	if err != nil {
+		return nil, err
+	}
+
+	newLabelIDs := make(map[int64]int64, len(labels))
+	for _, l := range labels {
+		oldID := l.ID
+		if l.ClonedFromID == 0 {
+			l.ClonedFromID = oldID
+		}
+		l.ID = 0
+		l.ProjectID = pd.Project.ID
+		if _, err := s.Insert(l); err != nil {
+			return nil, err
+		}
+		newLabelIDs[oldID] = l.ID
+	}
+
+	log.Debugf("Duplicated all labels from project %d into %d", pd.ProjectID, pd.Project.ID)
+
+	return newLabelIDs, nil
+}
+
+func duplicateTasks(s *xorm.Session, doer web.Auth, ld *ProjectDuplicate, newLabelIDs map[int64]int64) (newTaskIDs map[int64]int64, err error) {
 	// Get all tasks + all task details
 	tasks, _, _, err := getTasksForProjects(s, []*Project{{ID: ld.ProjectID}}, doer, &taskSearchOptions{}, nil)
 	if err != nil {
@@ -422,7 +455,6 @@ func duplicateTasks(s *xorm.Session, doer web.Auth, ld *ProjectDuplicate) (newTa
 
 	log.Debugf("Duplicated all attachments from project %d into %d", ld.ProjectID, ld.Project.ID)
 
-	// Copy label tasks (not the labels)
 	labelTasks := []*LabelTask{}
 	err = s.In("task_id", oldTaskIDs).Find(&labelTasks)
 	if err != nil {
@@ -430,14 +462,20 @@ func duplicateTasks(s *xorm.Session, doer web.Auth, ld *ProjectDuplicate) (newTa
 	}
 
 	for _, lt := range labelTasks {
+		newLabelID, has := newLabelIDs[lt.LabelID]
+		if !has {
+			log.Warningf("Not duplicating label %d on task %d: the label is not in project %d", lt.LabelID, lt.TaskID, ld.ProjectID)
+			continue
+		}
 		lt.ID = 0
 		lt.TaskID = newTaskIDs[lt.TaskID]
+		lt.LabelID = newLabelID
 		if _, err := s.Insert(lt); err != nil {
 			return nil, err
 		}
 	}
 
-	log.Debugf("Duplicated all labels from project %d into %d", ld.ProjectID, ld.Project.ID)
+	log.Debugf("Duplicated all label tasks from project %d into %d", ld.ProjectID, ld.Project.ID)
 
 	// Assignees
 	// Only copy those assignees who have access to the task

@@ -18,6 +18,7 @@ package webtests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -38,7 +39,9 @@ import (
 //   - task 16 (project 7): shared via team 3 with write.
 //   - task 34 (project 20): private to user13 → no access.
 //
-// Labels: #1 own; #3 (user2, attached to no visible task) is invisible to user1.
+// Labels belong to one project and attach only to that project's tasks: #1 is
+// in project 1, #6 in user13's project 20. Task 16 gets a label of project 7
+// created by the test.
 func TestLabelTaskBulk_V2(t *testing.T) {
 	e, err := setupTestEnv()
 	require.NoError(t, err)
@@ -65,6 +68,14 @@ func TestLabelTaskBulk_V2(t *testing.T) {
 		return nil, ids, rec.Code
 	}
 
+	rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels", `{"title":"project 7","project_id":7}`, token, "")
+	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
+	var project7Label struct {
+		ID int64 `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &project7Label))
+	project7Body := fmt.Sprintf(`{"labels":[{"id":%d}]}`, project7Label.ID)
+
 	t.Run("Replace adds and removes", func(t *testing.T) {
 		// task 1 starts with label #4; replacing with [#1] must add #1 and drop #4.
 		p, ids, code := put("1", `{"labels":[{"id":1}]}`)
@@ -75,9 +86,9 @@ func TestLabelTaskBulk_V2(t *testing.T) {
 	})
 	t.Run("Empty list clears all labels", func(t *testing.T) {
 		// task 16 (write-shared) gets a label, then an empty replace removes it.
-		_, ids, code := put("16", `{"labels":[{"id":1}]}`)
+		_, ids, code := put("16", project7Body)
 		assert.Equal(t, http.StatusOK, code)
-		assert.ElementsMatch(t, []int64{1}, ids)
+		assert.ElementsMatch(t, []int64{project7Label.ID}, ids)
 
 		p, ids, code := put("16", `{"labels":[]}`)
 		require.Nil(t, p)
@@ -85,9 +96,9 @@ func TestLabelTaskBulk_V2(t *testing.T) {
 		assert.Empty(t, ids, "empty replace must remove every label")
 	})
 	t.Run("Write share can replace", func(t *testing.T) {
-		_, ids, code := put("16", `{"labels":[{"id":1}]}`)
+		_, ids, code := put("16", project7Body)
 		assert.Equal(t, http.StatusOK, code)
-		assert.ElementsMatch(t, []int64{1}, ids)
+		assert.ElementsMatch(t, []int64{project7Label.ID}, ids)
 	})
 	t.Run("Read-only share is forbidden", func(t *testing.T) {
 		p, _, code := put("15", `{"labels":[{"id":1}]}`)
@@ -107,9 +118,15 @@ func TestLabelTaskBulk_V2(t *testing.T) {
 		assert.Equal(t, models.ErrCodeTaskDoesNotExist, p.Code)
 	})
 	t.Run("Label the user cannot see is rejected", func(t *testing.T) {
-		// label #3 (user2's, attached to no task user1 can see) is invisible to
-		// user1; attaching it to a writable task must be refused.
-		p, _, code := put("1", `{"labels":[{"id":3}]}`)
+		// label #6 is in user13's project 20; attaching it to a writable task must be refused.
+		p, _, code := put("1", `{"labels":[{"id":6}]}`)
+		assert.Equal(t, http.StatusForbidden, code)
+		require.NotNil(t, p)
+		assert.Equal(t, models.ErrCodeUserHasNoAccessToLabel, p.Code)
+	})
+	t.Run("Label of another project is rejected", func(t *testing.T) {
+		// task 16 is in project 7, label #1 in project 1.
+		p, _, code := put("16", `{"labels":[{"id":1}]}`)
 		assert.Equal(t, http.StatusForbidden, code)
 		require.NotNil(t, p)
 		assert.Equal(t, models.ErrCodeUserHasNoAccessToLabel, p.Code)

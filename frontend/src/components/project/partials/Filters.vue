@@ -125,7 +125,7 @@ watch(
 	},
 )
 
-const {getLabelByExactTitle} = useLabels()
+const {getLabelIdsByTitle} = useLabels()
 const projectList = useProjects()
 
 const filterInputRef = ref()
@@ -160,7 +160,7 @@ function change(event: 'blur' | 'modelValue' | 'always') {
 
 	const filter = transformFilterStringForApi(
 		filterQuery.value,
-		labelTitle => getLabelByExactTitle(labelTitle)?.id || null,
+		labelTitle => getLabelIdsByTitle(labelTitle),
 		projectTitle => {
 			const found = projectList.findProjectByExactname(projectTitle)
 			return found?.id || null

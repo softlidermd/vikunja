@@ -23,6 +23,7 @@ import (
 	"code.vikunja.io/api/pkg/utils"
 
 	"code.vikunja.io/api/pkg/web"
+	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
@@ -36,6 +37,10 @@ type Label struct {
 	Description string `xorm:"longtext null" json:"description" doc:"The label description."`
 	// The color this label has in hex format.
 	HexColor string `xorm:"varchar(6) null" json:"hex_color" valid:"runelength(0|7)" maxLength:"7" doc:"The color this label has in hex format."`
+	// The project this label belongs to. Required on create; cannot be changed afterwards.
+	ProjectID int64 `xorm:"bigint not null default 0 INDEX" json:"project_id" doc:"The project this label belongs to. Required on create; cannot be changed afterwards."`
+	// Root label this was copied from; label filters match the whole family.
+	ClonedFromID int64 `xorm:"bigint not null default 0 INDEX" json:"-"`
 
 	CreatedByID int64 `xorm:"bigint not null" json:"-"`
 	// The user who created this label
@@ -57,7 +62,7 @@ func (*Label) TableName() string {
 
 // Create creates a new label
 // @Summary Create a label
-// @Description Creates a new label.
+// @Description Creates a new label in a project. `project_id` is required and the user needs write access to that project.
 // @tags labels
 // @Accept json
 // @Produce json
@@ -65,9 +70,15 @@ func (*Label) TableName() string {
 // @Param label body models.Label true "The label object"
 // @Success 201 {object} models.Label "The created label object."
 // @Failure 400 {object} web.HTTPError "Invalid label object provided."
+// @Failure 403 {object} web.HTTPError "No write access to the project."
+// @Failure 404 {object} web.HTTPError "The project does not exist."
 // @Failure 500 {object} models.Message "Internal error"
 // @Router /labels [put]
 func (l *Label) Create(s *xorm.Session, a web.Auth) (err error) {
+	if l.ProjectID < 1 {
+		return ErrProjectDoesNotExist{ID: l.ProjectID}
+	}
+
 	u, err := user.GetFromAuth(a)
 	if err != nil {
 		return
@@ -84,7 +95,7 @@ func (l *Label) Create(s *xorm.Session, a web.Auth) (err error) {
 
 // Update updates a label
 // @Summary Update a label
-// @Description Update an existing label. The user needs to be the creator of the label to be able to do this.
+// @Description Update an existing label. The user needs write access to the label's project. The project cannot be changed.
 // @tags labels
 // @Accept json
 // @Produce json
@@ -119,7 +130,7 @@ func (l *Label) Update(s *xorm.Session, a web.Auth) (err error) {
 
 // Delete deletes a label
 // @Summary Delete a label
-// @Description Delete an existing label. The user needs to be the creator of the label to be able to do this.
+// @Description Delete an existing label. The user needs write access to the label's project.
 // @tags labels
 // @Accept json
 // @Produce json
@@ -143,7 +154,7 @@ func (l *Label) Delete(s *xorm.Session, _ web.Auth) (err error) {
 
 // ReadAll gets all labels a user can use
 // @Summary Get all labels a user has access to
-// @Description Returns all labels which are either created by the user or associated with a task the user has at least read-access to.
+// @Description Returns all labels of the projects the user is a member of.
 // @tags labels
 // @Accept json
 // @Produce json
@@ -179,12 +190,73 @@ func (l *Label) ReadOne(s *xorm.Session, _ web.Auth) (err error) {
 	*l = *label
 
 	u, err := user.GetUserByID(s, l.CreatedByID)
+	if user.IsErrUserDoesNotExist(err) {
+		return nil
+	}
 	if err != nil {
 		return
 	}
 
 	l.CreatedBy = u
 	return
+}
+
+// GetOrCreateProjectLabel returns the label in projectID matching src: one of
+// src's family, else one with src's exact title, else a new copy of src that
+// keeps its creator and lineage. src is never modified.
+func GetOrCreateProjectLabel(s *xorm.Session, projectID int64, src *Label) (*Label, error) {
+	root := src.ClonedFromID
+	if root == 0 {
+		root = src.ID
+	}
+
+	if root > 0 {
+		family := &Label{}
+		has, err := s.
+			Where(builder.And(
+				builder.Eq{"project_id": projectID},
+				builder.Or(
+					builder.Eq{"id": root},
+					builder.Eq{"cloned_from_id": root},
+				),
+			)).
+			OrderBy("id ASC").
+			Get(family)
+		if err != nil {
+			return nil, err
+		}
+		if has {
+			return family, nil
+		}
+	}
+
+	sameTitle := &Label{}
+	has, err := s.
+		Where(builder.Eq{
+			"project_id": projectID,
+			"title":      src.Title,
+		}).
+		OrderBy("id ASC").
+		Get(sameTitle)
+	if err != nil {
+		return nil, err
+	}
+	if has {
+		return sameTitle, nil
+	}
+
+	clone := &Label{
+		Title:        src.Title,
+		Description:  src.Description,
+		HexColor:     utils.NormalizeHex(src.HexColor),
+		ProjectID:    projectID,
+		CreatedByID:  src.CreatedByID,
+		ClonedFromID: root,
+	}
+	if _, err := s.Insert(clone); err != nil {
+		return nil, err
+	}
+	return clone, nil
 }
 
 func getLabelByIDSimple(s *xorm.Session, labelID int64) (*Label, error) {

@@ -24,8 +24,8 @@ import (
 )
 
 // labelNamespace is auto-prepended to label names that don't already have it,
-// so the agent's labels live in their own corner of the user's global label
-// list and don't pollute manually-curated labels.
+// so the agent's labels live in their own corner of the project's label
+// list and do not pollute manually-curated labels.
 const labelNamespace = "veans:"
 
 func normalizeLabelTitle(raw string) string {
@@ -39,21 +39,20 @@ func normalizeLabelTitle(raw string) string {
 	return labelNamespace + t
 }
 
-// getOrCreateLabelByTitle returns the ID of the label with the given title,
-// creating it under the current user if it doesn't exist. Labels are global
-// per user in Vikunja, so this only finds labels visible to whoever the
-// `c` client is authenticated as (i.e. the bot when called from veans).
-func getOrCreateLabelByTitle(ctx context.Context, c *client.Client, title string) (*client.Label, error) {
+// getOrCreateLabelByTitle returns the label with the exact title in the given
+// project, creating it there if missing. Labels belong to one project, so the
+// same title in another project is a different label and is ignored.
+func getOrCreateLabelByTitle(ctx context.Context, c *client.Client, projectID int64, title string) (*client.Label, error) {
 	existing, err := c.ListLabels(ctx, title)
 	if err != nil {
 		return nil, err
 	}
 	for _, l := range existing {
-		if l.Title == title {
+		if l.ProjectID == projectID && l.Title == title {
 			return l, nil
 		}
 	}
-	created, err := c.CreateLabel(ctx, &client.Label{Title: title})
+	created, err := c.CreateLabel(ctx, &client.Label{Title: title, ProjectID: projectID})
 	if err != nil {
 		return nil, err
 	}

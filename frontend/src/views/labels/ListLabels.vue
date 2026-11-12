@@ -37,8 +37,12 @@
 					class="tag"
 				>
 					<span>{{ label.title }}</span>
+					<span
+						v-if="projectList.projects[label.project_id ?? 0]"
+						class="label-project"
+					>{{ projectList.projects[label.project_id ?? 0].title }}</span>
 					<BaseButton
-						v-if="userInfo?.id === label.created_by?.id"
+						v-if="canEdit(label)"
 						class="label-edit-button is-small"
 						:aria-label="$t('label.edit.header')"
 						@click.stop.prevent="editLabel(label)"
@@ -128,7 +132,8 @@ import Editor from '@/components/input/AsyncEditor'
 import ColorPicker from '@/components/input/ColorPicker.vue'
 import FormField from '@/components/input/FormField.vue'
 
-import {useAuthStore} from '@/stores/auth'
+import {useProjects} from '@/composables/useProjects'
+import {PERMISSIONS} from '@/constants/permissions'
 
 import { useTitle } from '@/composables/useTitle'
 import {useLabelStyles} from '@/composables/useLabelStyles'
@@ -151,8 +156,15 @@ const labelToDelete = ref<Label | undefined>(undefined)
 
 useTitle(() => t('label.title'))
 
-const authStore = useAuthStore()
-const userInfo = computed(() => authStore.info)
+const projectList = useProjects()
+
+// Archived projects stay in the list, so their labels still show their project; they are read-only.
+function canEdit(label: Label) {
+	const project = projectList.projects[label.project_id ?? 0]
+	return project !== undefined
+		&& (project.max_permission ?? PERMISSIONS.READ) >= PERMISSIONS.READ_WRITE
+		&& !project.is_archived
+}
 
 const {labels, isPending} = useLabels()
 const updateLabelMutation = useUpdateLabelMutation()
@@ -176,7 +188,7 @@ function editLabelSubmit() {
 }
 
 function editLabel(label: Label) {
-	if (typeof label.id === 'undefined' || label.created_by?.id !== userInfo.value?.id) {
+	if (typeof label.id === 'undefined' || !canEdit(label)) {
 		return
 	}
 	labelEditLabel.value = {
@@ -203,6 +215,11 @@ function showDeleteDialoge(label: Label) {
 </script>
 
 <style lang="scss" scoped>
+.label-project {
+	margin-inline-start: .25rem;
+	opacity: .75;
+}
+
 .label-edit-button {
 	border-radius: 100%;
 	background-color: rgba(0,0,0,0.2);

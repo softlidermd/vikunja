@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -113,16 +114,9 @@ func insertFromStructure(s *xorm.Session, str []*models.ProjectWithTasksAndBucke
 
 	log.Infof("[creating structure] Creating %d projects for user %d", len(str), user.ID)
 
-	// Seed the dedup map with the user's existing labels so re-imports
-	// reuse them instead of creating duplicates (see issue #2742).
+	// Labels belong to one project and imports always create new projects, so
+	// existing labels are never reused; this only dedups within each new project.
 	labels := make(map[string]*models.Label)
-	existingLabels := []*models.Label{}
-	if err = s.Where("created_by_id = ?", user.ID).Find(&existingLabels); err != nil {
-		return err
-	}
-	for _, l := range existingLabels {
-		labels[l.Title+utils.NormalizeHex(l.HexColor)] = l
-	}
 
 	archivedProjects := []int64{}
 
@@ -597,23 +591,26 @@ func createProjectWithEverything(s *xorm.Session, project *models.ProjectWithTas
 
 		// Create all labels
 		for _, label := range t.Labels {
-			// Check if we already have a label with that name + color combination and use it
-			// If not, create one and save it for later
-			var lb *models.Label
-			var exists bool
 			if label == nil {
 				continue
 			}
-			key := label.Title + utils.NormalizeHex(label.HexColor)
-			lb, exists = labels[key]
+			// Nameless Trello labels differ only by color. Color first: hex never contains "|".
+			key := fmt.Sprintf("%d|%s|%s", t.ProjectID, utils.NormalizeHex(label.HexColor), label.Title)
+			lb, exists := labels[key]
 			if !exists {
-				err = label.Create(s, user)
+				// Migrators may share one *Label across projects, so never mutate it.
+				lb = &models.Label{
+					Title:       label.Title,
+					Description: label.Description,
+					HexColor:    label.HexColor,
+					ProjectID:   t.ProjectID,
+				}
+				err = lb.Create(s, user)
 				if err != nil {
 					return err
 				}
-				log.Debugf("[creating structure] Created new label %d", label.ID)
-				labels[key] = label
-				lb = label
+				log.Debugf("[creating structure] Created new label %d", lb.ID)
+				labels[key] = lb
 			}
 
 			lt := &models.LabelTask{

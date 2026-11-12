@@ -128,6 +128,7 @@ func init() {
 		"IssuerLocal":                          reflect.ValueOf(constant.MakeFromLiteral("\"local\"", token.STRING, 0)),
 		"ListAllUsers":                         reflect.ValueOf(user.ListAllUsers),
 		"ListUsers":                            reflect.ValueOf(user.ListUsers),
+		"ListUsersForEmptySearch":              reflect.ValueOf(user.ListUsersForEmptySearch),
 		"RegisterDeletionNotificationCron":     reflect.ValueOf(user.RegisterDeletionNotificationCron),
 		"RegisterTokenCleanupCron":             reflect.ValueOf(user.RegisterTokenCleanupCron),
 		"RequestDeletion":                      reflect.ValueOf(user.RequestDeletion),

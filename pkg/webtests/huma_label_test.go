@@ -25,47 +25,34 @@ import (
 	"strings"
 	"testing"
 
+	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/user"
+	"code.vikunja.io/api/pkg/web/handler"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // testuser22 is the second bot owner from pkg/db/fixtures/users.yml; user22
-// owns bot 24. Paired with testuser21 to assert bot-owner isolation: each
-// owner sees and acts on their own bots' resources, never the other's.
+// owns bot 24 and is a member of none of the label projects below.
 var testuser22 = user.User{ID: 22, Username: "user_bot_owner_b", Issuer: "local"}
 
-// Paired to assert a bot inherits its own owner's labels and nobody else's.
+// Bot 23 is an admin member of project 44 (users_projects.yml); bot 24 is not.
 var testbot23 = user.User{ID: 23, Username: "bot-owner-a-assistant", Issuer: "local", BotOwnerID: 21}
 var testbot24 = user.User{ID: 24, Username: "bot-owner-b-assistant", Issuer: "local", BotOwnerID: 22}
 
 // TestHumaLabel mirrors v1's TestProject shape so v2 contract parity is
-// readable side-by-side. Labels has no v1 webtest; coverage is ported 1:1
-// from the model-level matrix in pkg/models/label_test.go so the v2 HTTP
-// surface independently proves the full visibility/permission contract once
-// v1's routes and tests are removed.
+// readable side-by-side, ported from the model-level matrix in
+// pkg/models/label_test.go.
 //
-// Fixture topology the matrix relies on (see pkg/db/fixtures/labels.yml and
-// label_tasks.yml):
-//   - #1, #2: owned by user1, no task attachment.
-//   - #3: owned by user2, no task attachment — invisible to user1.
-//   - #4: owned by user2, attached to task #1 in project 1 (user1 is admin),
-//     so user1 can READ it (visible via an accessible task) but must NOT be
-//     able to update/delete it (not the owner).
-//   - #5: owned by user2, attached to task #35 in project 21, which user1 owns
-//     but has archived — archiving does not hide a project's tasks, so user1
-//     can read it.
-//   - #6: owned by user13, attached only to task #34 in private project 20
-//     (GHSA-hj5c-mhh2-g7jq regression fixture) — invisible to user1.
-//   - #7: owned by user1, no task attachment — readable by its creator.
-//   - #8: owned by user1, attached only to inaccessible task #34 — still
-//     readable via the creator branch.
-//   - #10: owned by user6, attached only to task #25 in project 16, a child of
-//     project 33 which is shared to team 1 (user1 is a member) — visible via
-//     the inherited child-project access.
-//   - #13: owned by user13, attached only to the soft-deleted task #51 in
-//     project 1 — invisible to user1 despite the accessible project.
+// Every label belongs to one project, and the caller's own membership of that
+// project decides: read to see it, write to manage it. Fixture topology (see
+// pkg/db/fixtures/labels.yml):
+//   - project 1 (user1 owns): #1, #2, #4 (created by user2), #5, #7, #13.
+//   - project 16 (user1 writes through team 1's share on its parent 33): #10.
+//   - projects 21 and 22 (user1 owns, archived): #14, #15, #17.
+//   - project 20 (user13 only): #6 (GHSA-hj5c-mhh2-g7jq) and #8 (created by user1).
+//   - project 36 (user15): #16. Project 44 (user21, bot 23): #9, #11, #12.
 func TestHumaLabel(t *testing.T) {
 	testHandler := webHandlerTestV2{
 		user:     &testuser1,
@@ -80,8 +67,8 @@ func TestHumaLabel(t *testing.T) {
 			require.NoError(t, err)
 
 			ids := labelIDsFromReadAll(t, rec.Body.Bytes())
-			assert.ElementsMatch(t, []int64{1, 2, 4, 5, 7, 8, 10}, ids,
-				"ReadAll must return exactly {1,2,4,5,7,8,10}; body: %s", rec.Body.String())
+			assert.ElementsMatch(t, []int64{1, 2, 4, 5, 7, 10, 13, 14, 15, 17}, ids,
+				"ReadAll must return exactly the labels of user1's projects; body: %s", rec.Body.String())
 		})
 
 		t.Run("Pagination - full page forces the Count() fallback", func(t *testing.T) {
@@ -90,24 +77,24 @@ func TestHumaLabel(t *testing.T) {
 			ids := labelIDsFromReadAll(t, rec.Body.Bytes())
 			assert.Equal(t, []int64{1, 2, 4}, ids,
 				"a full page 1 of 3 must slice the first 3 ids in order; body: %s", rec.Body.String())
-			assert.EqualValues(t, 7, totalFromReadAll(t, rec.Body.Bytes()),
+			assert.EqualValues(t, 10, totalFromReadAll(t, rec.Body.Bytes()),
 				"a full unfiltered page must report the true total via Count(); body: %s", rec.Body.String())
 		})
 		t.Run("Pagination - partial last page uses the start+len shortcut", func(t *testing.T) {
-			rec, err := testHandler.testReadAllWithUser(url.Values{"page": {"3"}, "per_page": {"3"}}, nil)
-			require.NoError(t, err)
-			ids := labelIDsFromReadAll(t, rec.Body.Bytes())
-			assert.Equal(t, []int64{10}, ids,
-				"the short last page must contain only the trailing id; body: %s", rec.Body.String())
-			assert.EqualValues(t, 7, totalFromReadAll(t, rec.Body.Bytes()),
-				"a short last page must still report the true total; body: %s", rec.Body.String())
-		})
-		t.Run("Pagination - page past the end still reports the true total", func(t *testing.T) {
 			rec, err := testHandler.testReadAllWithUser(url.Values{"page": {"4"}, "per_page": {"3"}}, nil)
 			require.NoError(t, err)
 			ids := labelIDsFromReadAll(t, rec.Body.Bytes())
+			assert.Equal(t, []int64{17}, ids,
+				"the short last page must contain only the trailing id; body: %s", rec.Body.String())
+			assert.EqualValues(t, 10, totalFromReadAll(t, rec.Body.Bytes()),
+				"a short last page must still report the true total; body: %s", rec.Body.String())
+		})
+		t.Run("Pagination - page past the end still reports the true total", func(t *testing.T) {
+			rec, err := testHandler.testReadAllWithUser(url.Values{"page": {"5"}, "per_page": {"3"}}, nil)
+			require.NoError(t, err)
+			ids := labelIDsFromReadAll(t, rec.Body.Bytes())
 			assert.Empty(t, ids, "a page past the end must return no items; body: %s", rec.Body.String())
-			assert.EqualValues(t, 7, totalFromReadAll(t, rec.Body.Bytes()),
+			assert.EqualValues(t, 10, totalFromReadAll(t, rec.Body.Bytes()),
 				"an empty page with a non-zero offset must fall back to Count(), not report 0 or the offset; body: %s", rec.Body.String())
 		})
 		t.Run("Pagination - full non-last page respects the q filter", func(t *testing.T) {
@@ -127,6 +114,7 @@ func TestHumaLabel(t *testing.T) {
 			rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "1"})
 			require.NoError(t, err)
 			assert.Contains(t, rec.Body.String(), `"title":"Label #1"`)
+			assert.Contains(t, rec.Body.String(), `"project_id":1`)
 			assert.Contains(t, rec.Body.String(), `"max_permission":`)
 			assert.NotEmpty(t, rec.Result().Header.Get("ETag"))
 		})
@@ -137,64 +125,49 @@ func TestHumaLabel(t *testing.T) {
 			assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 		})
 		t.Run("Permissions check", func(t *testing.T) {
-			t.Run("Forbidden - other owner, unattached (#3)", func(t *testing.T) {
-				// Label #3: user2's label with no task attachment. user1 is
-				// neither owner nor has a task path to it.
-				_, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "3"})
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-			})
-			t.Run("Forbidden - GHSA private label only on unreachable task (#6)", func(t *testing.T) {
-				// Label #6: user13's private label, reachable only via task #34
-				// in private project 20. GHSA-hj5c-mhh2-g7jq: must stay hidden.
+			t.Run("Forbidden - GHSA private label in a foreign project (#6)", func(t *testing.T) {
 				_, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "6"})
 				require.Error(t, err)
 				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 			})
-			t.Run("Allowed - other owner but visible via accessible task (#4)", func(t *testing.T) {
-				// GHSA-hj5c-mhh2-g7jq read-vs-write case: #4 is owned by user2
-				// but attached to task #1 in a project user1 administers, so
-				// READ must succeed even though user1 is not the owner.
+			t.Run("Forbidden - own label in a foreign project (#8)", func(t *testing.T) {
+				// Creating a label grants nothing; only the project counts.
+				_, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "8"})
+				require.Error(t, err)
+				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+			})
+			t.Run("Allowed - another user's label in a member project (#4)", func(t *testing.T) {
 				rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "4"})
 				require.NoError(t, err)
 				assert.Contains(t, rec.Body.String(), `"title":"Label #4 - visible via other task"`)
-				assert.Contains(t, rec.Body.String(), `"id":4`)
 			})
-			t.Run("Allowed - own label, no task attachment (#7)", func(t *testing.T) {
-				// Creator of an unattached label can read it.
-				rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "7"})
+			t.Run("Allowed - project reached through a parent share (#10)", func(t *testing.T) {
+				rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "10"})
 				require.NoError(t, err)
-				assert.Contains(t, rec.Body.String(), `"title":"Label #7 - created by user 1, no task attachment"`)
+				assert.Contains(t, rec.Body.String(), `"title":"Label #10 - attached in child project only"`)
 			})
-			t.Run("Allowed - own label only on inaccessible task (#8)", func(t *testing.T) {
-				// Access comes from the creator branch: #8's only label_tasks
-				// row points at inaccessible task #34, yet the owner can read it.
-				rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "8"})
+			t.Run("Allowed - only on a soft-deleted task (#13)", func(t *testing.T) {
+				rec, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "13"})
 				require.NoError(t, err)
-				assert.Contains(t, rec.Body.String(), `"title":"Label #8 - user 1 creator, only attached to inaccessible task"`)
-			})
-			t.Run("Forbidden - only on a soft-deleted task in an accessible project (#13)", func(t *testing.T) {
-				// Task #51 is soft-deleted but in project 1 (user1's), so this only passes if the deleted-task filter runs.
-				_, err := testHandler.testReadOneWithUser(nil, map[string]string{"label": "13"})
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+				assert.Contains(t, rec.Body.String(), `"title":"Label #13 - attached only to a soft-deleted task"`)
 			})
 		})
 	})
 
 	t.Run("Create", func(t *testing.T) {
 		t.Run("Normal", func(t *testing.T) {
-			rec, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem","description":"Ipsum","hex_color":"00ff00"}`)
+			rec, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem","description":"Ipsum","hex_color":"00ff00","project_id":1}`)
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusCreated, rec.Code)
 			assert.Contains(t, rec.Body.String(), `"title":"Lorem"`)
 			assert.Contains(t, rec.Body.String(), `"description":"Ipsum"`)
 			assert.Contains(t, rec.Body.String(), `"hex_color":"00ff00"`)
+			assert.Contains(t, rec.Body.String(), `"project_id":1`)
 		})
 		t.Run("Hex color is normalized", func(t *testing.T) {
 			// NormalizeHex strips a leading '#' (and truncates to 6 chars).
 			// Send a non-normalized value and assert the stored/returned form.
-			rec, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Normalized","hex_color":"#aabbcc"}`)
+			rec, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Normalized","hex_color":"#aabbcc","project_id":1}`)
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusCreated, rec.Code)
 			assert.Contains(t, rec.Body.String(), `"hex_color":"aabbcc"`,
@@ -203,9 +176,29 @@ func TestHumaLabel(t *testing.T) {
 		})
 		t.Run("Empty title", func(t *testing.T) {
 			// v2 returns 422, not v1's 400; full body shape asserted in TestHuma_ErrorShapeIsRFC9457.
-			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":""}`)
+			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"","project_id":1}`)
 			require.Error(t, err)
 			assert.Equal(t, http.StatusUnprocessableEntity, getHTTPErrorCode(err))
+		})
+		t.Run("Without a project", func(t *testing.T) {
+			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem"}`)
+			require.Error(t, err)
+			assert.Equal(t, http.StatusNotFound, getHTTPErrorCode(err))
+		})
+		t.Run("Missing project", func(t *testing.T) {
+			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem","project_id":99999}`)
+			require.Error(t, err)
+			assert.Equal(t, http.StatusNotFound, getHTTPErrorCode(err))
+		})
+		t.Run("Read-only project", func(t *testing.T) {
+			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem","project_id":3}`)
+			require.Error(t, err)
+			assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+		})
+		t.Run("Foreign project", func(t *testing.T) {
+			_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"Lorem","project_id":20}`)
+			require.Error(t, err)
+			assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 		})
 	})
 
@@ -215,32 +208,31 @@ func TestHumaLabel(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, rec.Body.String(), `"title":"TestLoremIpsum"`)
 		})
+		t.Run("project_id in the body is ignored", func(t *testing.T) {
+			rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "1"}, `{"title":"Moved?","project_id":16}`)
+			require.NoError(t, err)
+			assert.Contains(t, rec.Body.String(), `"project_id":1,`)
+		})
 		t.Run("Nonexisting", func(t *testing.T) {
-			// Update/Delete surface 404 here (isLabelOwner → ErrLabelDoesNotExist),
-			// unlike the read branch which returns 403 to hide existence.
 			_, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "9999"}, `{"title":"TestLoremIpsum"}`)
 			require.Error(t, err)
 			assert.Equal(t, http.StatusNotFound, getHTTPErrorCode(err))
 		})
 		t.Run("Permissions check", func(t *testing.T) {
-			t.Run("Forbidden - other owner, unattached (#3)", func(t *testing.T) {
-				// Only the owner may update; #3 belongs to user2.
-				_, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "3"}, `{"title":"TestLoremIpsum"}`)
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-			})
-			t.Run("Forbidden - other owner but readable via task (#4)", func(t *testing.T) {
-				// GHSA-hj5c-mhh2-g7jq read-vs-write case: #4 is READABLE by user1
-				// (visible via an accessible task) but must NOT be updatable —
-				// update requires ownership, which user1 does not have.
-				_, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "4"}, `{"title":"TestLoremIpsum"}`)
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+			t.Run("Allowed - another user's label in a member project (#4)", func(t *testing.T) {
+				rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "4"}, `{"title":"TestLoremIpsum"}`)
+				require.NoError(t, err)
+				assert.Contains(t, rec.Body.String(), `"title":"TestLoremIpsum"`)
 			})
 			t.Run("Forbidden - GHSA private label (#6)", func(t *testing.T) {
 				_, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "6"}, `{"title":"TestLoremIpsum"}`)
 				require.Error(t, err)
 				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+			})
+			t.Run("Forbidden - archived project (#14)", func(t *testing.T) {
+				_, err := testHandler.testUpdateWithUser(nil, map[string]string{"label": "14"}, `{"title":"TestLoremIpsum"}`)
+				require.Error(t, err)
+				assert.Equal(t, http.StatusPreconditionFailed, getHTTPErrorCode(err))
 			})
 		})
 	})
@@ -259,18 +251,10 @@ func TestHumaLabel(t *testing.T) {
 			assert.Equal(t, http.StatusNotFound, getHTTPErrorCode(err))
 		})
 		t.Run("Permissions check", func(t *testing.T) {
-			t.Run("Forbidden - other owner, unattached (#3)", func(t *testing.T) {
-				// Only the owner may delete; #3 belongs to user2.
-				_, err := testHandler.testDeleteWithUser(nil, map[string]string{"label": "3"})
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-			})
-			t.Run("Forbidden - other owner but readable via task (#4)", func(t *testing.T) {
-				// GHSA-hj5c-mhh2-g7jq read-vs-write case: #4 is READABLE but
-				// must NOT be deletable by the non-owner.
-				_, err := testHandler.testDeleteWithUser(nil, map[string]string{"label": "4"})
-				require.Error(t, err)
-				assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+			t.Run("Allowed - another user's label in a member project (#4)", func(t *testing.T) {
+				rec, err := testHandler.testDeleteWithUser(nil, map[string]string{"label": "4"})
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusNoContent, rec.Code)
 			})
 			t.Run("Forbidden - GHSA private label (#6)", func(t *testing.T) {
 				_, err := testHandler.testDeleteWithUser(nil, map[string]string{"label": "6"})
@@ -281,117 +265,116 @@ func TestHumaLabel(t *testing.T) {
 	})
 }
 
-// TestHumaLabel_BotOwner asserts that bot owners can read, update, and delete
-// labels that were created by bots they own. Fixture label #9 is owned by
-// bot 23, whose owner is user 21 (testuser21); user 22 owns a different bot
-// and must not see or touch it.
-func TestHumaLabel_BotOwner(t *testing.T) {
-	botOwner := webHandlerTestV2{
+func TestHumaLabel_ReadOnlyMember(t *testing.T) {
+	// Team 1 reads project 21; user2 created label #17 there but may not manage it.
+	reader := webHandlerTestV2{
+		user:     &testuser2,
+		basePath: "/api/v2/labels",
+		idParam:  "label",
+		t:        t,
+	}
+
+	rec, err := reader.testReadOneWithUser(nil, map[string]string{"label": "17"})
+	require.NoError(t, err)
+	assert.Contains(t, rec.Body.String(), `"title":"Label #5"`)
+
+	_, err = reader.testUpdateWithUser(nil, map[string]string{"label": "17"}, `{"title":"renamed"}`)
+	require.Error(t, err)
+	assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+
+	_, err = reader.testDeleteWithUser(nil, map[string]string{"label": "17"})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+}
+
+// v1 is frozen but still serves PUT /labels, which now needs a project too.
+func TestLabel_V1CreateRequiresProject(t *testing.T) {
+	testHandler := webHandlerTest{
+		user: &testuser1,
+		strFunc: func() handler.CObject {
+			return &models.Label{}
+		},
+		t: t,
+	}
+
+	_, err := testHandler.testCreateWithUser(nil, nil, `{"title":"no project"}`)
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotFound, getHTTPErrorCode(err))
+
+	rec, err := testHandler.testCreateWithUser(nil, nil, `{"title":"with project","project_id":1}`)
+	require.NoError(t, err)
+	assert.Contains(t, rec.Body.String(), `"project_id":1`)
+}
+
+// Bot labels live in project 44 (owned by user21, bot 23 is an admin member);
+// access follows that membership like for any other user.
+func TestHumaLabel_BotProjectMembership(t *testing.T) {
+	owner := webHandlerTestV2{
 		user:     &testuser21,
 		basePath: "/api/v2/labels",
 		idParam:  "label",
 		t:        t,
 	}
-	require.NoError(t, botOwner.ensureEnv())
-	otherOwner := webHandlerTestV2{
-		user:     &testuser22,
-		basePath: "/api/v2/labels",
-		idParam:  "label",
-		t:        t,
-		e:        botOwner.e,
-	}
-
-	t.Run("ReadOne - bot owner can read label created by their bot", func(t *testing.T) {
-		rec, err := botOwner.testReadOneWithUser(nil, map[string]string{"label": "9"})
-		require.NoError(t, err)
-		assert.Contains(t, rec.Body.String(), `"title":"Label #9 - created by bot 23 owned by user 21"`)
-	})
-	t.Run("ReadOne - non-owner cannot read another owner's bot's label", func(t *testing.T) {
-		_, err := otherOwner.testReadOneWithUser(nil, map[string]string{"label": "9"})
-		require.Error(t, err)
-		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-	})
-	t.Run("ReadAll - bot owner's listing surfaces their bot's labels", func(t *testing.T) {
-		rec, err := botOwner.testReadAllWithUser(nil, nil)
-		require.NoError(t, err)
-		ids := labelIDsFromReadAll(t, rec.Body.Bytes())
-		assert.Contains(t, ids, int64(9), "label #9 (created by user 21's bot) must be listed")
-	})
-	t.Run("Update - bot owner can update label created by their bot", func(t *testing.T) {
-		rec, err := botOwner.testUpdateWithUser(nil, map[string]string{"label": "9"}, `{"title":"renamed by owner"}`)
-		require.NoError(t, err)
-		assert.Contains(t, rec.Body.String(), `"title":"renamed by owner"`)
-	})
-	t.Run("Update - non-owner cannot update another owner's bot's label", func(t *testing.T) {
-		_, err := otherOwner.testUpdateWithUser(nil, map[string]string{"label": "9"}, `{"title":"hijack"}`)
-		require.Error(t, err)
-		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-	})
-	t.Run("Delete - non-owner cannot delete another owner's bot's label", func(t *testing.T) {
-		_, err := otherOwner.testDeleteWithUser(nil, map[string]string{"label": "9"})
-		require.Error(t, err)
-		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
-	})
-	t.Run("Delete - bot owner can delete label created by their bot", func(t *testing.T) {
-		// Run last so the earlier subtests still have label #9 to operate on.
-		rec, err := botOwner.testDeleteWithUser(nil, map[string]string{"label": "9"})
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNoContent, rec.Code)
-	})
-}
-
-// Unattached labels #11 and #12 isolate identity-based access (#3592).
-func TestHumaLabel_BotUsesOwnerLabel(t *testing.T) {
+	require.NoError(t, owner.ensureEnv())
 	bot := webHandlerTestV2{
 		user:     &testbot23,
 		basePath: "/api/v2/labels",
 		idParam:  "label",
 		t:        t,
+		e:        owner.e,
 	}
-	require.NoError(t, bot.ensureEnv())
+	otherOwner := webHandlerTestV2{
+		user:     &testuser22,
+		basePath: "/api/v2/labels",
+		idParam:  "label",
+		t:        t,
+		e:        owner.e,
+	}
 	otherBot := webHandlerTestV2{
 		user:     &testbot24,
 		basePath: "/api/v2/labels",
 		idParam:  "label",
 		t:        t,
-		e:        bot.e,
+		e:        owner.e,
 	}
 
-	t.Run("ReadAll - bot's listing surfaces its owner's and its siblings' unattached labels", func(t *testing.T) {
-		rec, err := bot.testReadAllWithUser(nil, nil)
-		require.NoError(t, err)
-		ids := labelIDsFromReadAll(t, rec.Body.Bytes())
-		assert.ElementsMatch(t, []int64{9, 11, 12}, ids,
-			"bot's ReadAll must return exactly {9,11,12}; body: %s", rec.Body.String())
+	t.Run("ReadAll - members list the project's labels", func(t *testing.T) {
+		for _, h := range []webHandlerTestV2{owner, bot} {
+			rec, err := h.testReadAllWithUser(nil, nil)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []int64{9, 11, 12}, labelIDsFromReadAll(t, rec.Body.Bytes()),
+				"user %d; body: %s", h.user.ID, rec.Body.String())
+		}
 	})
-	t.Run("ReadOne - bot can read a label created by a sibling bot", func(t *testing.T) {
-		rec, err := bot.testReadOneWithUser(nil, map[string]string{"label": "12"})
-		require.NoError(t, err)
-		assert.Contains(t, rec.Body.String(), `"title":"Label #12 - created by bot 25, sibling of bot 23"`)
+	t.Run("ReadAll - non-members see none of them", func(t *testing.T) {
+		for _, h := range []webHandlerTestV2{otherOwner, otherBot} {
+			rec, err := h.testReadAllWithUser(nil, nil)
+			require.NoError(t, err)
+			assert.Empty(t, labelIDsFromReadAll(t, rec.Body.Bytes()), "user %d; body: %s", h.user.ID, rec.Body.String())
+		}
 	})
-	t.Run("ReadOne - a different owner's bot cannot read the sibling's label", func(t *testing.T) {
-		_, err := otherBot.testReadOneWithUser(nil, map[string]string{"label": "12"})
+	t.Run("ReadOne - a non-member owner of another bot cannot read", func(t *testing.T) {
+		_, err := otherOwner.testReadOneWithUser(nil, map[string]string{"label": "9"})
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 	})
-	t.Run("ReadOne - bot can read its owner's unattached label", func(t *testing.T) {
-		rec, err := bot.testReadOneWithUser(nil, map[string]string{"label": "11"})
+	t.Run("Update - the project owner can rename a bot's label", func(t *testing.T) {
+		rec, err := owner.testUpdateWithUser(nil, map[string]string{"label": "9"}, `{"title":"renamed by owner"}`)
 		require.NoError(t, err)
-		assert.Contains(t, rec.Body.String(), `"title":"Label #11 - created by user 21, owner of bot 23, no task attachment"`)
+		assert.Contains(t, rec.Body.String(), `"title":"renamed by owner"`)
 	})
-	t.Run("ReadOne - a different owner's bot cannot read it", func(t *testing.T) {
-		_, err := otherBot.testReadOneWithUser(nil, map[string]string{"label": "11"})
+	t.Run("Update - the bot member can rename its owner's label", func(t *testing.T) {
+		rec, err := bot.testUpdateWithUser(nil, map[string]string{"label": "11"}, `{"title":"renamed by bot"}`)
+		require.NoError(t, err)
+		assert.Contains(t, rec.Body.String(), `"title":"renamed by bot"`)
+	})
+	t.Run("Update - a non-member cannot", func(t *testing.T) {
+		_, err := otherOwner.testUpdateWithUser(nil, map[string]string{"label": "9"}, `{"title":"hijack"}`)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 	})
-	t.Run("ReadAll - a different owner's bot's listing does not surface it", func(t *testing.T) {
-		rec, err := otherBot.testReadAllWithUser(nil, nil)
-		require.NoError(t, err)
-		ids := labelIDsFromReadAll(t, rec.Body.Bytes())
-		assert.Empty(t, ids, "other owner's bot must see no labels; body: %s", rec.Body.String())
-	})
-	t.Run("Update - bot cannot rename its owner's label", func(t *testing.T) {
-		_, err := bot.testUpdateWithUser(nil, map[string]string{"label": "11"}, `{"title":"renamed by bot"}`)
+	t.Run("Delete - a non-member cannot", func(t *testing.T) {
+		_, err := otherOwner.testDeleteWithUser(nil, map[string]string{"label": "9"})
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
 	})
@@ -401,21 +384,17 @@ func TestHumaLabel_BotUsesOwnerLabel(t *testing.T) {
 		basePath: "/api/v2/tasks/52/labels",
 		idParam:  "label",
 		t:        t,
-		e:        bot.e,
+		e:        owner.e,
 	}
-	t.Run("Create - bot can attach its owner's never-used label", func(t *testing.T) {
-		rec, err := attach.testCreateWithUser(nil, nil, `{"label_id":11}`)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusCreated, rec.Code)
-		assert.Contains(t, rec.Body.String(), `"label_id":11`)
+	t.Run("Create - the bot can attach labels of the task's project", func(t *testing.T) {
+		for _, labelID := range []string{"11", "12"} {
+			rec, err := attach.testCreateWithUser(nil, nil, `{"label_id":`+labelID+`}`)
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusCreated, rec.Code)
+			assert.Contains(t, rec.Body.String(), `"label_id":`+labelID)
+		}
 	})
-	t.Run("Create - bot can attach a never-used label created by a sibling bot", func(t *testing.T) {
-		rec, err := attach.testCreateWithUser(nil, nil, `{"label_id":12}`)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusCreated, rec.Code)
-		assert.Contains(t, rec.Body.String(), `"label_id":12`)
-	})
-	t.Run("Create - bot cannot attach an unrelated user's label", func(t *testing.T) {
+	t.Run("Create - the bot cannot attach a label of another project", func(t *testing.T) {
 		_, err := attach.testCreateWithUser(nil, nil, `{"label_id":6}`)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
@@ -471,14 +450,14 @@ func TestHumaLabel_ETagReturns304(t *testing.T) {
 }
 
 func TestHumaLabel_ETagReflectsPermission(t *testing.T) {
-	// Label #4 is owned by user2 (admin) but readable by user1 only at read level;
-	// same label, so the per-caller ETag must differ — else a 304 serves stale perms.
+	// Label #10 is in project 16: user6 owns it (admin), user1 writes through a
+	// parent share. Same label, so the per-caller ETag must differ — else a 304 serves stale perms.
 	e, err := setupTestEnv()
 	require.NoError(t, err)
 
-	reader := humaRequest(t, e, http.MethodGet, "/api/v2/labels/4", "", humaTokenFor(t, &testuser1), "")
+	reader := humaRequest(t, e, http.MethodGet, "/api/v2/labels/10", "", humaTokenFor(t, &testuser1), "")
 	require.Equal(t, http.StatusOK, reader.Code, "body: %s", reader.Body.String())
-	owner := humaRequest(t, e, http.MethodGet, "/api/v2/labels/4", "", humaTokenFor(t, &testuser2), "")
+	owner := humaRequest(t, e, http.MethodGet, "/api/v2/labels/10", "", humaTokenFor(t, &testuser6), "")
 	require.Equal(t, http.StatusOK, owner.Code, "body: %s", owner.Body.String())
 
 	assert.NotEmpty(t, reader.Header().Get("ETag"))
@@ -493,7 +472,7 @@ func TestHumaLabel_PATCHMergePatch(t *testing.T) {
 
 	// Create a fresh label so we don't stomp fixtures.
 	rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels",
-		`{"title":"before","description":"keep me","hex_color":"112233"}`, token, "")
+		`{"title":"before","description":"keep me","hex_color":"112233","project_id":1}`, token, "")
 	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 	var created struct {
 		ID int64 `json:"id"`

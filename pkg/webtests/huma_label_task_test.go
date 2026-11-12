@@ -18,6 +18,7 @@ package webtests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -124,19 +125,39 @@ func TestLabelTask(t *testing.T) {
 			assert.Equal(t, http.StatusCreated, rec.Code)
 			assert.Contains(t, rec.Body.String(), `"label_id":1`)
 		})
+		// A label of the task's own project, created through the API.
+		newLabelIn := func(t *testing.T, projectID int64) int64 {
+			labels := webHandlerTestV2{user: &testuser1, basePath: "/api/v2/labels", idParam: "label", t: t, e: owned.e}
+			rec, err := labels.testCreateWithUser(nil, nil, fmt.Sprintf(`{"title":"in project %d","project_id":%d}`, projectID, projectID))
+			require.NoError(t, err)
+			var created struct {
+				ID int64 `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
+			return created.ID
+		}
 		t.Run("Write share can attach", func(t *testing.T) {
-			// task 16 is write-shared; user1 has access to label #1.
-			rec, err := writeShared.testCreateWithUser(nil, nil, `{"label_id":1}`)
+			// task 16 is in write-shared project 7.
+			labelID := newLabelIn(t, 7)
+			rec, err := writeShared.testCreateWithUser(nil, nil, fmt.Sprintf(`{"label_id":%d}`, labelID))
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusCreated, rec.Code)
 		})
 		t.Run("Inherited child-project access can attach", func(t *testing.T) {
-			// Task 26 and label #10 are reachable only through team 1's shares
-			// on the parent projects 34 and 33 — no direct share on either child.
+			// Task 26 is in project 17, reachable only through team 1's share on
+			// the parent project 34 — no direct share on the child.
+			labelID := newLabelIn(t, 17)
 			childShared := webHandlerTestV2{user: &testuser1, basePath: "/api/v2/tasks/26/labels", idParam: "label", t: t, e: owned.e}
-			rec, err := childShared.testCreateWithUser(nil, nil, `{"label_id":10}`)
+			rec, err := childShared.testCreateWithUser(nil, nil, fmt.Sprintf(`{"label_id":%d}`, labelID))
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusCreated, rec.Code)
+		})
+		t.Run("Label of another project", func(t *testing.T) {
+			// task 16 is in project 7, label #1 in project 1.
+			_, err := writeShared.testCreateWithUser(nil, nil, `{"label_id":1}`)
+			require.Error(t, err)
+			assert.Equal(t, http.StatusForbidden, getHTTPErrorCode(err))
+			assertHandlerErrorCode(t, err, models.ErrCodeUserHasNoAccessToLabel)
 		})
 		t.Run("Already on task", func(t *testing.T) {
 			// label #4 is already attached to task 1.
@@ -146,7 +167,7 @@ func TestLabelTask(t *testing.T) {
 			assertHandlerErrorCode(t, err, models.ErrCodeLabelIsAlreadyOnTask)
 		})
 		t.Run("Nonexisting label", func(t *testing.T) {
-			// CanCreate looks the label up first, so a missing label surfaces as
+			// Create looks the label up first, so a missing label surfaces as
 			// 404 (label not found) rather than a permission error.
 			_, err := owned.testCreateWithUser(nil, nil, `{"label_id":9999}`)
 			require.Error(t, err)

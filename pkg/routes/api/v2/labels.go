@@ -42,7 +42,7 @@ func RegisterLabelRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "labels-list",
 		Summary:     "List labels",
-		Description: "Returns the labels visible to the authenticated user — their own plus any used on tasks they can access. Not a global list.",
+		Description: "Returns the labels of the projects the authenticated user is a member of. Not a global list.",
 		Method:      http.MethodGet,
 		Path:        "/labels",
 		Tags:        tags,
@@ -60,7 +60,7 @@ func RegisterLabelRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "labels-create",
 		Summary:     "Create a label",
-		Description: "Creates a label; the authenticated user becomes its owner.",
+		Description: "Creates a label in a project. `project_id` is required and the user needs write access to that project (404 if the project does not exist, 403 without write access).",
 		Method:      http.MethodPost,
 		Path:        "/labels",
 		Tags:        tags,
@@ -69,7 +69,7 @@ func RegisterLabelRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "labels-update",
 		Summary:     "Update a label",
-		Description: "Replaces all of a label's fields — only the owner may update it. Use PATCH for a partial update.",
+		Description: "Replaces all of a label's fields — requires write access to the label's project. Use PATCH for a partial update.",
 		Method:      http.MethodPut,
 		Path:        "/labels/{id}",
 		Tags:        tags,
@@ -78,7 +78,7 @@ func RegisterLabelRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "labels-delete",
 		Summary:     "Delete a label",
-		Description: "Deletes a label. Only the owner may delete it.",
+		Description: "Deletes a label. Requires write access to the label's project.",
 		Method:      http.MethodDelete,
 		Path:        "/labels/{id}",
 		Tags:        tags,

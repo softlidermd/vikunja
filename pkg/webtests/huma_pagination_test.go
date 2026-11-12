@@ -59,8 +59,8 @@ func TestHumaListPagination_MaxItemsPerPage(t *testing.T) {
 		env := paginationEnvelopeFrom(t, rec.Body.Bytes())
 		assert.Len(t, env.Items, 3, "an omitted per_page must page at service.maxitemsperpage; body: %s", rec.Body.String())
 		assert.Equal(t, 3, env.PerPage, "the envelope must report the effective per_page")
-		assert.EqualValues(t, 7, env.Total)
-		assert.EqualValues(t, 3, env.TotalPages, "total_pages must be computed from the effective per_page")
+		assert.EqualValues(t, 10, env.Total)
+		assert.EqualValues(t, 4, env.TotalPages, "total_pages must be computed from the effective per_page")
 	})
 
 	t.Run("smaller explicit per_page is honoured", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestHumaListPagination_MaxItemsPerPage(t *testing.T) {
 		env := paginationEnvelopeFrom(t, rec.Body.Bytes())
 		assert.Len(t, env.Items, 2)
 		assert.Equal(t, 2, env.PerPage)
-		assert.EqualValues(t, 4, env.TotalPages)
+		assert.EqualValues(t, 5, env.TotalPages)
 	})
 
 	t.Run("larger explicit per_page is silently capped", func(t *testing.T) {
@@ -79,15 +79,15 @@ func TestHumaListPagination_MaxItemsPerPage(t *testing.T) {
 		env := paginationEnvelopeFrom(t, rec.Body.Bytes())
 		assert.Len(t, env.Items, 3, "body: %s", rec.Body.String())
 		assert.Equal(t, 3, env.PerPage, "the envelope must report the cap, not the requested value")
-		assert.EqualValues(t, 3, env.TotalPages)
+		assert.EqualValues(t, 4, env.TotalPages)
 	})
 
 	t.Run("a later page uses the capped size too", func(t *testing.T) {
-		rec := humaRequest(t, e, http.MethodGet, "/api/v2/labels?page=3&per_page=1000", "", token, "")
+		rec := humaRequest(t, e, http.MethodGet, "/api/v2/labels?page=4&per_page=1000", "", token, "")
 		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 		env := paginationEnvelopeFrom(t, rec.Body.Bytes())
-		assert.Len(t, env.Items, 1, "page 3 of 7 items at 3 per page holds the trailing item; body: %s", rec.Body.String())
-		assert.Equal(t, 3, env.Page)
+		assert.Len(t, env.Items, 1, "page 4 of 10 items at 3 per page holds the trailing item; body: %s", rec.Body.String())
+		assert.Equal(t, 4, env.Page)
 		assert.Equal(t, 3, env.PerPage)
 	})
 

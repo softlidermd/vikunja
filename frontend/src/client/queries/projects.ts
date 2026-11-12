@@ -24,6 +24,7 @@ import {contextMutationOptions} from './contextMutation'
 import {fetchAllPages} from './fetchAllPages'
 import {setSubscription} from './subscriptionRequests'
 import {taskKeys} from './tasks'
+import {labelKeys} from './labels'
 
 export type ProjectResponse = Omit<Project,
 	'id' |
@@ -482,6 +483,8 @@ export function duplicateProjectMutationOptions() {
 			client.setQueryData<ProjectListResult>(projectKeys.list(), current =>
 				current ? replaceProjectInList(current, duplicate) : current,
 			)
+			// The duplicate gets its own copies of the source project's labels.
+			void client.invalidateQueries({queryKey: labelKeys.all})
 		},
 		onSettled: (_input, client) => client.invalidateQueries({queryKey: projectKeys.list(), refetchType: 'none'}),
 		successMessage: () => i18n.global.t('project.duplicate.success'),

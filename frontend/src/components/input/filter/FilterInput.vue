@@ -31,7 +31,7 @@ const emit = defineEmits(['update:modelValue'])
 const {t} = useI18n()
 
 // Services and stores for autocomplete
-const {labels, isPending, getLabelByExactTitle, getLabelById} = useLabels()
+const {labels, isPending, getLabelIdsByTitle, getLabelById} = useLabels()
 const projectList = useProjects()
 
 // Date picker functionality
@@ -143,7 +143,7 @@ const editor = useEditor({
 const processContent = (content: string) => {
 	return transformFilterStringForApi(
 		content,
-		labelTitle => getLabelByExactTitle(labelTitle)?.id || null,
+		labelTitle => getLabelIdsByTitle(labelTitle),
 		projectTitle => {
 			const found = projectList.findProjectByExactname(projectTitle)
 			return found?.id || null

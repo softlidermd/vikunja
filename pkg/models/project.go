@@ -1488,6 +1488,11 @@ func (p *Project) Delete(s *xorm.Session, a web.Auth) (err error) {
 		}
 	}
 
+	_, err = s.Where("project_id = ?", p.ID).Delete(&Label{})
+	if err != nil {
+		return
+	}
+
 	err = fullProject.DeleteBackgroundFileIfExists(s)
 	if err != nil {
 		return

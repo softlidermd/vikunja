@@ -240,7 +240,7 @@ func TestInsertFromStructure(t *testing.T) {
 		require.True(t, found)
 		assert.WithinDuration(t, doneAt, task.DoneAt, time.Second, "an explicit done_at is kept")
 	})
-	t.Run("reuses existing labels across imports", func(t *testing.T) {
+	t.Run("each import's project has its own label", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 
 		makeStructure := func() []*models.ProjectWithTasksAndBuckets {
@@ -261,20 +261,29 @@ func TestInsertFromStructure(t *testing.T) {
 			}
 		}
 
-		require.NoError(t, InsertFromStructure(makeStructure(), u))
-		require.NoError(t, InsertFromStructure(makeStructure(), u))
+		first := makeStructure()
+		second := makeStructure()
+		require.NoError(t, InsertFromStructure(first, u))
+		require.NoError(t, InsertFromStructure(second, u))
+
+		for _, str := range [][]*models.ProjectWithTasksAndBuckets{first, second} {
+			db.AssertExists(t, "labels", map[string]interface{}{
+				"title":         "Mealie",
+				"created_by_id": u.ID,
+				"project_id":    str[0].ID,
+			}, false)
+		}
 
 		s := db.NewSession()
 		defer s.Close()
 		count, err := s.Where("created_by_id = ? AND title = ?", u.ID, "Mealie").Count(&models.Label{})
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), count, "second import must reuse the existing 'Mealie' label")
+		assert.Equal(t, int64(2), count)
 	})
-	t.Run("does not merge into another user's label", func(t *testing.T) {
+	t.Run("a title existing in another project gets a new label", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 
-		// Fixture label #3 'Label #3 - other user' is created_by_id: 2.
-		// Importing the same title for user 1 must create a new, user-owned label.
+		// Fixture label 1 'Label #1' belongs to user 1's project 1.
 		structure := []*models.ProjectWithTasksAndBuckets{
 			{
 				Project: models.Project{Title: "Import project"},
@@ -282,7 +291,7 @@ func TestInsertFromStructure(t *testing.T) {
 					{
 						Task: models.Task{
 							Title:  "Task",
-							Labels: []*models.Label{{Title: "Label #3 - other user"}},
+							Labels: []*models.Label{{Title: "Label #1"}},
 						},
 					},
 				},
@@ -290,10 +299,83 @@ func TestInsertFromStructure(t *testing.T) {
 		}
 		require.NoError(t, InsertFromStructure(structure, u))
 
+		s := db.NewSession()
+		defer s.Close()
+		lt := &models.LabelTask{}
+		has, err := s.Where("task_id = ?", structure[0].Tasks[0].ID).Get(lt)
+		require.NoError(t, err)
+		require.True(t, has)
+		assert.NotEqual(t, int64(1), lt.LabelID)
 		db.AssertExists(t, "labels", map[string]interface{}{
-			"title":         "Label #3 - other user",
+			"id":            lt.LabelID,
+			"title":         "Label #1",
 			"created_by_id": u.ID,
+			"project_id":    structure[0].ID,
 		}, false)
+	})
+	t.Run("a label shared by two projects becomes two labels", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+
+		// Todoist hands out one *Label for every task that uses it.
+		shared := &models.Label{
+			Title:    "Shared",
+			HexColor: "123456",
+		}
+		structure := []*models.ProjectWithTasksAndBuckets{
+			{
+				Project: models.Project{Title: "Import A"},
+				Tasks: []*models.TaskWithComments{
+					{
+						Task: models.Task{
+							Title:  "A1",
+							Labels: []*models.Label{shared},
+						},
+					},
+					{
+						Task: models.Task{
+							Title:  "A2",
+							Labels: []*models.Label{shared},
+						},
+					},
+				},
+			},
+			{
+				Project: models.Project{Title: "Import B"},
+				Tasks: []*models.TaskWithComments{
+					{
+						Task: models.Task{
+							Title:  "B1",
+							Labels: []*models.Label{shared},
+						},
+					},
+				},
+			},
+		}
+		require.NoError(t, InsertFromStructure(structure, u))
+		assert.Equal(t, int64(0), shared.ID, "the migrator's label must not be mutated")
+
+		s := db.NewSession()
+		defer s.Close()
+		labels := []*models.Label{}
+		require.NoError(t, s.Where("title = ?", "Shared").OrderBy("id").Find(&labels))
+		require.Len(t, labels, 2)
+		assert.Equal(t, structure[0].ID, labels[0].ProjectID)
+		assert.Equal(t, structure[1].ID, labels[1].ProjectID)
+		for _, l := range labels {
+			assert.Equal(t, "123456", l.HexColor)
+		}
+
+		wantLabelByTask := map[int64]int64{
+			structure[0].Tasks[0].ID: labels[0].ID,
+			structure[0].Tasks[1].ID: labels[0].ID,
+			structure[1].Tasks[0].ID: labels[1].ID,
+		}
+		for taskID, labelID := range wantLabelByTask {
+			db.AssertExists(t, "label_tasks", map[string]interface{}{
+				"task_id":  taskID,
+				"label_id": labelID,
+			}, false)
+		}
 	})
 	t.Run("seeds positions when the export has none", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)

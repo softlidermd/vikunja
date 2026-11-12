@@ -65,7 +65,7 @@ func newClaimCmd() *cobra.Command {
 			// Tag with the current branch label, if there is one.
 			if branch := currentGitBranch(cmd.Context()); branch != "" {
 				labelTitle := branchLabel(branch)
-				l, err := getOrCreateLabelByTitle(cmd.Context(), rt.client, labelTitle)
+				l, err := getOrCreateLabelByTitle(cmd.Context(), rt.client, rt.cfg.ProjectID, labelTitle)
 				if err != nil {
 					return err
 				}

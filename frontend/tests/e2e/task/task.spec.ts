@@ -801,6 +801,70 @@ test.describe('Task', () => {
 			await expect(page.locator('.bucket .task')).toContainText(labels[0].title)
 		})
 
+		test('Label picker shows only labels of the task project', async ({authenticatedPage: page}) => {
+			const projects = await ProjectFactory.create(2)
+			const tasks = await TaskFactory.create(1, {id: 1, project_id: projects[0].id})
+			const [own] = await LabelFactory.create(1, {title: 'lbl own', project_id: projects[0].id})
+			const [foreign] = await LabelFactory.create(1, {id: 2, title: 'lbl foreign', project_id: projects[1].id}, false)
+
+			await page.goto(`/tasks/${tasks[0].id}`)
+			await page.locator('.task-view .action-buttons .button').filter({hasText: 'Add Labels'}).click()
+			await page.locator('.task-view .details.labels-list .multiselect input').fill('lbl')
+
+			const results = page.locator('.task-view .details.labels-list .multiselect .search-results')
+			await expect(results).toContainText(own.title)
+			await expect(results).not.toContainText(foreign.title)
+		})
+
+		test('Creating a label from the picker stores it in the task project', async ({authenticatedPage: page, apiContext, userToken}) => {
+			const projects = await ProjectFactory.create(2)
+			const tasks = await TaskFactory.create(1, {id: 1, project_id: projects[1].id})
+			const newLabelText = 'picker project label'
+
+			await page.goto(`/tasks/${tasks[0].id}`)
+			await page.locator('.task-view .action-buttons .button').filter({hasText: 'Add Labels'}).click()
+			await page.locator('.task-view .details.labels-list .multiselect input').fill(newLabelText)
+			await page.locator('.task-view .details.labels-list .multiselect .search-results .is-create-option').click()
+			await expect(page.locator('.global-notification')).toContainText('Success')
+
+			const response = await apiContext.get('/api/v2/labels', {headers: {Authorization: `Bearer ${userToken}`}})
+			expect(response.ok()).toBe(true)
+			const labels = (await response.json()).items as {title: string, project_id: number}[]
+			expect(labels.filter(label => label.title === newLabelText)).toEqual([
+				expect.objectContaining({project_id: projects[1].id}),
+			])
+		})
+
+		test('Moving a task keeps the same-title label, now from the target project', async ({authenticatedPage: page, apiContext, userToken}) => {
+			const projects = await ProjectFactory.create(2)
+			await createDefaultViews(projects[0].id, 10)
+			await createDefaultViews(projects[1].id, 14)
+			const tasks = await TaskFactory.create(1, {id: 1, project_id: projects[0].id})
+			const [source] = await LabelFactory.create(1, {title: 'shared title', project_id: projects[0].id})
+			const [target] = await LabelFactory.create(1, {id: 2, title: 'shared title', project_id: projects[1].id}, false)
+			await LabelTaskFactory.create(1, {task_id: tasks[0].id, label_id: source.id})
+
+			await page.goto(`/tasks/${tasks[0].id}`)
+			await page.locator('.task-view .action-buttons .button').filter({hasText: /^Move$/}).click()
+			const multiselectInput = page.locator('.task-view .content.details .field .multiselect.control .input-wrapper input')
+			await multiselectInput.click()
+			await multiselectInput.pressSequentially(projects[1].title.substring(0, 10), {delay: 20})
+			const searchResults = page.locator('.task-view .content.details .field .multiselect.control .search-results')
+			await expect(searchResults).toBeVisible({timeout: 5000})
+			await searchResults.locator('> *').first().click()
+			await expect(page.locator('.global-notification')).toContainText('Success')
+
+			const labelWrapper = page.locator('.task-view .details.labels-list .multiselect .input-wrapper')
+			await expect(labelWrapper).toContainText('shared title')
+			await page.reload()
+			await expect(labelWrapper).toContainText('shared title')
+
+			const response = await apiContext.get(`/api/v1/tasks/${tasks[0].id}`, {headers: {Authorization: `Bearer ${userToken}`}})
+			expect(response.ok()).toBe(true)
+			const task = await response.json()
+			expect(task.labels.map((l: {id: number}) => l.id)).toEqual([target.id])
+		})
+
 		test('Can remove a label from a task', async ({authenticatedPage: page}) => {
 			const tasks = await TaskFactory.create(1, {
 				id: 1,

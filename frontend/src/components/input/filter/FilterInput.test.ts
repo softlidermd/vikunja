@@ -16,6 +16,7 @@ const editorState = vi.hoisted(() => ({
 
 vi.mock('@/composables/useLabels', async () => {
 	const {ref} = await import('vue')
+	const {getLabelIdsByTitle} = await import('@/client/queries/labels')
 	labelState.labels = ref([])
 	labelState.isPending = ref(true)
 
@@ -24,7 +25,7 @@ vi.mock('@/composables/useLabels', async () => {
 			labels: labelState.labels,
 			isPending: labelState.isPending,
 			getLabelById: (id: number) => labelState.labels?.value.find(label => label.id === id),
-			getLabelByExactTitle: (title: string) => labelState.labels?.value.find(label => label.title === title),
+			getLabelIdsByTitle: (title: string) => getLabelIdsByTitle(labelState.labels?.value ?? [], title),
 		}),
 	}
 })

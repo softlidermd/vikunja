@@ -555,7 +555,7 @@ export const inviteLinksCheck = <ThrowOnError extends boolean = true>(options: O
 /**
  * List labels
  *
- * Returns the labels visible to the authenticated user — their own plus any used on tasks they can access. Not a global list.
+ * Returns the labels of the projects the authenticated user is a member of. Not a global list.
  */
 export const labelsList = <ThrowOnError extends boolean = true>(options?: Options<LabelsListData, ThrowOnError>): RequestResult<LabelsListResponses, LabelsListErrors, ThrowOnError> => (options?.client ?? client).get<LabelsListResponses, LabelsListErrors, ThrowOnError>({
     security: [{
@@ -574,7 +574,7 @@ export const labelsList = <ThrowOnError extends boolean = true>(options?: Option
 /**
  * Create a label
  *
- * Creates a label; the authenticated user becomes its owner.
+ * Creates a label in a project. `project_id` is required and the user needs write access to that project (404 if the project does not exist or is not accessible).
  */
 export const labelsCreate = <ThrowOnError extends boolean = true>(options: Options<LabelsCreateData, ThrowOnError>): RequestResult<LabelsCreateResponses, LabelsCreateErrors, ThrowOnError> => (options.client ?? client).post<LabelsCreateResponses, LabelsCreateErrors, ThrowOnError>({
     security: [{
@@ -597,7 +597,7 @@ export const labelsCreate = <ThrowOnError extends boolean = true>(options: Optio
 /**
  * Delete a label
  *
- * Deletes a label. Only the owner may delete it.
+ * Deletes a label. Requires write access to the label's project.
  */
 export const labelsDelete = <ThrowOnError extends boolean = true>(options: Options<LabelsDeleteData, ThrowOnError>): RequestResult<LabelsDeleteResponses, LabelsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<LabelsDeleteResponses, LabelsDeleteErrors, ThrowOnError>({
     security: [{
@@ -658,7 +658,7 @@ export const patchLabelsRead = <ThrowOnError extends boolean = true>(options: Op
 /**
  * Update a label
  *
- * Replaces all of a label's fields — only the owner may update it. Use PATCH for a partial update.
+ * Replaces all of a label's fields — requires write access to the label's project. Use PATCH for a partial update.
  */
 export const labelsUpdate = <ThrowOnError extends boolean = true>(options: Options<LabelsUpdateData, ThrowOnError>): RequestResult<LabelsUpdateResponses, LabelsUpdateErrors, ThrowOnError> => (options.client ?? client).put<LabelsUpdateResponses, LabelsUpdateErrors, ThrowOnError>({
     security: [{
@@ -2825,7 +2825,7 @@ export const taskLabelsList = <ThrowOnError extends boolean = true>(options: Opt
 /**
  * Add a label to a task
  *
- * Attaches an existing label to the given task. Requires write access to the task and access to the label. Fails if the label is already on the task.
+ * Attaches an existing label to the given task. Requires write access to the task; the label must belong to the task's project (403 otherwise). Fails if the label is already on the task.
  */
 export const taskLabelsCreate = <ThrowOnError extends boolean = true>(options: Options<TaskLabelsCreateData, ThrowOnError>): RequestResult<TaskLabelsCreateResponses, TaskLabelsCreateErrors, ThrowOnError> => (options.client ?? client).post<TaskLabelsCreateResponses, TaskLabelsCreateErrors, ThrowOnError>({
     security: [{
@@ -2848,7 +2848,7 @@ export const taskLabelsCreate = <ThrowOnError extends boolean = true>(options: O
 /**
  * Replace all labels on a task
  *
- * Sets the task's labels to exactly the provided list: labels not in the list are removed, missing ones are added, unchanged ones are left alone. Requires write access to the task, and you must be able to see every label you attach. Returns the resulting label set.
+ * Sets the task's labels to exactly the provided list: labels not in the list are removed, missing ones are added, unchanged ones are left alone. Requires write access to the task, and every label you attach must belong to the task's project (403 otherwise). Returns the resulting label set.
  */
 export const taskLabelsBulkReplace = <ThrowOnError extends boolean = true>(options: Options<TaskLabelsBulkReplaceData, ThrowOnError>): RequestResult<TaskLabelsBulkReplaceResponses, TaskLabelsBulkReplaceErrors, ThrowOnError> => (options.client ?? client).put<TaskLabelsBulkReplaceResponses, TaskLabelsBulkReplaceErrors, ThrowOnError>({
     security: [{

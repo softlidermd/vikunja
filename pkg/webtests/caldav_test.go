@@ -1182,10 +1182,18 @@ END:VCALENDAR`
 		ctag1 := getCtag(t, e, "36")
 		require.NotEmpty(t, ctag1, "project 36 should have a ctag before the label change")
 
-		// Task 40 lives in project 36; label 5 is not yet attached to it.
+		// Task 40 lives in project 36; the label must belong to that project too.
 		s := db.NewSession()
 		defer s.Close()
-		lt := &models.LabelTask{TaskID: 40, LabelID: 5}
+		label := &models.Label{
+			Title:     "ctag label",
+			ProjectID: 36,
+		}
+		require.NoError(t, label.Create(s, &testuser15))
+		lt := &models.LabelTask{
+			TaskID:  40,
+			LabelID: label.ID,
+		}
 		require.NoError(t, lt.Create(s, &testuser15))
 		require.NoError(t, s.Commit())
 

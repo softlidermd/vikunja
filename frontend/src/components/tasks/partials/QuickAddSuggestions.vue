@@ -59,6 +59,7 @@ import {autoUpdate, computePosition, flip, offset, shift} from '@floating-ui/dom
 
 import User from '@/components/misc/User.vue'
 import {useLabels} from '@/composables/useLabels'
+import {labelsInProject} from '@/client/queries/labels'
 import {useLabelStyles} from '@/composables/useLabelStyles'
 import {useProjects} from '@/composables/useProjects'
 import {useProjectUserSearch} from '@/composables/useUserSearch'
@@ -107,7 +108,7 @@ watch(() => [token.value?.kind, token.value?.query], () => {
 	dismissed.value = false
 })
 
-// shortcut: a `+project` in the text does not change whose members are searched; upgrade if users ask for it.
+// shortcut: a `+project` in the text does not change whose members or labels are suggested; upgrade if users ask for it.
 const searchProjectId = computed(() => props.projectId > 0
 	? props.projectId
 	: authStore.settings.default_project_id ?? 0)
@@ -124,7 +125,7 @@ const rows = computed<Row[]>(() => {
 	const q = query.value.toLowerCase()
 	switch (token.value?.kind) {
 		case 'label': {
-			const found = rankByTitle(labels.value, q, label => label.title ?? '')
+			const found = rankByTitle(labelsInProject(labels.value, searchProjectId.value), q, label => label.title ?? '')
 				.map(label => ({key: `l${label.id}`, value: label.title, label}))
 			if (found.length > 0) return found
 			return q === ''

@@ -95,11 +95,24 @@ func (lt *LabelTask) Delete(s *xorm.Session, auth web.Auth) (err error) {
 // @Param label body models.LabelTask true "The label object"
 // @Success 201 {object} models.LabelTask "The created label relation object."
 // @Failure 400 {object} web.HTTPError "Invalid label object provided."
-// @Failure 403 {object} web.HTTPError "Not allowed to add the label."
+// @Failure 403 {object} web.HTTPError "Not allowed to add the label, or the label belongs to another project."
 // @Failure 404 {object} web.HTTPError "The label does not exist."
 // @Failure 500 {object} models.Message "Internal error"
 // @Router /tasks/{task}/labels [put]
 func (lt *LabelTask) Create(s *xorm.Session, auth web.Auth) (err error) {
+	label, err := getLabelByIDSimple(s, lt.LabelID)
+	if err != nil {
+		return err
+	}
+	task, err := GetTaskByIDSimple(s, lt.TaskID)
+	if err != nil {
+		return err
+	}
+	err = checkLabelInTaskProject(label, task.ProjectID)
+	if err != nil {
+		return err
+	}
+
 	// Check if the label is already added
 	exists, err := s.Exist(&LabelTask{LabelID: lt.LabelID, TaskID: lt.TaskID})
 	if err != nil {
@@ -350,6 +363,59 @@ func addLabelCreators(s *xorm.Session, labels []*LabelWithTaskID) (err error) {
 	return nil
 }
 
+// checkLabelInTaskProject enforces the invariant labels.project_id == tasks.project_id.
+// Every write path that attaches a label must call it, whatever its permission checks.
+func checkLabelInTaskProject(label *Label, taskProjectID int64) error {
+	if label.ProjectID != taskProjectID {
+		return ErrUserHasNoAccessToLabel{LabelID: label.ID}
+	}
+	return nil
+}
+
+// moveTaskLabels repoints the task's labels to their counterparts in projectID
+// (see GetOrCreateProjectLabel) and returns the task's labels afterwards.
+func moveTaskLabels(s *xorm.Session, taskID, projectID int64) ([]*Label, error) {
+	current, _, _, err := GetLabelsByTaskIDs(s, []int64{taskID}, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	onTask := make(map[int64]bool, len(current))
+	for _, l := range current {
+		onTask[l.ID] = true
+	}
+
+	for _, l := range current {
+		if l.ProjectID == projectID {
+			continue
+		}
+		target, err := GetOrCreateProjectLabel(s, projectID, &l.Label)
+		if err != nil {
+			return nil, err
+		}
+		old := s.Where("task_id = ? AND label_id = ?", taskID, l.ID)
+		if onTask[target.ID] {
+			_, err = old.Delete(&LabelTask{})
+		} else {
+			_, err = old.Cols("label_id").Update(&LabelTask{LabelID: target.ID})
+			onTask[target.ID] = true
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	moved, _, _, err := GetLabelsByTaskIDs(s, []int64{taskID}, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+	labels := make([]*Label, 0, len(moved))
+	for _, l := range moved {
+		labels = append(labels, &l.Label)
+	}
+	return labels, nil
+}
+
 // Create or update a bunch of task labels
 func (t *Task) UpdateTaskLabels(s *xorm.Session, creator web.Auth, labels []*Label) (err error) {
 
@@ -418,13 +484,9 @@ func (t *Task) UpdateTaskLabels(s *xorm.Session, creator web.Auth, labels []*Lab
 			return err
 		}
 
-		// Check if the user has the permissions to see the label he is about to add
-		hasAccessToLabel, _, err := label.hasAccessToLabel(s, creator)
+		err = checkLabelInTaskProject(label, t.ProjectID)
 		if err != nil {
 			return err
-		}
-		if !hasAccessToLabel {
-			return ErrUserHasNoAccessToLabel{LabelID: l.ID, UserID: creator.GetID()}
 		}
 
 		// Insert it
@@ -450,7 +512,7 @@ func (t *Task) UpdateTaskLabels(s *xorm.Session, creator web.Auth, labels []*Lab
 // LabelTaskBulk is a helper struct to update a bunch of labels at once
 type LabelTaskBulk struct {
 	// All labels you want to update at once.
-	Labels []*Label `json:"labels" doc:"The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. You must be able to see every label you attach."`
+	Labels []*Label `json:"labels" doc:"The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. Every label you attach must belong to the task's project."`
 	TaskID int64    `json:"-" param:"projecttask"`
 
 	web.CRUDable    `json:"-"`

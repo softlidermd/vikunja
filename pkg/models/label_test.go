@@ -17,10 +17,7 @@
 package models
 
 import (
-	"reflect"
-	"runtime"
 	"testing"
-	"time"
 
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/user"
@@ -31,188 +28,49 @@ import (
 	"gopkg.in/d4l3k/messagediff.v1"
 )
 
-func TestLabel_ReadAll(t *testing.T) {
-	type fields struct {
-		ID          int64
-		Title       string
-		Description string
-		HexColor    string
-		CreatedByID int64
-		CreatedBy   *user.User
-		Created     time.Time
-		Updated     time.Time
-		CRUDable    web.CRUDable
-		Permissions web.Permissions
+// Fixture memberships the label tests rely on:
+// user 1 owns 1, 21 and 22 (21 and 22 archived), reads 3, and writes 16 through
+// team 1's share on its parent 33. User 13 owns 20, user 21 owns 44, bot 23 is
+// admin on 44, user 15 owns 36. User 2 reads 3 and 21 (team 1). Link share 1
+// reads project 1.
+func labelIDs(t *testing.T, ls interface{}) []int64 {
+	t.Helper()
+	labels, ok := ls.([]*LabelWithTaskID)
+	require.True(t, ok)
+	ids := make([]int64, 0, len(labels))
+	for _, l := range labels {
+		ids = append(ids, l.ID)
 	}
-	type args struct {
-		search string
-		a      web.Auth
-		page   int
-	}
-	user1 := &user.User{
-		ID:                           1,
-		Username:                     "user1",
-		Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-		Issuer:                       "local",
-		EmailRemindersEnabled:        true,
-		OverdueTasksRemindersEnabled: true,
-		OverdueTasksRemindersTime:    "09:00",
-		Created:                      testCreatedTime,
-		Updated:                      testUpdatedTime,
-		ExportFileID:                 1,
-	}
-	user2 := &user.User{
-		ID:                           2,
-		Username:                     "user2",
-		Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-		Issuer:                       "local",
-		EmailRemindersEnabled:        true,
-		OverdueTasksRemindersEnabled: true,
-		OverdueTasksRemindersTime:    "09:00",
-		DefaultProjectID:             4,
-		Created:                      testCreatedTime,
-		Updated:                      testUpdatedTime,
-	}
-	user6 := &user.User{
-		ID:                           6,
-		Username:                     "user6",
-		Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-		Issuer:                       "local",
-		EmailRemindersEnabled:        true,
-		OverdueTasksRemindersEnabled: true,
-		OverdueTasksRemindersTime:    "09:00",
-		Created:                      testCreatedTime,
-		Updated:                      testUpdatedTime,
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantLs  []*LabelWithTaskID
-		wantErr bool
-	}{
-		{
-			name: "normal",
-			args: args{
-				a: &user.User{ID: 1},
-			},
-			wantLs: []*LabelWithTaskID{
-				{
-					Label: Label{
-						ID:          1,
-						Title:       "Label #1",
-						CreatedByID: 1,
-						CreatedBy:   user1,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-				{
-					Label: Label{
-						ID:          2,
-						Title:       "Label #2",
-						CreatedByID: 1,
-						CreatedBy:   user1,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-				{
-					Label: Label{
-						ID:          4,
-						Title:       "Label #4 - visible via other task",
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-						CreatedByID: 2,
-						CreatedBy:   user2,
-					},
-				},
-				{
-					// Task 35 (project 21, owned by user1); archiving a project doesn't hide its tasks.
-					Label: Label{
-						ID:          5,
-						Title:       "Label #5",
-						CreatedByID: 2,
-						CreatedBy:   user2,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-				{
-					Label: Label{
-						ID:          7,
-						Title:       "Label #7 - created by user 1, no task attachment",
-						CreatedByID: 1,
-						CreatedBy:   user1,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-				{
-					Label: Label{
-						ID:          8,
-						Title:       "Label #8 - user 1 creator, only attached to inaccessible task",
-						CreatedByID: 1,
-						CreatedBy:   user1,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-				{
-					// Attached to task 25 in project 16, visible via the team 1
-					// share on the parent project 33.
-					Label: Label{
-						ID:          10,
-						Title:       "Label #10 - attached in child project only",
-						CreatedByID: 6,
-						CreatedBy:   user6,
-						Created:     testCreatedTime,
-						Updated:     testUpdatedTime,
-					},
-				},
-			},
-		},
-		{
-			name: "invalid user",
-			args: args{
-				a: &user.User{ID: -1},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &Label{
-				ID:          tt.fields.ID,
-				Title:       tt.fields.Title,
-				Description: tt.fields.Description,
-				HexColor:    tt.fields.HexColor,
-				CreatedByID: tt.fields.CreatedByID,
-				CreatedBy:   tt.fields.CreatedBy,
-				Created:     tt.fields.Created,
-				Updated:     tt.fields.Updated,
-				CRUDable:    tt.fields.CRUDable,
-				Permissions: tt.fields.Permissions,
-			}
-			db.LoadAndAssertFixtures(t)
-			s := db.NewSession()
-			defer s.Close()
-			gotLs, _, _, err := l.ReadAll(s, tt.args.a, tt.args.search, tt.args.page, 0)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Label.ReadAll() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			got := gotLs.([]*LabelWithTaskID)
-
-			if diff, equal := messagediff.PrettyDiff(got, tt.wantLs); !equal {
-				t.Errorf("Label.ReadAll() = %v, want %v, diff: %v", gotLs, tt.wantLs, diff)
-			}
-		})
-	}
+	return ids
 }
 
-// Separate from the table above: its args are built before a session exists, so the share can't be loaded yet.
+func TestLabel_ReadAll(t *testing.T) {
+	t.Run("labels of the member projects", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		gotLs, _, _, err := (&Label{}).ReadAll(s, &user.User{ID: 1}, "", 0, 0)
+		require.NoError(t, err)
+		// Project 1: 1, 2, 4, 5, 7, 13. Project 16: 10. Project 21: 14, 17. Project 22: 15.
+		// Not 6 and 8 (project 20), 9, 11 and 12 (project 44), 16 (project 36).
+		assert.Equal(t, []int64{1, 2, 4, 5, 7, 10, 13, 14, 15, 17}, labelIDs(t, gotLs))
+
+		labels := gotLs.([]*LabelWithTaskID)
+		assert.Equal(t, int64(1), labels[2].ProjectID)
+		require.NotNil(t, labels[2].CreatedBy)
+		assert.Equal(t, "user2", labels[2].CreatedBy.Username)
+	})
+	t.Run("invalid user", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		_, _, _, err := (&Label{}).ReadAll(s, &user.User{ID: -1}, "", 0, 0)
+		require.Error(t, err)
+	})
+}
+
 func TestLabel_ReadAll_LinkShare(t *testing.T) {
 	db.LoadAndAssertFixtures(t)
 	s := db.NewSession()
@@ -221,20 +79,9 @@ func TestLabel_ReadAll_LinkShare(t *testing.T) {
 	share, err := GetLinkShareByID(s, 1)
 	require.NoError(t, err)
 
-	l := &Label{}
-	gotLs, _, _, err := l.ReadAll(s, share, "", 0, 0)
+	gotLs, _, _, err := (&Label{}).ReadAll(s, share, "", 0, 0)
 	require.NoError(t, err)
-
-	labels, ok := gotLs.([]*LabelWithTaskID)
-	require.True(t, ok)
-
-	ids := make([]int64, 0, len(labels))
-	for _, lb := range labels {
-		ids = append(ids, lb.ID)
-	}
-	// Label #4: on tasks #1/#2 (project 1) - visible via the share.
-	// Label #5: only on project-21 tasks and soft-deleted task #51 - stays out.
-	assert.ElementsMatch(t, []int64{4}, ids, "link share for project 1 must see exactly {4}; got %v", ids)
+	assert.Equal(t, []int64{1, 2, 4, 5, 7, 13}, labelIDs(t, gotLs), "link share for project 1 sees exactly project 1's labels")
 }
 
 func TestLabel_ReadAll_SearchMatchesDescription(t *testing.T) {
@@ -245,29 +92,12 @@ func TestLabel_ReadAll_SearchMatchesDescription(t *testing.T) {
 	_, err := s.ID(7).Cols("description").Update(&Label{Description: "haystackneedle"})
 	require.NoError(t, err)
 
-	l := &Label{}
-	gotLs, _, _, err := l.ReadAll(s, &user.User{ID: 1}, "haystackneedle", 0, 0)
+	gotLs, _, _, err := (&Label{}).ReadAll(s, &user.User{ID: 1}, "haystackneedle", 0, 0)
 	require.NoError(t, err)
-
-	labels, ok := gotLs.([]*LabelWithTaskID)
-	require.True(t, ok)
-	require.Len(t, labels, 1)
-	assert.Equal(t, int64(7), labels[0].ID)
+	assert.Equal(t, []int64{7}, labelIDs(t, gotLs))
 }
 
 func TestLabel_ReadOne(t *testing.T) {
-	type fields struct {
-		ID          int64
-		Title       string
-		Description string
-		HexColor    string
-		CreatedByID int64
-		CreatedBy   *user.User
-		Created     time.Time
-		Updated     time.Time
-		CRUDable    web.CRUDable
-		Permissions web.Permissions
-	}
 	user1 := &user.User{
 		ID:                           1,
 		Username:                     "user1",
@@ -281,664 +111,408 @@ func TestLabel_ReadOne(t *testing.T) {
 		ExportFileID:                 1,
 	}
 	tests := []struct {
-		name                string
-		fields              fields
-		want                *Label
-		wantErr             bool
-		errType             func(error) bool
-		auth                web.Auth
-		wantForbidden       bool
-		assertMaxPermission bool
-		wantMaxPermission   int
+		name              string
+		labelID           int64
+		auth              web.Auth
+		wantForbidden     bool
+		wantMaxPermission Permission
+		want              *Label
 	}{
 		{
-			name: "Get label #1",
-			fields: fields{
-				ID: 1,
-			},
+			name:              "owner of the label's project",
+			labelID:           1,
+			auth:              &user.User{ID: 1},
+			wantMaxPermission: PermissionAdmin,
 			want: &Label{
 				ID:          1,
 				Title:       "Label #1",
+				ProjectID:   1,
 				CreatedByID: 1,
 				CreatedBy:   user1,
 				Created:     testCreatedTime,
 				Updated:     testUpdatedTime,
 			},
-			auth:                &user.User{ID: 1},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionAdmin),
 		},
 		{
-			name: "Get nonexistant label",
-			fields: fields{
-				ID: 9999,
-			},
-			wantErr:       true,
-			errType:       IsErrLabelDoesNotExist,
-			wantForbidden: true,
+			name:              "project member, not the creator",
+			labelID:           4,
+			auth:              &user.User{ID: 1},
+			wantMaxPermission: PermissionAdmin,
+		},
+		{
+			name:              "team share inherited from the parent project",
+			labelID:           10,
+			auth:              &user.User{ID: 1},
+			wantMaxPermission: PermissionWrite,
+		},
+		{
+			name:              "archived project stays readable",
+			labelID:           14,
+			auth:              &user.User{ID: 1},
+			wantMaxPermission: PermissionAdmin,
+		},
+		{
+			// Team 1 reads project 21; user 2 created label 17 but gets nothing extra for it.
+			name:              "read-only member",
+			labelID:           17,
+			auth:              &user.User{ID: 2},
+			wantMaxPermission: PermissionRead,
+		},
+		{
+			name:              "label created by a bot, read through project 44",
+			labelID:           11,
+			auth:              &user.User{ID: 21},
+			wantMaxPermission: PermissionAdmin,
+		},
+		{
+			name:              "bot member of the label's project",
+			labelID:           9,
+			auth:              &user.User{ID: 23},
+			wantMaxPermission: PermissionAdmin,
+		},
+		{
+			name:              "link share of the label's project",
+			labelID:           1,
+			auth:              &LinkSharing{ID: 1, ProjectID: 1, Permission: PermissionRead},
+			wantMaxPermission: PermissionRead,
+		},
+		{
+			// GHSA-hj5c-mhh2-g7jq: label 6 lives in user 13's private project 20.
+			name:          "non-member",
+			labelID:       6,
 			auth:          &user.User{ID: 1},
+			wantForbidden: true,
 		},
 		{
-			name: "no permissions",
-			fields: fields{
-				ID: 3,
-			},
-			wantForbidden: true,
+			name:          "creator who is not a member of the label's project",
+			labelID:       8,
 			auth:          &user.User{ID: 1},
-		},
-		{
-			// Label 4 is owned by user 2; user 1 can read it via a shared task
-			// but is not the owner, so max permission is read.
-			name: "Get label #4 - other user",
-			fields: fields{
-				ID: 4,
-			},
-			want: &Label{
-				ID:          4,
-				Title:       "Label #4 - visible via other task",
-				CreatedByID: 2,
-				CreatedBy: &user.User{
-					ID:                           2,
-					Username:                     "user2",
-					Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-					Issuer:                       "local",
-					EmailRemindersEnabled:        true,
-					OverdueTasksRemindersEnabled: true,
-					OverdueTasksRemindersTime:    "09:00",
-					DefaultProjectID:             4,
-					Created:                      testCreatedTime,
-					Updated:                      testUpdatedTime,
-				},
-				Created: testCreatedTime,
-				Updated: testUpdatedTime,
-			},
-			auth:                &user.User{ID: 1},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionRead),
-		},
-		{
-			// PoC for GHSA-hj5c-mhh2-g7jq: label 6 is reachable only via task
-			// 34 in the private project 20, user 1 must not see it.
-			name: "PoC GHSA-hj5c-mhh2-g7jq: label 6 attached only to unreachable task must be forbidden",
-			fields: fields{
-				ID: 6,
-			},
 			wantForbidden: true,
-			auth:          &user.User{ID: 1},
 		},
 		{
-			// Creator of an unattached label must still be able to read it.
-			name: "creator can read own label with no task attachment",
-			fields: fields{
-				ID: 7,
-			},
-			want: &Label{
-				ID:          7,
-				Title:       "Label #7 - created by user 1, no task attachment",
-				CreatedByID: 1,
-				CreatedBy:   user1,
-				Created:     testCreatedTime,
-				Updated:     testUpdatedTime,
-			},
-			auth:                &user.User{ID: 1},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionAdmin),
-		},
-		{
-			// Label 8's only label_tasks row points at inaccessible task 34, so
-			// access comes from the creator branch; as the owner, user 1's max
-			// permission is admin.
-			name: "creator can read own label only attached to inaccessible task",
-			fields: fields{
-				ID: 8,
-			},
-			want: &Label{
-				ID:          8,
-				Title:       "Label #8 - user 1 creator, only attached to inaccessible task",
-				CreatedByID: 1,
-				CreatedBy:   user1,
-				Created:     testCreatedTime,
-				Updated:     testUpdatedTime,
-			},
-			auth:                &user.User{ID: 1},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionAdmin),
-		},
-		{
-			// Non-creator must not be able to read an unattached label owned
-			// by someone else — label 3 in fixtures.
-			name: "non-creator cannot read label with no task attachment",
-			fields: fields{
-				ID: 3,
-			},
-			wantForbidden: true,
-			auth:          &user.User{ID: 1},
-		},
-		{
-			// Label 10 is attached only to task 25 in project 16; user 1's
-			// access comes from the team 1 share on the parent project 33.
-			name: "label attached to task in child project readable via parent share",
-			fields: fields{
-				ID: 10,
-			},
-			want: &Label{
-				ID:          10,
-				Title:       "Label #10 - attached in child project only",
-				CreatedByID: 6,
-				CreatedBy: &user.User{
-					ID:                           6,
-					Username:                     "user6",
-					Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-					Issuer:                       "local",
-					EmailRemindersEnabled:        true,
-					OverdueTasksRemindersEnabled: true,
-					OverdueTasksRemindersTime:    "09:00",
-					Created:                      testCreatedTime,
-					Updated:                      testUpdatedTime,
-				},
-				Created: testCreatedTime,
-				Updated: testUpdatedTime,
-			},
-			auth:                &user.User{ID: 1},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionRead),
-		},
-		{
-			// Label 9 was created by bot 23, whose owner is user 21. The
-			// bot owner inherits admin-level access.
-			name: "bot owner can read label created by their bot",
-			fields: fields{
-				ID: 9,
-			},
-			want: &Label{
-				ID:          9,
-				Title:       "Label #9 - created by bot 23 owned by user 21",
-				CreatedByID: 23,
-				CreatedBy: &user.User{
-					ID:                           23,
-					Name:                         "Owner A Assistant",
-					Username:                     "bot-owner-a-assistant",
-					Issuer:                       "local",
-					BotOwnerID:                   21,
-					EmailRemindersEnabled:        true,
-					OverdueTasksRemindersEnabled: true,
-					OverdueTasksRemindersTime:    "09:00",
-					Created:                      testCreatedTime,
-					Updated:                      testUpdatedTime,
-				},
-				Created: testCreatedTime,
-				Updated: testUpdatedTime,
-			},
-			auth:                &user.User{ID: 21},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionAdmin),
-		},
-		{
-			// User 22 owns a different bot and must not see another owner's
-			// bot's label.
-			name: "non-owner cannot read label created by someone else's bot",
-			fields: fields{
-				ID: 9,
-			},
-			wantForbidden: true,
+			name:          "unrelated user",
+			labelID:       9,
 			auth:          &user.User{ID: 22},
-		},
-		{
-			// Label 11 is unattached, so only the owner branch can grant this (#3592).
-			name: "bot can read never-used label created by its owner",
-			fields: fields{
-				ID: 11,
-			},
-			want: &Label{
-				ID:          11,
-				Title:       "Label #11 - created by user 21, owner of bot 23, no task attachment",
-				CreatedByID: 21,
-				CreatedBy: &user.User{
-					ID:                           21,
-					Username:                     "user_bot_owner_a",
-					Password:                     "$2a$04$X4aRMEt0ytgPwMIgv36cI..7X9.nhY/.tYwxpqSi0ykRHx2CwQ0S6",
-					Issuer:                       "local",
-					EmailRemindersEnabled:        true,
-					OverdueTasksRemindersEnabled: true,
-					OverdueTasksRemindersTime:    "09:00",
-					Created:                      testCreatedTime,
-					Updated:                      testUpdatedTime,
-				},
-				Created: testCreatedTime,
-				Updated: testUpdatedTime,
-			},
-			auth:                &user.User{ID: 23, BotOwnerID: 21},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionRead),
-		},
-		{
-			// Bot 24 belongs to user 22, so user 21's label stays out of reach.
-			name: "bot cannot read label created by a different bot owner",
-			fields: fields{
-				ID: 11,
-			},
 			wantForbidden: true,
-			auth:          &user.User{ID: 24, BotOwnerID: 22},
 		},
 		{
-			// JWT auth carries no BotOwnerID, so the identity must resolve from the database.
-			name: "bot can read label created by a sibling bot",
-			fields: fields{
-				ID: 12,
-			},
-			want: &Label{
-				ID:          12,
-				Title:       "Label #12 - created by bot 25, sibling of bot 23",
-				CreatedByID: 25,
-				CreatedBy: &user.User{
-					ID:                           25,
-					Name:                         "Owner A Scheduler",
-					Username:                     "bot-owner-a-scheduler",
-					Issuer:                       "local",
-					BotOwnerID:                   21,
-					EmailRemindersEnabled:        true,
-					OverdueTasksRemindersEnabled: true,
-					OverdueTasksRemindersTime:    "09:00",
-					Created:                      testCreatedTime,
-					Updated:                      testUpdatedTime,
-				},
-				Created: testCreatedTime,
-				Updated: testUpdatedTime,
-			},
-			auth:                &user.User{ID: 23},
-			assertMaxPermission: true,
-			wantMaxPermission:   int(PermissionRead),
-		},
-		{
-			name:          "other owner's bot cannot read a sibling bot's label",
-			fields:        fields{ID: 12},
+			name:          "link share of another project",
+			labelID:       6,
+			auth:          &LinkSharing{ID: 1, ProjectID: 1, Permission: PermissionRead},
 			wantForbidden: true,
-			auth:          &user.User{ID: 24, BotOwnerID: 22},
 		},
 		{
-			name:          "unrelated user cannot read a sibling bot's label",
-			fields:        fields{ID: 12},
-			wantForbidden: true,
+			// Reads don't disclose whether a label id exists.
+			name:          "nonexistent label",
+			labelID:       9999,
 			auth:          &user.User{ID: 1},
-		},
-		{
-			name:          "other bot owner cannot read a sibling bot's label",
-			fields:        fields{ID: 12},
 			wantForbidden: true,
-			auth:          &user.User{ID: 22},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)
-			l := &Label{
-				ID:          tt.fields.ID,
-				Title:       tt.fields.Title,
-				Description: tt.fields.Description,
-				HexColor:    tt.fields.HexColor,
-				CreatedByID: tt.fields.CreatedByID,
-				CreatedBy:   tt.fields.CreatedBy,
-				Created:     tt.fields.Created,
-				Updated:     tt.fields.Updated,
-				CRUDable:    tt.fields.CRUDable,
-				Permissions: tt.fields.Permissions,
-			}
-
 			s := db.NewSession()
 			defer s.Close()
 
+			l := &Label{ID: tt.labelID}
 			allowed, maxPermission, err := l.CanRead(s, tt.auth)
 			require.NoError(t, err)
-			if !allowed && !tt.wantForbidden {
-				t.Errorf("Label.CanRead() forbidden, want %v", tt.wantForbidden)
+			if tt.wantForbidden {
+				assert.False(t, allowed)
+				return
 			}
-			if allowed && tt.wantForbidden {
-				t.Errorf("Label.CanRead() allowed, want forbidden")
-			}
-			if tt.assertMaxPermission && maxPermission != tt.wantMaxPermission {
-				t.Errorf("Label.CanRead() maxPermission = %d, want %d", maxPermission, tt.wantMaxPermission)
-			}
-			err = l.ReadOne(s, tt.auth)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Label.ReadOne() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if (err != nil) && tt.wantErr && !tt.errType(err) {
-				t.Errorf("Label.ReadOne() Wrong error type! Error = %v, want = %v", err, runtime.FuncForPC(reflect.ValueOf(tt.errType).Pointer()).Name())
-			}
-			if diff, equal := messagediff.PrettyDiff(l, tt.want); !equal && !tt.wantErr && !tt.wantForbidden {
-				t.Errorf("Label.ReadAll() = %v, want %v, diff: %v", l, tt.want, diff)
+			require.True(t, allowed)
+			assert.Equal(t, int(tt.wantMaxPermission), maxPermission)
+
+			require.NoError(t, l.ReadOne(s, tt.auth))
+			if tt.want != nil {
+				if diff, equal := messagediff.PrettyDiff(l, tt.want); !equal {
+					t.Errorf("Label.ReadOne() = %v, want %v, diff: %v", l, tt.want, diff)
+				}
 			}
 		})
 	}
 }
 
+func TestLabel_ReadOne_DeletedCreator(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	_, err := s.ID(13).Delete(&user.User{})
+	require.NoError(t, err)
+
+	l := &Label{ID: 6}
+	require.NoError(t, l.ReadOne(s, &user.User{ID: 13}))
+	assert.Equal(t, int64(20), l.ProjectID)
+	assert.Nil(t, l.CreatedBy)
+}
+
 func TestLabel_Create(t *testing.T) {
-	type fields struct {
-		ID          int64
-		Title       string
-		Description string
-		HexColor    string
-		CreatedByID int64
-		CreatedBy   *user.User
-		Created     time.Time
-		Updated     time.Time
-		CRUDable    web.CRUDable
-		Permissions web.Permissions
-	}
-	type args struct {
-		a web.Auth
-	}
 	tests := []struct {
 		name          string
-		fields        fields
-		args          args
-		wantErr       bool
+		projectID     int64
+		auth          web.Auth
 		wantForbidden bool
+		wantErr       func(error) bool
 	}{
 		{
-			name: "normal",
-			fields: fields{
-				Title:       "Test #1",
-				Description: "Lorem Ipsum",
-				HexColor:    "ffccff",
-			},
-			args: args{
-				a: &user.User{ID: 1},
-			},
+			name:      "owner",
+			projectID: 1,
+			auth:      &user.User{ID: 1},
+		},
+		{
+			name:      "write through a team share on the parent project",
+			projectID: 16,
+			auth:      &user.User{ID: 1},
+		},
+		{
+			name:          "read-only member",
+			projectID:     3,
+			auth:          &user.User{ID: 1},
+			wantForbidden: true,
+		},
+		{
+			name:          "non-member",
+			projectID:     20,
+			auth:          &user.User{ID: 1},
+			wantForbidden: true,
+		},
+		{
+			name:          "link share with write access",
+			projectID:     2,
+			auth:          &LinkSharing{ID: 2, ProjectID: 2, Permission: PermissionWrite},
+			wantForbidden: true,
+		},
+		{
+			name:      "no project",
+			projectID: 0,
+			auth:      &user.User{ID: 1},
+			wantErr:   IsErrProjectDoesNotExist,
+		},
+		{
+			name:      "negative project",
+			projectID: -1,
+			auth:      &user.User{ID: 1},
+			wantErr:   IsErrProjectDoesNotExist,
+		},
+		{
+			name:      "missing project",
+			projectID: 99999,
+			auth:      &user.User{ID: 1},
+			wantErr:   IsErrProjectDoesNotExist,
+		},
+		{
+			name:      "archived project",
+			projectID: 22,
+			auth:      &user.User{ID: 1},
+			wantErr:   IsErrProjectIsArchived,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)
-			l := &Label{
-				ID:          tt.fields.ID,
-				Title:       tt.fields.Title,
-				Description: tt.fields.Description,
-				HexColor:    tt.fields.HexColor,
-				CreatedByID: tt.fields.CreatedByID,
-				CreatedBy:   tt.fields.CreatedBy,
-				Created:     tt.fields.Created,
-				Updated:     tt.fields.Updated,
-				CRUDable:    tt.fields.CRUDable,
-				Permissions: tt.fields.Permissions,
-			}
 			s := db.NewSession()
 			defer s.Close()
-			allowed, _ := l.CanCreate(s, tt.args.a)
-			if !allowed && !tt.wantForbidden {
-				t.Errorf("Label.CanCreate() forbidden, want %v", tt.wantForbidden)
+
+			l := &Label{
+				Title:       "Test #1",
+				Description: "Lorem Ipsum",
+				HexColor:    "ffccff",
+				ProjectID:   tt.projectID,
 			}
-			if allowed && tt.wantForbidden {
-				t.Errorf("Label.CanCreate() allowed, want forbidden")
+			allowed, err := l.CanCreate(s, tt.auth)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.True(t, tt.wantErr(err), "got %v", err)
+				return
 			}
-			if err := l.Create(s, tt.args.a); (err != nil) != tt.wantErr {
-				t.Errorf("Label.Create() error = %v, wantErr %v", err, tt.wantErr)
+			require.NoError(t, err)
+			if tt.wantForbidden {
+				assert.False(t, allowed)
+				return
 			}
-			if !tt.wantErr {
-				require.NoError(t, s.Commit())
-				db.AssertExists(t, "labels", map[string]interface{}{
-					"id":          l.ID,
-					"title":       l.Title,
-					"description": l.Description,
-					"hex_color":   l.HexColor,
-				}, false)
-			}
+			require.True(t, allowed)
+
+			require.NoError(t, l.Create(s, tt.auth))
+			require.NoError(t, s.Commit())
+			db.AssertExists(t, "labels", map[string]interface{}{
+				"id":            l.ID,
+				"title":         l.Title,
+				"description":   l.Description,
+				"hex_color":     l.HexColor,
+				"project_id":    tt.projectID,
+				"created_by_id": tt.auth.GetID(),
+			}, false)
 		})
+	}
+}
+
+// Create is reachable without CanCreate (importer, MCP), so it must refuse a missing project itself.
+func TestLabel_Create_RequiresProject(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	s := db.NewSession()
+	defer s.Close()
+
+	for _, projectID := range []int64{0, -1} {
+		err := (&Label{Title: "no project", ProjectID: projectID}).Create(s, &user.User{ID: 1})
+		require.Error(t, err)
+		assert.True(t, IsErrProjectDoesNotExist(err), "got %v", err)
 	}
 }
 
 func TestLabel_Update(t *testing.T) {
-	type fields struct {
-		ID          int64
-		Title       string
-		Description string
-		HexColor    string
-		CreatedByID int64
-		CreatedBy   *user.User
-		Created     time.Time
-		Updated     time.Time
-		CRUDable    web.CRUDable
-		Permissions web.Permissions
-	}
 	tests := []struct {
-		name              string
-		fields            fields
-		wantErr           bool
-		auth              web.Auth
-		wantForbidden     bool
-		permissionErrType func(error) bool
+		name          string
+		labelID       int64
+		auth          web.Auth
+		wantForbidden bool
+		wantErr       func(error) bool
 	}{
 		{
-			name: "normal",
-			fields: fields{
-				ID:    1,
-				Title: "new and better",
-			},
-			auth: &user.User{ID: 1},
+			name:    "write member who did not create the label",
+			labelID: 4,
+			auth:    &user.User{ID: 1},
 		},
 		{
-			name: "nonexisting",
-			fields: fields{
-				ID:    99999,
-				Title: "new and better",
-			},
-			auth:              &user.User{ID: 1},
-			wantForbidden:     true,
-			wantErr:           true,
-			permissionErrType: IsErrLabelDoesNotExist,
+			name:    "write through a team share on the parent project",
+			labelID: 10,
+			auth:    &user.User{ID: 1},
 		},
 		{
-			name: "no permissions",
-			fields: fields{
-				ID:    3,
-				Title: "new and better",
-			},
+			name:          "read-only member who created the label",
+			labelID:       17,
+			auth:          &user.User{ID: 2},
+			wantForbidden: true,
+		},
+		{
+			name:          "non-member",
+			labelID:       6,
 			auth:          &user.User{ID: 1},
 			wantForbidden: true,
 		},
 		{
-			name: "no permissions other creator but access",
-			fields: fields{
-				ID:    4,
-				Title: "new and better",
-			},
+			name:          "creator who is not a member",
+			labelID:       8,
 			auth:          &user.User{ID: 1},
 			wantForbidden: true,
 		},
 		{
-			// Label 9 was created by bot 23 (owned by user 21). The bot's
-			// owner inherits update permission.
-			name: "bot owner can update label created by their bot",
-			fields: fields{
-				ID:    9,
-				Title: "new and better",
-			},
-			auth: &user.User{ID: 21},
-		},
-		{
-			// User 22 owns a different bot and must not be able to update
-			// another owner's bot's label.
-			name: "non-owner cannot update label created by someone else's bot",
-			fields: fields{
-				ID:    9,
-				Title: "new and better",
-			},
-			auth:          &user.User{ID: 22},
+			name:          "link share with admin access",
+			labelID:       1,
+			auth:          &LinkSharing{ID: 1, ProjectID: 1, Permission: PermissionAdmin},
 			wantForbidden: true,
 		},
 		{
-			name: "bot owner can update label created by their second bot",
-			fields: fields{
-				ID:    12,
-				Title: "new and better",
-			},
-			auth: &user.User{ID: 21},
+			name:    "archived project",
+			labelID: 14,
+			auth:    &user.User{ID: 1},
+			wantErr: IsErrProjectIsArchived,
 		},
 		{
-			name: "bot cannot update label created by a sibling bot",
-			fields: fields{
-				ID:    12,
-				Title: "new and better",
-			},
-			auth:          &user.User{ID: 23},
-			wantForbidden: true,
+			name:    "nonexistent label",
+			labelID: 99999,
+			auth:    &user.User{ID: 1},
+			wantErr: IsErrLabelDoesNotExist,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)
-			l := &Label{
-				ID:          tt.fields.ID,
-				Title:       tt.fields.Title,
-				Description: tt.fields.Description,
-				HexColor:    tt.fields.HexColor,
-				CreatedByID: tt.fields.CreatedByID,
-				CreatedBy:   tt.fields.CreatedBy,
-				Created:     tt.fields.Created,
-				Updated:     tt.fields.Updated,
-				CRUDable:    tt.fields.CRUDable,
-				Permissions: tt.fields.Permissions,
-			}
 			s := db.NewSession()
 			defer s.Close()
+
+			// The project_id in the body must be ignored: labels never move.
+			l := &Label{
+				ID:        tt.labelID,
+				Title:     "new and better",
+				ProjectID: 20,
+			}
 			allowed, err := l.CanUpdate(s, tt.auth)
-			if tt.permissionErrType != nil {
+			if tt.wantErr != nil {
 				require.Error(t, err)
-				require.True(t, tt.permissionErrType(err))
-			} else {
-				require.NoError(t, err)
-			}
-			if !allowed && !tt.wantForbidden {
-				t.Errorf("Label.CanUpdate() forbidden, want %v", tt.wantForbidden)
-			}
-			if allowed && tt.wantForbidden {
-				t.Errorf("Label.CanUpdate() allowed, want forbidden")
-			}
-			if tt.wantForbidden {
+				assert.True(t, tt.wantErr(err), "got %v", err)
 				return
 			}
-			if err := l.Update(s, tt.auth); (err != nil) != tt.wantErr {
-				t.Errorf("Label.Update() error = %v, wantErr %v", err, tt.wantErr)
+			require.NoError(t, err)
+			if tt.wantForbidden {
+				assert.False(t, allowed)
+				return
 			}
-			if !tt.wantErr {
-				require.NoError(t, s.Commit())
-				db.AssertExists(t, "labels", map[string]interface{}{
-					"id":    tt.fields.ID,
-					"title": tt.fields.Title,
-				}, false)
-			}
+			require.True(t, allowed)
+
+			stored, err := getLabelByIDSimple(s, tt.labelID)
+			require.NoError(t, err)
+
+			require.NoError(t, l.Update(s, tt.auth))
+			require.NoError(t, s.Commit())
+			db.AssertExists(t, "labels", map[string]interface{}{
+				"id":         tt.labelID,
+				"title":      "new and better",
+				"project_id": stored.ProjectID,
+			}, false)
 		})
 	}
 }
 
 func TestLabel_Delete(t *testing.T) {
-	type fields struct {
-		ID          int64
-		Title       string
-		Description string
-		HexColor    string
-		CreatedByID int64
-		CreatedBy   *user.User
-		Created     time.Time
-		Updated     time.Time
-		CRUDable    web.CRUDable
-		Permissions web.Permissions
-	}
 	tests := []struct {
 		name          string
-		fields        fields
-		wantErr       bool
+		labelID       int64
 		auth          web.Auth
 		wantForbidden bool
+		wantErr       func(error) bool
 	}{
-
 		{
-			name: "normal",
-			fields: fields{
-				ID: 1,
-			},
-			auth: &user.User{ID: 1},
+			name:    "write member who did not create the label",
+			labelID: 4,
+			auth:    &user.User{ID: 1},
 		},
 		{
-			name: "nonexisting",
-			fields: fields{
-				ID: 99999,
-			},
-			auth:          &user.User{ID: 1},
-			wantForbidden: true, // When the label does not exist, it is forbidden. We should fix this, but for everything.
+			name:          "read-only member who created the label",
+			labelID:       17,
+			auth:          &user.User{ID: 2},
+			wantForbidden: true,
 		},
 		{
-			name: "no permissions",
-			fields: fields{
-				ID: 3,
-			},
+			name:          "non-member",
+			labelID:       6,
 			auth:          &user.User{ID: 1},
 			wantForbidden: true,
 		},
 		{
-			name: "no permissions but visible",
-			fields: fields{
-				ID: 4,
-			},
-			auth:          &user.User{ID: 1},
-			wantForbidden: true,
-		},
-		{
-			// Label 9 was created by bot 23 (owned by user 21). The bot's
-			// owner inherits delete permission.
-			name: "bot owner can delete label created by their bot",
-			fields: fields{
-				ID: 9,
-			},
-			auth: &user.User{ID: 21},
-		},
-		{
-			// User 22 owns a different bot and must not be able to delete
-			// another owner's bot's label.
-			name: "non-owner cannot delete label created by someone else's bot",
-			fields: fields{
-				ID: 9,
-			},
-			auth:          &user.User{ID: 22},
-			wantForbidden: true,
+			name:    "nonexistent label",
+			labelID: 99999,
+			auth:    &user.User{ID: 1},
+			wantErr: IsErrLabelDoesNotExist,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db.LoadAndAssertFixtures(t)
-			l := &Label{
-				ID:          tt.fields.ID,
-				Title:       tt.fields.Title,
-				Description: tt.fields.Description,
-				HexColor:    tt.fields.HexColor,
-				CreatedByID: tt.fields.CreatedByID,
-				CreatedBy:   tt.fields.CreatedBy,
-				Created:     tt.fields.Created,
-				Updated:     tt.fields.Updated,
-				CRUDable:    tt.fields.CRUDable,
-				Permissions: tt.fields.Permissions,
-			}
 			s := db.NewSession()
 			defer s.Close()
-			allowed, _ := l.CanDelete(s, tt.auth)
-			if !allowed && !tt.wantForbidden {
-				t.Errorf("Label.CanDelete() forbidden, want %v", tt.wantForbidden)
-			}
-			if allowed && tt.wantForbidden {
-				t.Errorf("Label.CanDelete() allowed, want forbidden")
-			}
-			if tt.wantForbidden {
+
+			l := &Label{ID: tt.labelID}
+			allowed, err := l.CanDelete(s, tt.auth)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.True(t, tt.wantErr(err), "got %v", err)
 				return
 			}
-			if err := l.Delete(s, tt.auth); (err != nil) != tt.wantErr {
-				t.Errorf("Label.Delete() error = %v, wantErr %v", err, tt.wantErr)
+			require.NoError(t, err)
+			if tt.wantForbidden {
+				assert.False(t, allowed)
+				return
 			}
-			if !tt.wantErr {
-				require.NoError(t, s.Commit())
-				db.AssertMissing(t, "labels", map[string]interface{}{
-					"id": l.ID,
-				})
-			}
+			require.True(t, allowed)
+
+			require.NoError(t, l.Delete(s, tt.auth))
+			require.NoError(t, s.Commit())
+			db.AssertMissing(t, "labels", map[string]interface{}{
+				"id": tt.labelID,
+			})
 		})
 	}
 }
@@ -960,55 +534,31 @@ func TestLabel_ReadAllMatchesCanRead(t *testing.T) {
 	auths := map[string]web.Auth{
 		"user 1":       &user.User{ID: 1},
 		"user 13":      &user.User{ID: 13},
+		"user 15":      &user.User{ID: 15},
 		"user 21":      &user.User{ID: 21},
 		"link share 1": share,
 	}
 
-	// Pinned independently of labelVisibleCond, so a widening of the shared
-	// cond (e.g. dropping taskNotDeletedCond or the bot-identity branch)
-	// can't slip through just because both sides of the parity check moved
-	// together. Cross-checked against TestLabel_ReadAll and
-	// TestLabel_ReadAll_LinkShare, and against labels.yml/label_tasks.yml/
-	// tasks.yml/link_shares.yml.
+	// Pinned from labels.yml and the project memberships, independently of
+	// labelVisibleCond, so a widening of the shared cond can't slip through just
+	// because both sides of the parity check moved together.
 	want := map[string][]int64{
-		// Owner (1, 2, 7): unattached, readable via the creator branch.
-		// Task access (4, 5, 10): attached to tasks in projects 1/21/16 that
-		// user 1 owns or reaches via the team share on parent project 33.
-		// Owner despite an inaccessible attachment (8): only label_tasks row
-		// points at task 34 in project 20, which user 1 can't reach.
-		// Excluded: 3 (other user, unattached), 6/9/11/12 (other
-		// users'/bots' identities), 13 (only attached to soft-deleted task 51).
-		"user 1": {1, 2, 4, 5, 7, 8, 10},
-		// Owner (6, 13): user 13's own labels, readable regardless of attachment.
-		// Task access (8): attached to task 34 in project 20, which user 13 owns.
-		"user 13": {6, 8, 13},
-		// Bot-identity branch only: 9 (bot 23), 11 (self), 12 (bot 25) all
-		// resolve to owner 21 via SameBotIdentityCond. User 21's own project
-		// (44) has no labeled tasks, so nothing arrives via task access.
-		"user 21": {9, 11, 12},
-		// Link share 1 grants read on project 1. Only tasks 1 and 2 there
-		// carry a label (4); task 51 is soft-deleted and excluded, and link
-		// shares don't get the bot-identity branch.
-		"link share 1": {4},
+		"user 1":       {1, 2, 4, 5, 7, 10, 13, 14, 15, 17},
+		"user 13":      {6, 8},
+		"user 15":      {16},
+		"user 21":      {9, 11, 12},
+		"link share 1": {1, 2, 4, 5, 7, 13},
 	}
 
 	for name, a := range auths {
 		t.Run(name, func(t *testing.T) {
-			l := &Label{}
-			gotLs, _, _, err := l.ReadAll(s, a, "", 0, 0)
+			gotLs, _, _, err := (&Label{}).ReadAll(s, a, "", 0, 0)
 			require.NoError(t, err)
-			labels, ok := gotLs.([]*LabelWithTaskID)
-			require.True(t, ok)
-
-			listed := make([]int64, 0, len(labels))
-			for _, lb := range labels {
-				listed = append(listed, lb.ID)
-			}
+			listed := labelIDs(t, gotLs)
 
 			readable := []int64{}
 			for _, lb := range allLabels {
-				single := &Label{ID: lb.ID}
-				can, _, err := single.CanRead(s, a)
+				can, _, err := (&Label{ID: lb.ID}).CanRead(s, a)
 				require.NoError(t, err)
 				if can {
 					readable = append(readable, lb.ID)
@@ -1054,12 +604,73 @@ func TestLabel_DeleteRemovesTaskAssociations(t *testing.T) {
 	s := db.NewSession()
 	defer s.Close()
 
-	// Label 8 was created by user 1 and is attached to task 34.
+	// Label 8 is attached to task 34.
 	l := &Label{ID: 8}
-	require.NoError(t, l.Delete(s, &user.User{ID: 1}))
+	require.NoError(t, l.Delete(s, &user.User{ID: 13}))
 	require.NoError(t, s.Commit())
 
 	db.AssertMissing(t, "labels", map[string]interface{}{"id": 8})
 	db.AssertMissing(t, "label_tasks", map[string]interface{}{"label_id": 8})
 	db.AssertExists(t, "label_tasks", map[string]interface{}{"label_id": 4, "task_id": 1}, false)
+}
+
+func TestLabel_GetOrCreateProjectLabel(t *testing.T) {
+	t.Run("a label of the same family", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		src, err := getLabelByIDSimple(s, 4)
+		require.NoError(t, err)
+		got, err := GetOrCreateProjectLabel(s, 21, src)
+		require.NoError(t, err)
+		assert.Equal(t, int64(14), got.ID)
+
+		// From a copy, the root itself is family too.
+		src, err = getLabelByIDSimple(s, 15)
+		require.NoError(t, err)
+		got, err = GetOrCreateProjectLabel(s, 1, src)
+		require.NoError(t, err)
+		assert.Equal(t, int64(4), got.ID)
+	})
+	t.Run("an unrelated label with the exact title", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		got, err := GetOrCreateProjectLabel(s, 21, &Label{Title: "Label #5"})
+		require.NoError(t, err)
+		assert.Equal(t, int64(17), got.ID)
+
+		// Exact: a title differing only in case is not a match.
+		got, err = GetOrCreateProjectLabel(s, 21, &Label{Title: "label #5", CreatedByID: 1})
+		require.NoError(t, err)
+		assert.NotEqual(t, int64(17), got.ID)
+	})
+	t.Run("a new copy keeping creator and lineage", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		src, err := getLabelByIDSimple(s, 14)
+		require.NoError(t, err)
+		_, err = s.ID(src.ID).Cols("hex_color").Update(&Label{HexColor: "abcdef"})
+		require.NoError(t, err)
+		src.HexColor = "#abcdef"
+		srcBefore := *src
+
+		got, err := GetOrCreateProjectLabel(s, 20, src)
+		require.NoError(t, err)
+		assert.Equal(t, srcBefore, *src, "src must not be modified")
+		assert.NotZero(t, got.ID)
+		require.NoError(t, s.Commit())
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"id":             got.ID,
+			"title":          "Label #4 - visible via other task",
+			"hex_color":      "abcdef",
+			"project_id":     20,
+			"created_by_id":  2,
+			"cloned_from_id": 4,
+		}, false)
+	})
 }

@@ -661,6 +661,14 @@ func TestProject_Delete(t *testing.T) {
 		db.AssertMissing(t, "project_task_counters", map[string]interface{}{
 			"project_id": 1,
 		})
+		db.AssertMissing(t, "labels", map[string]interface{}{
+			"project_id": 1,
+		})
+		// Label 4's copy in project 21 belongs to that project and stays.
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"id":         14,
+			"project_id": 21,
+		}, false)
 	})
 	t.Run("removes aliases owned by or targeting the project", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)

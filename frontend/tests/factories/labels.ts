@@ -13,6 +13,7 @@ export class LabelFactory extends Factory {
 			title: faker.lorem.words(2),
 			description: faker.lorem.text(10),
 			hex_color: (Math.random()*0xFFFFFF<<0).toString(16), // random 6-digit hex number
+			project_id: 1,
 			created_by_id: 1,
 			created: now.toISOString(),
 			updated: now.toISOString(),

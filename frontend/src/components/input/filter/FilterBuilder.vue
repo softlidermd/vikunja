@@ -331,16 +331,17 @@ const isCustom = ref(false)
 const openField = ref<BuilderField | null>(null)
 const search = ref('')
 
-const {labels, getLabelById, getLabelByExactTitle} = useLabels()
+const {labels, getLabelById, getLabelIdsByTitle} = useLabels()
 const projectList = useProjects()
 
 // View settings hold titles and camelCase fields, FilterInput emits ids and snake_case: parse both as the latter.
 // A number is already an id; resolving it as a title would pick a label or project named "4" instead.
+// A label title resolves to every visible label with that title (each project has its own labels).
 function toApiForm(filter: string): string {
 	const isId = (value: string) => /^\d+$/.test(value)
 	return transformFilterStringForApi(
 		filter,
-		title => isId(title) ? null : getLabelByExactTitle(title)?.id || null,
+		title => isId(title) ? null : getLabelIdsByTitle(title),
 		title => isId(title) ? null : projectList.findProjectByExactname(title)?.id || null,
 	)
 }
@@ -503,6 +504,7 @@ function optionsFor(condition: MultiCondition): Option[] {
 		options = labels.value.map(label => ({
 			value: String(label.id),
 			title: label.title ?? '',
+			subtitle: projectList.projects[label.project_id ?? 0]?.title,
 			color: label.hex_color ? '#' + label.hex_color.replace('#', '') : undefined,
 		}))
 	} else if (condition.field === 'project') {
@@ -590,7 +592,7 @@ function summary(condition: Condition): string {
 		if (condition.values.length === 0) {
 			return t('filters.builder.summary', {field, value: t('filters.builder.any')})
 		}
-		const names = condition.values.map(value => displayValue(condition.field, value))
+		const names = [...new Set(condition.values.map(value => displayValue(condition.field, value)))]
 		const more = names.length > 2 ? ' ' + t('filters.builder.more', {count: names.length - 2}) : ''
 		const value = names.slice(0, 2).join(', ') + more
 		return t(condition.negate ? 'filters.builder.summaryNot' : 'filters.builder.summary', {field, value})

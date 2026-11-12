@@ -52,7 +52,7 @@ func RegisterLabelTaskRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "task-labels-create",
 		Summary:     "Add a label to a task",
-		Description: "Attaches an existing label to the given task. Requires write access to the task and access to the label. Fails if the label is already on the task.",
+		Description: "Attaches an existing label to the given task. Requires write access to the task; the label must belong to the task's project (403 otherwise). Fails if the label is already on the task.",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{task}/labels",
 		Tags:        tags,

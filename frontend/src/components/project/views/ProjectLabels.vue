@@ -221,10 +221,12 @@ const cards = computed<LabelCard[]>(() => {
 	// while the label cards appear in front of it, opening the board at its far end.
 	// Only while loading: after a failed load the board still offers its add line.
 	if (query.isPending.value) return []
-	const used = new Map<number, LabelWithId>()
+	// A saved filter spans projects, each with its own labels: same-title labels share one card there.
+	const cardKey = (label: Label) => projectId.value < 0 ? label.title ?? '' : label.id
+	const used = new Map<number | string | undefined, LabelWithId>()
 	for (const task of tasks.value) {
 		for (const label of task.labels) {
-			if (label.id) used.set(label.id, label as LabelWithId)
+			if (label.id && !used.has(cardKey(label))) used.set(cardKey(label), label as LabelWithId)
 		}
 	}
 	// Spec 4.5 sorts by the ru locale whatever the UI language: it puts Cyrillic titles before Latin ones.
@@ -232,7 +234,7 @@ const cards = computed<LabelCard[]>(() => {
 		id: label.id,
 		title: label.title ?? '',
 		label,
-		tasks: tasks.value.filter(task => task.labels.some(item => item.id === label.id)),
+		tasks: tasks.value.filter(task => task.labels.some(item => cardKey(item) === cardKey(label))),
 	}))
 	return [...labelCards, {
 		id: 0,

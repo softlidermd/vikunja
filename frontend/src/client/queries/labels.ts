@@ -19,7 +19,7 @@ export const labelKeys = {
 }
 
 export type LabelDraft = Required<Pick<LabelWritable, 'title' | 'description' | 'hex_color'>>
-export type CreateLabelInput = Required<Pick<LabelWritable, 'title'>> &
+export type CreateLabelInput = Required<Pick<LabelWritable, 'title' | 'project_id'>> &
 	Pick<LabelWritable, 'description' | 'hex_color'>
 export type UpdateLabelInput = Required<Pick<Label, 'id' | 'title'>> &
 	Pick<Label, 'description' | 'hex_color'>
@@ -74,8 +74,36 @@ export function getLabelByExactTitle(labels: Label[], title: string): Label | un
 	return labels.find(label => (label.title ?? '').toLowerCase() === title.toLowerCase())
 }
 
-export function getLabelsByExactTitles(labels: Label[], titles: string[]): Label[] {
-	return labels.filter(label => titles.some(title => title.toLowerCase() === (label.title ?? '').toLowerCase()))
+export function labelsInProject(labels: Label[], projectId: number): Label[] {
+	return labels.filter(label => label.project_id === projectId)
+}
+
+// Display only: never resolve ids through this, same-title labels in other projects are different labels.
+export function uniqueLabelsByTitle(labels: Label[]): Label[] {
+	const seen = new Set<string>()
+	return labels.filter(label => {
+		const title = label.title ?? ''
+		if (seen.has(title)) {
+			return false
+		}
+		seen.add(title)
+		return true
+	})
+}
+
+export function getLabelIdsByTitle(labels: Label[], title: string): number[] | null {
+	// An all-digit token is an id the user picked, never a title.
+	if (/^\d+$/.test(title)) {
+		return null
+	}
+	const ids = (matches: Label[]) => matches.map(label => label.id).filter((id): id is number => id !== undefined)
+	const exact = ids(labels.filter(label => label.title === title))
+	if (exact.length > 0) {
+		return exact
+	}
+	const lower = title.toLowerCase()
+	const insensitive = ids(labels.filter(label => (label.title ?? '').toLowerCase() === lower))
+	return insensitive.length > 0 ? insensitive : null
 }
 
 export function filterLabelsByQuery(labels: Label[], labelsToHide: Label[], query: string): Label[] {
@@ -91,7 +119,7 @@ export function filterLabelsByQuery(labels: Label[], labelsToHide: Label[], quer
 			(label.description ?? '').toLowerCase().includes(normalizedQuery))
 }
 
-function labelBody(label: CreateLabelInput): LabelWritable {
+function labelBody(label: Omit<CreateLabelInput, 'project_id'>): LabelWritable {
 	return {
 		title: label.title,
 		description: label.description,
@@ -102,7 +130,12 @@ function labelBody(label: CreateLabelInput): LabelWritable {
 export function createLabelMutationOptions() {
 	return mutationOptions({
 		mutationFn: async (label: CreateLabelInput) => {
-			const {data} = await labelsCreate({body: labelBody(label)})
+			const {data} = await labelsCreate({
+				body: {
+					...labelBody(label),
+					project_id: label.project_id,
+				},
+			})
 			return data
 		},
 		onSuccess: (created, _label, _context, {client}) => {

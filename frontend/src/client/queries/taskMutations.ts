@@ -39,6 +39,7 @@ import {
 	taskQueryKeys,
 } from './taskCache'
 import {getCachedProject, projectKeys} from './projects'
+import {labelKeys} from './labels'
 import {colorFromHex} from '@/helpers/color/colorFromHex'
 import {getDefaultBucketId, getPlannedBucketId, moveTaskToBucket} from '@/helpers/task'
 import {translatedError} from '@/message'
@@ -197,6 +198,11 @@ export function updateTaskMutationOptions(optimistic = false) {
 		onSuccess: (task, input, client) => {
 			replaceTaskEverywhere(client, task)
 			reconcileDoneBuckets(client, normalizeTask({...task, id: input.id}))
+			// A move to another project may have copied labels into it that the label list doesn't hold yet.
+			const known = client.getQueryData<Label[]>(labelKeys.all)
+			if (known && task.labels?.some(label => !known.some(cached => cached.id === label.id))) {
+				void client.invalidateQueries({queryKey: labelKeys.all})
+			}
 		},
 		onSettled: ({id}, client) => settleTaskEdit(client, id),
 	})

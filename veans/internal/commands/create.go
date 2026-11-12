@@ -100,7 +100,7 @@ func runCreate(ctx context.Context, rt *runtime, title string, f *createFlags) (
 	// Attach labels (lazily creating them under veans: namespace).
 	for _, raw := range f.labels {
 		title := normalizeLabelTitle(raw)
-		l, err := getOrCreateLabelByTitle(ctx, rt.client, title)
+		l, err := getOrCreateLabelByTitle(ctx, rt.client, rt.cfg.ProjectID, title)
 		if err != nil {
 			return nil, output.Wrap(output.CodeUnknown, err, "label %q: %v", title, err)
 		}

@@ -618,15 +618,16 @@ func (vcls *VikunjaCaldavProjectStorage) CreateResource(rpath, content string) (
 	}
 
 	vcls.task.ID = vTask.ID
-	err = persistLabels(s, vcls.user, vcls.task, vTask.Labels)
+	vcls.task.ProjectID = vcls.project.ID
+	labels, err := persistLabels(s, vcls.user, vcls.task, vTask.Labels)
 	if err != nil {
 		log.Errorf("[CALDAV] Failed to persist labels in CreateResource: %v, labels: %+v", err, vTask.Labels)
 		_ = s.Rollback()
 		events.CleanupPending(s)
 		return nil, err
 	}
+	vTask.Labels = labels
 
-	vcls.task.ProjectID = vcls.project.ID
 	err = persistRelations(s, vcls.user, vcls.task, vTask.RelatedTasks)
 	if err != nil {
 		log.Errorf("[CALDAV] Failed to persist relations in CreateResource: %v, relations: %+v", err, vTask.RelatedTasks)
@@ -803,14 +804,14 @@ func (vcls *VikunjaCaldavProjectStorage) UpdateResource(rpath, content string) (
 
 	// nil = CATEGORIES absent, leave labels alone; non-nil (even empty) = explicit set.
 	if vTask.Labels != nil {
-		err = persistLabels(s, vcls.user, &base, vTask.Labels)
+		labels, err := persistLabels(s, vcls.user, &base, vTask.Labels)
 		if err != nil {
 			log.Errorf("[CALDAV] Failed to persist labels in UpdateResource: %v, labels: %+v", err, vTask.Labels)
 			_ = s.Rollback()
 			events.CleanupPending(s)
 			return nil, err
 		}
-		base.Labels = vTask.Labels
+		base.Labels = labels
 	}
 
 	// RELATED-TO has no explicit-clear form, so relations can be added or replaced via CalDAV, never removed.
@@ -886,43 +887,28 @@ func (vcls *VikunjaCaldavProjectStorage) DeleteResource(_ string) error {
 	return nil
 }
 
-func persistLabels(s *xorm.Session, a web.Auth, task *models.Task, labels []*models.Label) (err error) {
-
-	labelTitles := []string{}
-
+// persistLabels resolves the CATEGORIES to labels of the task's project, creating
+// missing ones, sets them on the task and returns them.
+func persistLabels(s *xorm.Session, a web.Auth, task *models.Task, labels []*models.Label) ([]*models.Label, error) {
+	var resolved []*models.Label
+	seen := make(map[int64]bool, len(labels))
 	for _, label := range labels {
-		labelTitles = append(labelTitles, label.Title)
-	}
-
-	u := &user2.User{
-		ID: a.GetID(),
-	}
-
-	// Using readall ensures the current user has the permission to see the labels they provided via caldav.
-	existingLabels, _, _, err := models.GetLabelsForUser(s, u, labelTitles, 0, 0)
-	if err != nil {
-		return err
-	}
-
-	labelMap := make(map[string]*models.Label)
-	for i := range existingLabels {
-		labelMap[existingLabels[i].Title] = &existingLabels[i].Label
-	}
-
-	for _, label := range labels {
-		if l, has := labelMap[label.Title]; has {
-			*label = *l
+		l, err := models.GetOrCreateProjectLabel(s, task.ProjectID, &models.Label{
+			Title:       label.Title,
+			HexColor:    label.HexColor,
+			CreatedByID: a.GetID(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		if seen[l.ID] {
 			continue
 		}
-
-		err = label.Create(s, a)
-		if err != nil {
-			return err
-		}
+		seen[l.ID] = true
+		resolved = append(resolved, l)
 	}
 
-	// Create the label <-> task relation
-	return task.UpdateTaskLabels(s, a, labels)
+	return resolved, task.UpdateTaskLabels(s, a, resolved)
 }
 
 func removeStaleRelations(s *xorm.Session, a web.Auth, task *models.Task, newRelations map[models.RelationKind][]*models.Task) (err error) {

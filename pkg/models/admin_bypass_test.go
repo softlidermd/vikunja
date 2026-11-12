@@ -111,3 +111,66 @@ func TestAdminBypass_StaleJWT_DeletedUser(t *testing.T) {
 		assert.False(t, can, "deleted admin must not grant bypass")
 	})
 }
+
+// Label endpoints use only the caller's own memberships: being an instance admin adds nothing.
+func TestAdminBypass_Label(t *testing.T) {
+	db.LoadAndAssertFixtures(t)
+	license.SetForTests([]license.Feature{license.FeatureAdminPanel})
+	defer license.ResetForTests()
+	s := db.NewSession()
+	defer s.Close()
+
+	_, err := s.ID(int64(2)).Cols("is_admin").Update(&user.User{IsAdmin: true})
+	require.NoError(t, err)
+	admin := &user.User{ID: 2, IsAdmin: true}
+
+	t.Run("project the admin is not a member of", func(t *testing.T) {
+		label := &Label{ID: 1}
+		can, _, err := label.CanRead(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanRead")
+
+		can, err = (&Label{ID: 1}).CanUpdate(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanUpdate")
+
+		can, err = (&Label{ID: 1}).CanDelete(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanDelete")
+
+		can, err = (&Label{Title: "admin", ProjectID: 1}).CanCreate(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanCreate")
+
+		ls, _, _, err := (&Label{}).ReadAll(s, admin, "", 0, 0)
+		require.NoError(t, err)
+		assert.NotContains(t, labelIDs(t, ls), int64(1))
+	})
+
+	t.Run("project the admin can only read", func(t *testing.T) {
+		// User 2 has read on project 3 (users_projects.yml).
+		label := &Label{
+			Title:       "in project 3",
+			ProjectID:   3,
+			CreatedByID: 3,
+		}
+		_, err := s.Insert(label)
+		require.NoError(t, err)
+
+		can, _, err := (&Label{ID: label.ID}).CanRead(s, admin)
+		require.NoError(t, err)
+		assert.True(t, can, "CanRead")
+
+		can, err = (&Label{ID: label.ID}).CanUpdate(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanUpdate")
+
+		can, err = (&Label{ID: label.ID}).CanDelete(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanDelete")
+
+		can, err = (&Label{Title: "admin", ProjectID: 3}).CanCreate(s, admin)
+		require.NoError(t, err)
+		assert.False(t, can, "CanCreate")
+	})
+}

@@ -55,6 +55,46 @@ func TestBulkTask_Update(t *testing.T) {
 		db.AssertExists(t, "tasks", map[string]interface{}{"id": 16, "title": "bulkupdated", "done": false}, false)
 	})
 
+	t.Run("moving tasks moves their labels", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// Tasks 1 and 2 (project 1) both carry label 4; user 1 has write on project 10.
+		bt := &BulkTask{
+			TaskIDs: []int64{1, 2},
+			Fields:  []string{"project_id"},
+			Values:  &Task{ProjectID: 10},
+		}
+		allowed, err := bt.CanUpdate(s, u)
+		require.NoError(t, err)
+		require.True(t, allowed)
+		require.NoError(t, bt.Update(s, u))
+		require.NoError(t, s.Commit())
+
+		require.Len(t, bt.Tasks, 2)
+		require.Len(t, bt.Tasks[0].Labels, 1)
+		require.Len(t, bt.Tasks[1].Labels, 1)
+		copied := bt.Tasks[0].Labels[0]
+		assert.NotEqual(t, int64(4), copied.ID)
+		assert.Equal(t, copied.ID, bt.Tasks[1].Labels[0].ID, "the second task reuses the first task's copy")
+
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"id":             copied.ID,
+			"project_id":     10,
+			"cloned_from_id": 4,
+		}, false)
+		for _, taskID := range bt.TaskIDs {
+			db.AssertExists(t, "label_tasks", map[string]interface{}{
+				"task_id":  taskID,
+				"label_id": copied.ID,
+			}, false)
+		}
+		db.AssertMissing(t, "label_tasks", map[string]interface{}{
+			"label_id": 4,
+		})
+	})
+
 	t.Run("unauthorized task prevents update", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)
 		s := db.NewSession()

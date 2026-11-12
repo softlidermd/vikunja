@@ -27,94 +27,111 @@ import (
 
 // CanUpdate checks if a user can update a label
 func (l *Label) CanUpdate(s *xorm.Session, a web.Auth) (bool, error) {
-	return l.isLabelOwner(s, a) // Only owners should be allowed to update a label
+	return canManageLabel(s, a, l.ID)
 }
 
 // CanDelete checks if a user can delete a label
 func (l *Label) CanDelete(s *xorm.Session, a web.Auth) (bool, error) {
-	return l.isLabelOwner(s, a) // Only owners should be allowed to delete a label
+	return canManageLabel(s, a, l.ID)
 }
 
 // CanRead checks if a user can read a label
 func (l *Label) CanRead(s *xorm.Session, a web.Auth) (bool, int, error) {
-	return l.hasAccessToLabel(s, a)
+	label, err := getLabelByIDSimple(s, l.ID)
+	// A plain denial: reads don't disclose whether a label id exists.
+	if IsErrLabelDoesNotExist(err) {
+		return false, 0, nil
+	}
+	if err != nil {
+		return false, 0, err
+	}
+
+	perm, has, err := labelProjectPermission(s, a, label.ProjectID)
+	if err != nil || !has {
+		return false, 0, err
+	}
+	return true, int(perm), nil
 }
 
-// CanCreate checks if the user can create a label
-// Currently a dummy.
-func (l *Label) CanCreate(_ *xorm.Session, a web.Auth) (bool, error) {
+// CanCreate checks if the user can create a label in l.ProjectID.
+func (l *Label) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
 	if _, is := a.(*LinkSharing); is {
 		return false, nil
 	}
 
+	project, err := GetProjectSimpleByID(s, l.ProjectID)
+	if err != nil {
+		return false, err
+	}
+
+	return canWriteLabelProject(s, a, project.ID)
+}
+
+// canManageLabel decides on the stored label's project, never on a project_id
+// sent in the request body.
+func canManageLabel(s *xorm.Session, a web.Auth, labelID int64) (bool, error) {
+	if _, is := a.(*LinkSharing); is {
+		return false, nil
+	}
+
+	label, err := getLabelByIDSimple(s, labelID)
+	if err != nil {
+		return false, err
+	}
+
+	return canWriteLabelProject(s, a, label.ProjectID)
+}
+
+func canWriteLabelProject(s *xorm.Session, a web.Auth, projectID int64) (bool, error) {
+	perm, has, err := labelProjectPermission(s, a, projectID)
+	if err != nil || !has || perm < PermissionWrite {
+		return false, err
+	}
+
+	// Surfaces ErrProjectIsArchived like Project.CanWrite does.
+	if err := (&Project{ID: projectID}).CheckIsArchived(s); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
-func (l *Label) isLabelOwner(s *xorm.Session, a web.Auth) (bool, error) {
-
-	// Link shares legitimately reach here through hasAccessToLabel, and are not
-	// users: a plain denial, not an error.
-	caller, err := user.GetFromAuth(a)
-	if user.IsErrMustNotBeLinkShare(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
+// labelProjectPermission is the caller's own membership permission on a
+// label's project. It reads the same map as labelVisibleCond, so single-label
+// checks and the list cannot drift, and instance admins get no bypass here.
+func labelProjectPermission(s *xorm.Session, a web.Auth, projectID int64) (Permission, bool, error) {
+	if share, is := a.(*LinkSharing); is {
+		return share.Permission, share.ProjectID == projectID, nil
 	}
 
-	lorig, err := getLabelByIDSimple(s, l.ID)
+	u, err := user.GetFromAuth(a)
 	if err != nil {
-		return false, err
-	}
-	if lorig.CreatedByID == caller.ID {
-		return true, nil
+		return 0, false, err
 	}
 
-	creator, err := user.GetUserByID(s, lorig.CreatedByID)
+	access, err := getProjectAccessForUser(s, u.ID)
 	if err != nil {
-		if user.IsErrUserDoesNotExist(err) {
-			return false, nil
-		}
-		return false, err
+		return 0, false, err
 	}
-	return creator.IsBotOwnedBy(caller), nil
+	perm, has := access.permission(projectID)
+	return perm, has, nil
 }
 
-// labelVisibleCond matches every label the caller may see: used on a task in a
-// project they can access, or created by their own bot identity. It is the one
-// definition of label visibility - single-label reads and the list must not drift.
+// labelVisibleCond matches every label in a project the caller can access. It
+// is the one definition of label visibility - single-label reads and the list
+// must not drift.
 //
-// The cond is assembled from builder.And / builder.Or values and must be handed
-// to Where in one shot. Chaining xorm's session .Where/.Or/.And instead flattens
-// the SQL to `A OR B OR C AND D`, which leaked any label with any label_tasks row
-// to any authenticated user (GHSA-hj5c-mhh2-g7jq).
+// The cond must be handed to Where in one shot. Chaining xorm's session
+// .Where/.Or/.And instead flattens the SQL to `A OR B OR C AND D`, which leaked
+// any label with any label_tasks row to any authenticated user
+// (GHSA-hj5c-mhh2-g7jq).
 func labelVisibleCond(s *xorm.Session, a web.Auth) (builder.Cond, error) {
 
-	// Must include projects inherited via a shared parent, otherwise users can
-	// remove but not re-add labels on tasks in child projects.
-	accessibleProjects, err := accessibleProjectIDsCond(s, a, "tasks.project_id")
+	// Includes projects inherited via a shared parent.
+	visible, err := accessibleProjectIDsCond(s, a, "labels.project_id")
 	if err != nil {
 		return nil, err
 	}
 
-	usedOnAccessibleTask := builder.In("labels.id",
-		builder.
-			Select("label_tasks.label_id").
-			From("label_tasks").
-			InnerJoin("tasks", "tasks.id = label_tasks.task_id").
-			Where(builder.And(accessibleProjects, taskNotDeletedCond("tasks"))),
-	)
-
-	accessBranches := []builder.Cond{usedOnAccessibleTask}
-	if _, isLinkShare := a.(*LinkSharing); !isLinkShare {
-		caller, err := user.GetFromAuth(a)
-		if err != nil {
-			return nil, err
-		}
-		accessBranches = append(accessBranches, user.SameBotIdentityCond(caller, "labels.created_by_id"))
-	}
-
-	visible := builder.Or(accessBranches...)
 	// Both consumers embed this in a builder.And, which silently drops an invalid
 	// cond - the query would then match every label instead of failing.
 	if visible == nil || !visible.IsValid() {
@@ -122,35 +139,4 @@ func labelVisibleCond(s *xorm.Session, a web.Auth) (builder.Cond, error) {
 	}
 
 	return visible, nil
-}
-
-// hasAccessToLabel reports whether the caller can read a label and, if so,
-// the caller's maximum permission on it.
-func (l *Label) hasAccessToLabel(s *xorm.Session, a web.Auth) (has bool, maxPermission int, err error) {
-
-	visible, err := labelVisibleCond(s, a)
-	if err != nil {
-		return false, 0, err
-	}
-
-	has, err = s.Table("labels").
-		Where(builder.And(builder.Eq{"labels.id": l.ID}, visible)).
-		Exist(&Label{})
-	if err != nil || !has {
-		return
-	}
-
-	// Writes and deletes are owner-only (CanUpdate/CanDelete), so the caller's
-	// max permission is admin for the owner and read for anyone else who can see it.
-	owner, err := l.isLabelOwner(s, a)
-	if err != nil {
-		return
-	}
-	if owner {
-		maxPermission = int(PermissionAdmin)
-	} else {
-		maxPermission = int(PermissionRead)
-	}
-
-	return
 }

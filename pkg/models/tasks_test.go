@@ -570,6 +570,126 @@ func TestTask_Update(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), task.Index)
 	})
+	t.Run("moving a task copies its labels into the new project", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		task := &Task{
+			ID:        1,
+			ProjectID: 2,
+		}
+		require.NoError(t, task.Update(s, u))
+		require.NoError(t, s.Commit())
+
+		require.Len(t, task.Labels, 1)
+		copied := task.Labels[0]
+		assert.NotEqual(t, int64(4), copied.ID)
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"id":             copied.ID,
+			"title":          "Label #4 - visible via other task",
+			"project_id":     2,
+			"created_by_id":  2,
+			"cloned_from_id": 4,
+		}, false)
+		db.AssertExists(t, "label_tasks", map[string]interface{}{
+			"task_id":  1,
+			"label_id": copied.ID,
+		}, false)
+		db.AssertMissing(t, "label_tasks", map[string]interface{}{
+			"task_id":  1,
+			"label_id": 4,
+		})
+	})
+	t.Run("moving a task reuses a label of the same family before one with the same title", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		sameTitle := &Label{
+			Title:       "Label #4 - visible via other task",
+			ProjectID:   2,
+			CreatedByID: 1,
+		}
+		family := &Label{
+			Title:        "renamed copy of label 4",
+			ProjectID:    2,
+			CreatedByID:  1,
+			ClonedFromID: 4,
+		}
+		_, err := s.Insert(sameTitle, family)
+		require.NoError(t, err)
+
+		task := &Task{
+			ID:        1,
+			ProjectID: 2,
+		}
+		require.NoError(t, task.Update(s, u))
+		require.NoError(t, s.Commit())
+
+		require.Len(t, task.Labels, 1)
+		assert.Equal(t, family.ID, task.Labels[0].ID)
+		db.AssertExists(t, "label_tasks", map[string]interface{}{
+			"task_id":  1,
+			"label_id": family.ID,
+		}, false)
+	})
+	t.Run("moving a task reuses a label with the exact title", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		sameTitle := &Label{
+			Title:       "Label #4 - visible via other task",
+			ProjectID:   2,
+			CreatedByID: 1,
+		}
+		_, err := s.Insert(sameTitle)
+		require.NoError(t, err)
+
+		task := &Task{
+			ID:        1,
+			ProjectID: 2,
+		}
+		require.NoError(t, task.Update(s, u))
+		require.NoError(t, s.Commit())
+
+		require.Len(t, task.Labels, 1)
+		assert.Equal(t, sameTitle.ID, task.Labels[0].ID)
+		db.AssertMissing(t, "labels", map[string]interface{}{
+			"project_id":     2,
+			"cloned_from_id": 4,
+		})
+	})
+	t.Run("moving a task whose labels map to one target keeps one row", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// An unrelated label with label 4's title, also on task 1.
+		twin := &Label{
+			Title:       "Label #4 - visible via other task",
+			ProjectID:   1,
+			CreatedByID: 1,
+		}
+		_, err := s.Insert(twin)
+		require.NoError(t, err)
+		_, err = s.Insert(&LabelTask{
+			TaskID:  1,
+			LabelID: twin.ID,
+		})
+		require.NoError(t, err)
+
+		task := &Task{
+			ID:        1,
+			ProjectID: 2,
+		}
+		require.NoError(t, task.Update(s, u))
+		require.NoError(t, s.Commit())
+
+		require.Len(t, task.Labels, 1)
+		db.AssertCount(t, "label_tasks", builder.Eq{"task_id": 1}, 1)
+	})
 
 	t.Run("reminders will be updated", func(t *testing.T) {
 		db.LoadAndAssertFixtures(t)

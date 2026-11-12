@@ -9,7 +9,13 @@ import {
 	useAddTaskAssigneeMutation,
 	useAddTaskLabelMutation,
 } from '@/client/queries/taskMutations'
-import {ensureLabels, refreshLabels, getLabelByExactTitle, useCreateLabelMutation} from '@/client/queries/labels'
+import {
+	ensureLabels,
+	refreshLabels,
+	getLabelByExactTitle,
+	labelsInProject,
+	useCreateLabelMutation,
+} from '@/client/queries/labels'
 import {ensureProjects, findProjectByExactTitle} from '@/client/queries/projects'
 import {searchProjectUsers} from '@/client/queries/userSearch'
 import {useAuthStore} from '@/stores/auth'
@@ -61,14 +67,20 @@ export function useQuickAddTask() {
 		return id
 	}
 
-	async function ensureLabelsExist(titles: string[], context = captureClientRequestContext()): Promise<ResolvedLabels> {
+	async function ensureLabelsExist(
+		projectId: number,
+		titles: string[],
+		context = captureClientRequestContext(),
+	): Promise<ResolvedLabels> {
 		const wanted = [...new Set(titles)]
 		if (!wanted.length) return {labels: [], skipped: []}
 		assertClientRequestContext(context)
 		let labels: Label[] = []
 		try {
-			labels = await ensureLabels()
-			if (wanted.some(title => !getLabelByExactTitle(labels, title))) labels = await refreshLabels()
+			labels = labelsInProject(await ensureLabels(), projectId)
+			if (wanted.some(title => !getLabelByExactTitle(labels, title))) {
+				labels = labelsInProject(await refreshLabels(), projectId)
+			}
 		} catch {
 			assertClientRequestContext(context)
 		}
@@ -78,7 +90,14 @@ export function useQuickAddTask() {
 			if (existing) return {title, label: existing}
 			// A label must never fail the task it belongs to; the caller summarises what was skipped.
 			try {
-				return {title, label: await createLabel.mutateAsync({title, hex_color: getRandomColorHex()})}
+				return {
+					title,
+					label: await createLabel.mutateAsync({
+						title,
+						hex_color: getRandomColorHex(),
+						project_id: projectId,
+					}),
+				}
 			} catch {
 				assertClientRequestContext(context)
 				return {title, label: undefined}
@@ -134,7 +153,7 @@ export function useQuickAddTask() {
 		{task, parsedLabels}: {task: Task, parsedLabels: string[]},
 		context = captureClientRequestContext(),
 	) {
-		const {labels, skipped} = await ensureLabelsExist(parsedLabels, context)
+		const {labels, skipped} = await ensureLabelsExist(task.project_id!, parsedLabels, context)
 		await runWrites(labels, label => {
 			assertClientRequestContext(context)
 			return addLabel.mutateAsync({taskId: task.id!, label: {...label, id: label.id!}})

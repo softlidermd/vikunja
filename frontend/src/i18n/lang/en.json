@@ -863,12 +863,13 @@
   "label": {
     "title": "Labels",
     "manage": "Manage labels",
-    "description": "Click on a label to edit it. You can edit all labels you created, you can use all labels which are associated with a task to whose project you have access.",
+    "description": "Each label belongs to one project. You can use the labels of every project you have access to, and edit them in projects where you can write.",
     "newCTA": "You currently do not have any labels.",
     "create": {
       "header": "New label",
       "title": "Create a label",
       "titleRequired": "Please specify a title.",
+      "projectRequired": "Please select a project.",
       "success": "The label was successfully created."
     },
     "edit": {

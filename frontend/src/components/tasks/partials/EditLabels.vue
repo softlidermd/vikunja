@@ -59,13 +59,17 @@ import {success} from '@/message'
 import BaseButton from '@/components/base/BaseButton.vue'
 import Multiselect from '@/components/input/Multiselect.vue'
 import type {Label} from '@/client/generated'
-import {useCreateLabelMutation} from '@/client/queries/labels'
+import {
+	filterLabelsByQuery,
+	getLabelByExactTitle,
+	labelsInProject,
+	refreshLabels,
+	useCreateLabelMutation,
+} from '@/client/queries/labels'
 import {useAddTaskLabelMutation, useRemoveTaskLabelMutation} from '@/client/queries/taskMutations'
 import {getRandomColorHex} from '@/helpers/color/randomColor'
 import {useLabelStyles} from '@/composables/useLabelStyles'
 import {useLabels} from '@/composables/useLabels'
-import {useQueryClient} from '@tanstack/vue-query'
-import {cachedListTasks} from '@/client/queries/taskCache'
 
 const props = withDefaults(defineProps<{
 	modelValue: Label[] | undefined
@@ -107,27 +111,16 @@ watch(
 
 const addLabelMutation = useAddTaskLabelMutation()
 const removeLabelMutation = useRemoveTaskLabelMutation()
-const {labels: allLabels, filterLabelsByQuery, isPending} = useLabels()
+const {labels: allLabels, isPending} = useLabels()
 const createLabelMutation = useCreateLabelMutation()
 const {getLabelStyles} = useLabelStyles()
 
-const queryClient = useQueryClient()
-
-// shortcut: ranks by the project's tasks already loaded in list/table/kanban caches, not the whole project;
-// add a backend "labels used in project" query if that proves too thin.
-function rankProjectLabelsFirst(found: Label[]): Label[] {
-	if (!props.projectId) return found
-	const usedIds = new Set(cachedListTasks(queryClient)
-		.filter(task => task.project_id === props.projectId)
-		.flatMap(task => (task.labels ?? []).map(label => label.id)))
-	// sort is stable, so each group keeps its alphabetical order
-	return [...found].sort((a, b) => Number(usedIds.has(b.id)) - Number(usedIds.has(a.id)))
-}
-
+// Only the task's project labels can be attached to it.
+const projectLabels = computed(() => labelsInProject(allLabels.value, props.projectId))
 // An empty query lists every label not yet on the task, so the picker shows options as soon as it is focused.
-const foundLabels = computed(() => rankProjectLabelsFirst(query.value === ''
-	? allLabels.value.filter(label => !labels.value.some(l => l.id === label.id))
-	: filterLabelsByQuery(labels.value, query.value)))
+const foundLabels = computed(() => query.value === ''
+	? projectLabels.value.filter(label => !labels.value.some(l => l.id === label.id))
+	: filterLabelsByQuery(projectLabels.value, labels.value, query.value))
 const loading = computed(() => isPending.value
 	|| createLabelMutation.isPending.value
 	|| addLabelMutation.isPending.value
@@ -168,9 +161,19 @@ async function createAndAddLabel(title: string) {
 		return
 	}
 
+	// The cached list may be stale: another user or tab could have created this label meanwhile.
+	const existing = getLabelByExactTitle(labelsInProject(await refreshLabels(), props.projectId), title)
+	if (existing) {
+		if (!labels.value.some(label => label.id === existing.id)) {
+			await addLabel(existing)
+		}
+		return
+	}
+
 	const newLabel = await createLabelMutation.mutateAsync({
 		title,
 		hex_color: getRandomColorHex(),
+		project_id: props.projectId,
 	})
 	await addLabel(newLabel, false)
 	success({message: t('task.label.addCreateSuccess')})

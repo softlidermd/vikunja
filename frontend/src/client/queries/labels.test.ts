@@ -19,13 +19,15 @@ import {
 	ensureLabels,
 	filterLabelsByQuery,
 	getLabelByExactTitle,
-	getLabelsByExactTitles,
 	getLabelById,
+	getLabelIdsByTitle,
 	getLabelsByIds,
 	labelKeys,
+	labelsInProject,
 	labelsQuery,
 	refreshLabels,
 	sortLabelsAlphabetically,
+	uniqueLabelsByTitle,
 	updateLabelMutationOptions,
 } from './labels'
 
@@ -98,7 +100,38 @@ describe('label derivations', () => {
 
 	it('looks labels up by title case-insensitively', () => {
 		expect(getLabelByExactTitle(labels, 'alpha')?.id).toBe(1)
-		expect(getLabelsByExactTitles(labels, ['bravo', 'ZULU']).map(label => label.id)).toEqual([3, 2])
+	})
+
+	describe('per-project labels', () => {
+		const projectLabels: Label[] = [
+			{id: 14, title: 'Bug', project_id: 2},
+			{id: 30, title: 'Bug', project_id: 3},
+			{id: 31, title: 'bug', project_id: 3},
+			{id: 40, title: 'Feature', project_id: 2},
+			{id: 41, title: '5', project_id: 2},
+		]
+
+		it('keeps only the labels of one project', () => {
+			expect(labelsInProject(projectLabels, 3).map(label => label.id)).toEqual([30, 31])
+		})
+
+		it('shows each exact title once', () => {
+			expect(uniqueLabelsByTitle(projectLabels).map(label => label.id)).toEqual([14, 31, 40, 41])
+		})
+
+		it('resolves a title to every exact-case match', () => {
+			expect(getLabelIdsByTitle(projectLabels, 'Bug')).toEqual([14, 30])
+		})
+
+		it('falls back to every case-insensitive match', () => {
+			expect(getLabelIdsByTitle(projectLabels, 'BUG')).toEqual([14, 30, 31])
+			expect(getLabelIdsByTitle(projectLabels, 'feature')).toEqual([40])
+		})
+
+		it('resolves nothing for an unknown title or an all-digit token', () => {
+			expect(getLabelIdsByTitle(projectLabels, 'Nope')).toBeNull()
+			expect(getLabelIdsByTitle(projectLabels, '5')).toBeNull()
+		})
 	})
 
 	it('filters titles and descriptions while excluding hidden labels', () => {
@@ -133,8 +166,14 @@ describe('label cache mutations', () => {
 		sdk.labelsCreate.mockResolvedValue({data: created})
 		const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
 
-		await expect(runMutation(createLabelMutationOptions(), {title: 'Created'})).resolves.toEqual(created)
+		await expect(runMutation(createLabelMutationOptions(), {title: 'Created', project_id: 7})).resolves.toEqual(created)
 
+		expect(sdk.labelsCreate).toHaveBeenCalledExactlyOnceWith({
+			body: expect.objectContaining({
+				title: 'Created',
+				project_id: 7,
+			}),
+		})
 		expect(cachedLabels()).toContainEqual(created)
 		expect(invalidate).toHaveBeenCalledWith({queryKey: labelKeys.all})
 	})
@@ -143,7 +182,7 @@ describe('label cache mutations', () => {
 		queryClient.clear()
 		sdk.labelsCreate.mockResolvedValue({data: {id: 4, title: 'Created'}})
 
-		await runMutation(createLabelMutationOptions(), {title: 'Created'})
+		await runMutation(createLabelMutationOptions(), {title: 'Created', project_id: 7})
 
 		expect(queryClient.getQueryData(labelKeys.all)).toBeUndefined()
 	})

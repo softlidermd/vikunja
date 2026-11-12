@@ -45,6 +45,7 @@ func init() {
 		"SetSessionContext":              reflect.ValueOf(db.SetSessionContext),
 		"TruncateAllTables":              reflect.ValueOf(db.TruncateAllTables),
 		"Type":                           reflect.ValueOf(db.Type),
+		"UnicodeLowerFunc":               reflect.ValueOf(constant.MakeFromLiteral("\"vikunja_lower\"", token.STRING, 0)),
 		"WipeEverything":                 reflect.ValueOf(db.WipeEverything),
 
 		// type definitions

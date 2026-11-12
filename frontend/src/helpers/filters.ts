@@ -94,7 +94,7 @@ export function getFilterFieldRegexPattern(field: string): RegExp {
 
 export function transformFilterStringForApi(
 	filter: string,
-	labelResolver: (title: string) => number | null,
+	labelResolver: (title: string) => number | number[] | null,
 	projectResolver: (title: string) => number | null,
 ): string {
 
@@ -112,7 +112,7 @@ export function transformFilterStringForApi(
 	// Transform labels and projects to ids
 	function transformFieldToIds(
 		fields: string[],
-		resolver: (title: string) => number | null,
+		resolver: (title: string) => number | number[] | null,
 		filter: string,
 	): string {
 		fields.forEach(field => {
@@ -122,17 +122,18 @@ export function transformFilterStringForApi(
 			const replacements: { start: number, length: number, replacement: string }[] = []
 
 			while ((match = pattern.exec(filter)) !== null) {
-				const [matched, fieldName, operator, _quotes, quotedContent, unquotedContent] = match
+				const [matched, fieldName, matchedOperator, _quotes, quotedContent, unquotedContent] = match
 				const keyword = quotedContent || unquotedContent
 				if (!keyword) {
 					continue
 				}
 
 				let keywords = [keyword.trim()]
-				if (isMultiValueOperator(operator)) {
+				if (isMultiValueOperator(matchedOperator)) {
 					keywords = keyword.trim().split(',').map(k => trimQuotes(k))
 				}
 
+				const strict = isStrictOperator(matchedOperator)
 				const transformedKeywords: string[] = []
 				keywords.forEach(k => {
 					let id = resolver(k)
@@ -143,14 +144,24 @@ export function transformFilterStringForApi(
 						transformedKeywords.push(k)
 						return
 					}
-				
-					transformedKeywords.push(String(id))
+
+					const ids = Array.isArray(id) ? id : [id]
+					transformedKeywords.push(...(strict ? ids : ids.slice(0, 1)).map(String))
 				})
-				
+				const uniqueKeywords = [...new Set(transformedKeywords)]
+
+				// A title matching several labels turns = / != into in / not in.
+				let operator = matchedOperator
+				if (uniqueKeywords.length > 1 && operator === '=') {
+					operator = 'in'
+				} else if (uniqueKeywords.length > 1 && operator === '!=') {
+					operator = 'not in'
+				}
+
 				// Join the transformed keywords back together
 				let replaced = isMultiValueOperator(operator)
-					? transformedKeywords.join(', ')
-					: transformedKeywords[0] || keyword
+					? uniqueKeywords.join(', ')
+					: uniqueKeywords[0] || keyword
 
 				replaced = replaced.replaceAll('"', '').replaceAll('\'', '')
 
@@ -248,7 +259,7 @@ export function transformFilterStringFromApi(
 
 				// Reconstruct the entire match with the replaced values
 				const replaced = isMultiValueOperator(operator)
-					? transformedKeywords.join(', ')
+					? [...new Set(transformedKeywords)].join(', ')
 					: transformedKeywords[0] || keyword
 
 				const reconstructedMatch = `${fieldName} ${operator} ${replaced}`
@@ -283,4 +294,8 @@ export function transformFilterStringFromApi(
 
 export function isMultiValueOperator(operator: string): boolean {
 	return ['in', '?=', 'not in', '?!='].includes(operator)
+}
+
+function isStrictOperator(operator: string): boolean {
+	return operator === '=' || operator === '!=' || isMultiValueOperator(operator)
 }

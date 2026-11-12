@@ -109,7 +109,7 @@ func TestHumaRichText_Read(t *testing.T) {
 
 	// Store a label with HTML directly (no format → verbatim).
 	rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels",
-		`{"title":"rt","description":"<p>Hello <strong>world</strong></p>","hex_color":"112233"}`, token, "")
+		`{"title":"rt","description":"<p>Hello <strong>world</strong></p>","hex_color":"112233","project_id":1}`, token, "")
 	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 	id, _ := decodeLabel(t, rec.Body.Bytes())
 
@@ -163,7 +163,7 @@ func TestHumaRichText_EveryEntity(t *testing.T) {
 		readPath   string // fmt verb %d for the created id
 		field      string
 	}{
-		{"label", "/api/v2/labels", `{"title":"e-label","description":"a **bold** note"}`, "/api/v2/labels/%d", "description"},
+		{"label", "/api/v2/labels", `{"title":"e-label","description":"a **bold** note","project_id":1}`, "/api/v2/labels/%d", "description"},
 		{"project", "/api/v2/projects", `{"title":"e-project","description":"a **bold** note"}`, "/api/v2/projects/%d", "description"},
 		{"team", "/api/v2/teams", `{"name":"e-team","description":"a **bold** note"}`, "/api/v2/teams/%d", "description"},
 		{"saved filter", "/api/v2/filters", `{"title":"e-filter","description":"a **bold** note","filters":{"filter":"done = true"}}`, "/api/v2/filters/%d", "description"},
@@ -254,7 +254,7 @@ func TestHumaRichText_Write(t *testing.T) {
 
 	t.Run("markdown write is stored as html", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels?format=markdown",
-			`{"title":"w1","description":"Hello **world**","hex_color":"112233"}`, token, "")
+			`{"title":"w1","description":"Hello **world**","hex_color":"112233","project_id":1}`, token, "")
 		require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 		id, _ := decodeLabel(t, rec.Body.Bytes())
 
@@ -267,7 +267,7 @@ func TestHumaRichText_Write(t *testing.T) {
 
 	t.Run("default write stores body verbatim", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels",
-			`{"title":"w2","description":"Hello **world**","hex_color":"112233"}`, token, "")
+			`{"title":"w2","description":"Hello **world**","hex_color":"112233","project_id":1}`, token, "")
 		require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 		id, _ := decodeLabel(t, rec.Body.Bytes())
 
@@ -279,7 +279,7 @@ func TestHumaRichText_Write(t *testing.T) {
 
 	t.Run("mention is rebuilt on markdown write", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels?format=markdown",
-			`{"title":"w3","description":"ping @user1","hex_color":"112233"}`, token, "")
+			`{"title":"w3","description":"ping @user1","hex_color":"112233","project_id":1}`, token, "")
 		require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 		id, _ := decodeLabel(t, rec.Body.Bytes())
 
@@ -291,7 +291,7 @@ func TestHumaRichText_Write(t *testing.T) {
 
 	t.Run("markdown round trip is stable", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels?format=markdown",
-			`{"title":"w4","description":"- [x] done\n- [ ] todo","hex_color":"112233"}`, token, "")
+			`{"title":"w4","description":"- [x] done\n- [ ] todo","hex_color":"112233","project_id":1}`, token, "")
 		require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 		id, _ := decodeLabel(t, rec.Body.Bytes())
 
@@ -300,7 +300,7 @@ func TestHumaRichText_Write(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 		_, md1 := decodeLabel(t, rec.Body.Bytes())
 
-		put := fmt.Sprintf(`{"title":"w4","description":%s,"hex_color":"112233"}`, mustJSON(md1))
+		put := fmt.Sprintf(`{"title":"w4","description":%s,"hex_color":"112233","project_id":1}`, mustJSON(md1))
 		rec = humaRequest(t, e, http.MethodPut, fmt.Sprintf("/api/v2/labels/%d?format=markdown", id), put, token, "")
 		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 
@@ -312,7 +312,7 @@ func TestHumaRichText_Write(t *testing.T) {
 
 	t.Run("patch honours markdown via header", func(t *testing.T) {
 		rec := humaRequest(t, e, http.MethodPost, "/api/v2/labels",
-			`{"title":"w5","description":"<p>old</p>","hex_color":"112233"}`, token, "")
+			`{"title":"w5","description":"<p>old</p>","hex_color":"112233","project_id":1}`, token, "")
 		require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 		id, _ := decodeLabel(t, rec.Body.Bytes())
 

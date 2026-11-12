@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {hasFilterQuery, transformFilterStringForApi, transformFilterStringFromApi} from '@/helpers/filters'
+import {getLabelIdsByTitle} from '@/client/queries/labels'
 
 const nullTitleToIdResolver = (title: string) => null
 const nullIdToTitleResolver = (id: number) => null
@@ -594,5 +595,45 @@ describe('hasFilterQuery', () => {
 	it('returns a boolean for a filter expression', () => {
 		expect(hasFilterQuery('done = false')).toBe(true)
 		expect(hasFilterQuery('hello')).toBe(false)
+	})
+})
+
+describe('per-project label titles', () => {
+	const labels = [
+		{id: 5, title: 'Bug', project_id: 1},
+		{id: 14, title: 'Bug', project_id: 2},
+		{id: 7, title: 'Срочно', project_id: 1},
+		{id: 9, title: '5', project_id: 1},
+	]
+	const resolveLabel = (title: string) => getLabelIdsByTitle(labels, title)
+	const forApi = (filter: string) => transformFilterStringForApi(filter, resolveLabel, nullTitleToIdResolver)
+
+	it('turns = into in when a title matches several labels', () => {
+		expect(forApi('labels = Bug')).toBe('labels in 5, 14')
+		expect(forApi('labels in Bug')).toBe('labels in 5, 14')
+	})
+
+	it('turns != into not in when a title matches several labels', () => {
+		expect(forApi('labels != Bug')).toBe('labels not in 5, 14')
+	})
+
+	it('resolves a Russian title', () => {
+		expect(forApi('labels = Срочно && done = false')).toBe('labels = 7 && done = false')
+	})
+
+	it('keeps an all-digit token as an id even if a label has that title', () => {
+		expect(forApi('labels = 5')).toBe('labels = 5')
+		expect(forApi('labels in 5, Срочно')).toBe('labels in 5, 7')
+	})
+
+	it('keeps a single id for a non-strict operator', () => {
+		expect(forApi('labels like Bug')).toBe('labels like 5')
+	})
+
+	it('collapses a repeated title inside one value list only', () => {
+		const title = (id: number) => labels.find(label => label.id === id)?.title
+		expect(transformFilterStringFromApi('labels in 5, 14', title, nullIdToTitleResolver)).toBe('labels in Bug')
+		expect(transformFilterStringFromApi('labels = 5 && labels = 14', title, nullIdToTitleResolver))
+			.toBe('labels = Bug && labels = Bug')
 	})
 })

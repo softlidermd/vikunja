@@ -773,6 +773,10 @@ export type Label = {
      */
     readonly id?: number;
     /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
+    /**
      * The title of the label. You'll see this one on tasks associated with it.
      */
     title?: string;
@@ -812,6 +816,10 @@ export type LabelReadBody = {
      */
     readonly max_permission?: number;
     /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
+    /**
      * The title of the label. You'll see this one on tasks associated with it.
      */
     title?: string;
@@ -842,7 +850,7 @@ export type LabelTaskBulk = {
      */
     readonly $schema?: string;
     /**
-     * The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. You must be able to see every label you attach.
+     * The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. Every label you attach must belong to the task's project.
      */
     labels?: Array<Label> | null;
 };
@@ -868,6 +876,10 @@ export type LabelWithTaskId = {
      * The unique, numeric id of this label.
      */
     readonly id?: number;
+    /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
     /**
      * The title of the label. You'll see this one on tasks associated with it.
      */
@@ -3993,6 +4005,10 @@ export type LabelWritable = {
      */
     hex_color?: string;
     /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
+    /**
      * The title of the label. You'll see this one on tasks associated with it.
      */
     title?: string;
@@ -4008,6 +4024,10 @@ export type LabelReadBodyWritable = {
      */
     hex_color?: string;
     /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
+    /**
      * The title of the label. You'll see this one on tasks associated with it.
      */
     title?: string;
@@ -4022,7 +4042,7 @@ export type LabelTaskWritable = {
 
 export type LabelTaskBulkWritable = {
     /**
-     * The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. You must be able to see every label you attach.
+     * The complete set of labels the task should have after the call. Any label currently on the task that is not in this list is removed; any label in the list that is not yet on the task is added. Every label you attach must belong to the task's project.
      */
     labels?: Array<LabelWritable> | null;
 };
@@ -4036,6 +4056,10 @@ export type LabelWithTaskIdWritable = {
      * The color this label has in hex format.
      */
     hex_color?: string;
+    /**
+     * The project this label belongs to. Required on create; cannot be changed afterwards.
+     */
+    project_id?: number;
     /**
      * The title of the label. You'll see this one on tasks associated with it.
      */

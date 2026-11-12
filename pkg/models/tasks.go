@@ -1317,6 +1317,7 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	if err != nil {
 		return
 	}
+	oldProjectID := ot.ProjectID
 
 	if t.ProjectID == 0 {
 		t.ProjectID = ot.ProjectID
@@ -1697,6 +1698,13 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 		return err
 	}
 	t.Updated = nt.Updated
+
+	if t.ProjectID != oldProjectID {
+		t.Labels, err = moveTaskLabels(s, t.ID, t.ProjectID)
+		if err != nil {
+			return err
+		}
+	}
 
 	events.DispatchOnCommit(s, &TaskUpdatedEvent{
 		Task: t,

@@ -142,9 +142,10 @@ type TaskComment struct {
 	Updated time.Time `json:"updated,omitempty"`
 }
 
-// Label is a global (per-user) label.
+// Label belongs to exactly one project.
 type Label struct {
 	ID          int64     `json:"id"`
+	ProjectID   int64     `json:"project_id,omitempty"`
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitempty"`
 	HexColor    string    `json:"hex_color,omitempty"`

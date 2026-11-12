@@ -92,6 +92,42 @@ describe('useQuickAddTask', () => {
 		expect(sdk.taskLabelsCreate).not.toHaveBeenCalled()
 	})
 
+	it('creates a missing label in the task project, ignoring the same title elsewhere', async () => {
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent', project_id: 2}], total_pages: 1}})
+		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Buy milk', project_id: 1}})
+		sdk.labelsCreate.mockResolvedValue({data: {id: 11, title: 'Urgent', project_id: 1}})
+		sdk.taskLabelsCreate.mockResolvedValue({data: {}})
+
+		await quickAdd().createNewTask({title: 'Buy milk *Urgent', project_id: 1})
+
+		expect(sdk.labelsCreate).toHaveBeenCalledExactlyOnceWith({
+			body: expect.objectContaining({
+				title: 'Urgent',
+				project_id: 1,
+			}),
+		})
+		expect(sdk.taskLabelsCreate).toHaveBeenCalledExactlyOnceWith({path: {task: 7}, body: {label_id: 11}})
+	})
+
+	it('reuses a label of the task project case-insensitively', async () => {
+		sdk.labelsList.mockResolvedValue({
+			data: {
+				items: [
+					{id: 9, title: 'Urgent', project_id: 2},
+					{id: 4, title: 'urgent', project_id: 1},
+				],
+				total_pages: 1,
+			},
+		})
+		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Buy milk', project_id: 1}})
+		sdk.taskLabelsCreate.mockResolvedValue({data: {}})
+
+		await quickAdd().createNewTask({title: 'Buy milk *Urgent', project_id: 1})
+
+		expect(sdk.labelsCreate).not.toHaveBeenCalled()
+		expect(sdk.taskLabelsCreate).toHaveBeenCalledExactlyOnceWith({path: {task: 7}, body: {label_id: 4}})
+	})
+
 	it('keeps a title that is only a project prefix in the input project', async () => {
 		sdk.projectsList.mockResolvedValue({data: {items: [{id: 42, title: 'Other'}], total_pages: 1}})
 		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: '+Other', project_id: 1}})
@@ -130,7 +166,7 @@ describe('useQuickAddTask', () => {
 	})
 
 	it('reports a failed label write on a bulk create without failing the create', async () => {
-		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent'}], total_pages: 1}})
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent', project_id: 1}], total_pages: 1}})
 		sdk.tasksBulkCreate.mockResolvedValue({data: {tasks: [{id: 7, title: 'Buy milk', project_id: 1}]}})
 		sdk.taskLabelsCreate.mockRejectedValue({status: 500})
 
@@ -143,7 +179,7 @@ describe('useQuickAddTask', () => {
 	})
 
 	it('refetches the visible lists once the label is on the task', async () => {
-		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent'}], total_pages: 1}})
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent', project_id: 1}], total_pages: 1}})
 		sdk.tasksBulkCreate.mockResolvedValue({data: {tasks: [{id: 7, title: 'Buy milk', project_id: 1}]}})
 		sdk.taskLabelsCreate.mockResolvedValue({data: {}})
 		const client = new QueryClient()
@@ -159,7 +195,7 @@ describe('useQuickAddTask', () => {
 	})
 
 	it('refetches the visible lists when a single create fails after saving the assignee', async () => {
-		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent'}], total_pages: 1}})
+		sdk.labelsList.mockResolvedValue({data: {items: [{id: 9, title: 'Urgent', project_id: 1}], total_pages: 1}})
 		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Buy milk', project_id: 1}})
 		sdk.taskLabelsCreate.mockRejectedValue({status: 500})
 		const client = new QueryClient()

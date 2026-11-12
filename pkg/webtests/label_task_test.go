@@ -54,7 +54,8 @@ func TestLabelTaskBulk(t *testing.T) {
 				assert.Contains(t, getHTTPErrorMessage(err), `Forbidden`)
 			})
 			t.Run("Shared Via Team write", func(t *testing.T) {
-				rec, err := testHandlerBulk.testCreateWithUser(nil, map[string]string{"projecttask": "16"}, `{"labels":[{"id":1}]}`)
+				// Task 16 is in project 7, which has no labels; an empty set still exercises the rights check.
+				rec, err := testHandlerBulk.testCreateWithUser(nil, map[string]string{"projecttask": "16"}, `{"labels":[]}`)
 				require.NoError(t, err)
 				assert.Contains(t, rec.Body.String(), `"labels"`)
 			})

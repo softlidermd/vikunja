@@ -37,7 +37,7 @@ func RegisterLabelTaskBulkRoutes(api huma.API) {
 	Register(api, huma.Operation{
 		OperationID: "task-labels-bulk-replace",
 		Summary:     "Replace all labels on a task",
-		Description: "Sets the task's labels to exactly the provided list: labels not in the list are removed, missing ones are added, unchanged ones are left alone. Requires write access to the task, and you must be able to see every label you attach. Returns the resulting label set.",
+		Description: "Sets the task's labels to exactly the provided list: labels not in the list are removed, missing ones are added, unchanged ones are left alone. Requires write access to the task, and every label you attach must belong to the task's project (403 otherwise). Returns the resulting label set.",
 		Method:      http.MethodPut,
 		Path:        "/tasks/{task}/labels/bulk",
 		Tags:        tags,

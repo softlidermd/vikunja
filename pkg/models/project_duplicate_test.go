@@ -109,6 +109,97 @@ func TestProjectDuplicate(t *testing.T) {
 		require.True(t, has)
 		assert.Equal(t, int64(10), counter.LastIndex)
 	})
+
+	t.Run("copies the labels and points the copied tasks at them", func(t *testing.T) {
+		files.InitTestFileFixtures(t)
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		usr := &user.User{ID: 1}
+		duplicate := &ProjectDuplicate{ProjectID: 1}
+		can, err := duplicate.CanCreate(s, usr)
+		require.NoError(t, err)
+		require.True(t, can)
+		require.NoError(t, duplicate.Create(s, usr))
+
+		sourceLabels := []*Label{}
+		require.NoError(t, s.Where("project_id = ?", 1).Find(&sourceLabels))
+		copiedLabels := []*Label{}
+		require.NoError(t, s.Where("project_id = ?", duplicate.Project.ID).Find(&copiedLabels))
+		require.Len(t, copiedLabels, len(sourceLabels))
+
+		copyOf := make(map[int64]*Label, len(copiedLabels))
+		for _, l := range copiedLabels {
+			copyOf[l.ClonedFromID] = l
+		}
+		for _, src := range sourceLabels {
+			c, has := copyOf[src.ID]
+			require.True(t, has, "label %d has no copy", src.ID)
+			assert.NotEqual(t, src.ID, c.ID)
+			assert.Equal(t, src.Title, c.Title)
+			assert.Equal(t, src.CreatedByID, c.CreatedByID)
+		}
+
+		// Tasks 1 and 2 carry label 4; their copies must carry label 4's copy.
+		label4Copy := copyOf[4]
+		copiedTasks := []*Task{}
+		require.NoError(t, s.Where("project_id = ?", duplicate.Project.ID).Find(&copiedTasks))
+		copiedTaskIDs := make([]int64, 0, len(copiedTasks))
+		for _, task := range copiedTasks {
+			copiedTaskIDs = append(copiedTaskIDs, task.ID)
+		}
+		labelTasks := []*LabelTask{}
+		require.NoError(t, s.In("task_id", copiedTaskIDs).Find(&labelTasks))
+		require.Len(t, labelTasks, 2)
+		for _, lt := range labelTasks {
+			assert.Equal(t, label4Copy.ID, lt.LabelID)
+		}
+	})
+
+	t.Run("copies the labels of a project without tasks", func(t *testing.T) {
+		files.InitTestFileFixtures(t)
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// Project 4 has no tasks.
+		root := &Label{
+			Title:       "root",
+			ProjectID:   4,
+			CreatedByID: 3,
+		}
+		copied := &Label{
+			Title:        "copy",
+			ProjectID:    4,
+			CreatedByID:  3,
+			ClonedFromID: 4,
+		}
+		_, err := s.Insert(root, copied)
+		require.NoError(t, err)
+
+		usr := &user.User{ID: 3}
+		duplicate := &ProjectDuplicate{ProjectID: 4}
+		can, err := duplicate.CanCreate(s, usr)
+		require.NoError(t, err)
+		require.True(t, can)
+		require.NoError(t, duplicate.Create(s, usr))
+		require.NoError(t, s.Commit())
+
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"title":          "root",
+			"project_id":     duplicate.Project.ID,
+			"created_by_id":  3,
+			"cloned_from_id": root.ID,
+		}, false)
+		// A copy of a copy points at the root, never at the intermediate copy.
+		db.AssertExists(t, "labels", map[string]interface{}{
+			"title":          "copy",
+			"project_id":     duplicate.Project.ID,
+			"created_by_id":  3,
+			"cloned_from_id": 4,
+		}, false)
+	})
 }
 
 func assertShareCount(t *testing.T, s *xorm.Session, projectID, users, teams, links int64) {

@@ -1,79 +1,110 @@
 - id: 1
   title: 'Label #1'
+  project_id: 1
   created_by_id: 1
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
 - id: 2
   title: 'Label #2'
+  project_id: 1
   created_by_id: 1
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-- id: 3
-  title: 'Label #3 - other user'
-  created_by_id: 2
-  updated: 2018-12-02 15:13:12
-  created: 2018-12-01 15:13:12
+# Original of the per-project copies 14, 15 and 16; kept in project 1, where it
+# is used most.
 - id: 4
   title: 'Label #4 - visible via other task'
+  project_id: 1
   created_by_id: 2
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
 - id: 5
   title: 'Label #5'
+  project_id: 1
   created_by_id: 2
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Regression for GHSA-hj5c-mhh2-g7jq: only attached to task #34
-# (project 20, user 13 only), must be unreachable for everyone else.
+# Regression for GHSA-hj5c-mhh2-g7jq: lives in project 20 (user 13 only), must
+# be unreachable for everyone else.
 - id: 6
   title: 'Label #6 - private, attached only to private task'
+  project_id: 20
   created_by_id: 13
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Covers the creator-can-read-own-unattached-label path.
 - id: 7
   title: 'Label #7 - created by user 1, no task attachment'
+  project_id: 1
   created_by_id: 1
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Covers the creator-branch maxPermission fallback: user 1's label whose
-# only label_tasks row points at task #34 (inaccessible to user 1).
+# Created by user 1 in a project user 1 cannot access: the creator gets no rights.
 - id: 8
   title: 'Label #8 - user 1 creator, only attached to inaccessible task'
+  project_id: 20
   created_by_id: 1
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Covers the bot-owner branch: created by bot 23, whose owner is user 21.
-# User 21 should be able to read/update/delete it; user 22 (who owns bot 24)
-# should not.
+# Created by bot 23 (owner user 21), placed in user 21's project 44.
 - id: 9
   title: 'Label #9 - created by bot 23 owned by user 21'
+  project_id: 44
   created_by_id: 23
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Attached only to task 25 in project 16, whose parent 33 is shared to team 1
-# with write access — covers label access inherited through child projects.
+# In project 16, whose parent 33 is shared to team 1 with write access: covers
+# label access inherited through child projects.
 - id: 10
   title: 'Label #10 - attached in child project only'
+  project_id: 16
   created_by_id: 6
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Regression for #3592.
 - id: 11
   title: 'Label #11 - created by user 21, owner of bot 23, no task attachment'
+  project_id: 44
   created_by_id: 21
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Must remain unattached so sibling-access tests exercise identity access, not task access.
 - id: 12
   title: 'Label #12 - created by bot 25, sibling of bot 23'
+  project_id: 44
   created_by_id: 25
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12
-# Attached only to the soft-deleted task 51 in project 1, which user 1 owns:
-# if a label visibility query stops filtering deleted tasks, this one leaks.
+# Attached only to the soft-deleted task 51 in project 1.
 - id: 13
   title: 'Label #13 - attached only to a soft-deleted task'
+  project_id: 1
   created_by_id: 13
+  updated: 2018-12-02 15:13:12
+  created: 2018-12-01 15:13:12
+# Per-project copies of labels 4 and 5, as the migration creates them.
+- id: 14
+  title: 'Label #4 - visible via other task'
+  project_id: 21
+  cloned_from_id: 4
+  created_by_id: 2
+  updated: 2018-12-02 15:13:12
+  created: 2018-12-01 15:13:12
+- id: 15
+  title: 'Label #4 - visible via other task'
+  project_id: 22
+  cloned_from_id: 4
+  created_by_id: 2
+  updated: 2018-12-02 15:13:12
+  created: 2018-12-01 15:13:12
+- id: 16
+  title: 'Label #4 - visible via other task'
+  project_id: 36
+  cloned_from_id: 4
+  created_by_id: 2
+  updated: 2018-12-02 15:13:12
+  created: 2018-12-01 15:13:12
+- id: 17
+  title: 'Label #5'
+  project_id: 21
+  cloned_from_id: 5
+  created_by_id: 2
   updated: 2018-12-02 15:13:12
   created: 2018-12-01 15:13:12

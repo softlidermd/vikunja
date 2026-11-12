@@ -21,24 +21,10 @@ import (
 	"xorm.io/xorm"
 )
 
-// CanCreate checks if a user can add a label to a task
+// CanCreate checks if a user can add a label to a task. Create itself enforces
+// that the label belongs to the task's project.
 func (lt *LabelTask) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
-	label, err := getLabelByIDSimple(s, lt.LabelID)
-	if err != nil {
-		return false, err
-	}
-
-	hasAccessTolabel, _, err := label.hasAccessToLabel(s, a)
-	if err != nil || !hasAccessTolabel { // If the user doesn't have access to the label, we can error out here
-		return false, err
-	}
-
-	canDoLabelTask, err := canDoLabelTask(s, lt.TaskID, a)
-	if err != nil {
-		return false, err
-	}
-
-	return hasAccessTolabel && canDoLabelTask, nil
+	return canDoLabelTask(s, lt.TaskID, a)
 }
 
 // CanDelete checks if a user can delete a label from a task
@@ -65,8 +51,7 @@ func (ltb *LabelTaskBulk) CanCreate(s *xorm.Session, a web.Auth) (bool, error) {
 	return canDoLabelTask(s, ltb.TaskID, a)
 }
 
-// Helper function to check if a user can write to a task
-// + is able to see the label
+// Helper function to check if a user can write to a task,
 // always the same check for either deleting or adding a label to a task
 func canDoLabelTask(s *xorm.Session, taskID int64, a web.Auth) (bool, error) {
 	// A user can add a label to a task if he can write to the task
