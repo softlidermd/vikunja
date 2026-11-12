@@ -113,7 +113,8 @@ type Task struct {
 	RepeatMode TaskRepeatMode `xorm:"not null default 0" json:"repeat_mode" doc:"How the task repeats when marked done: 0 = after repeat_after seconds, 1 = monthly (ignores repeat_after), 2 = from the current date rather than the last set date."`
 	// The task priority. Can be anything you want, it is possible to sort by this later.
 	Priority int64 `xorm:"bigint null" json:"priority"`
-	Size     int64 `xorm:"bigint not null default 0" json:"size" enum:"0,1,4,8,20,40,999" doc:"Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed."`
+	// The estimated effort in hours; validated by validateTaskSize.
+	Size int64 `xorm:"bigint not null default 0" json:"size" enum:"0,1,4,8,20,40,999" doc:"Estimated effort in hours: 0 = not estimated, 1, 4, 8, 20 or 40. 999 = long-running (more than a week); never summed."`
 	// When this task starts.
 	StartDate time.Time `xorm:"DATETIME INDEX null 'start_date'" json:"start_date" query:"-"`
 	// When this task ends.

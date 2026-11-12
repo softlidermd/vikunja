@@ -104,18 +104,22 @@ const {t} = useI18n({useScope: 'global'})
 
 const {data, isPending} = useQuery(adminWorkloadQuery())
 
-// The unassigned block comes last; its user is null at runtime, whatever the generated type says.
-const blocks = computed(() => [
-	...(data.value?.people ?? []).map(person => ({key: `user-${person.user?.id}`, person})),
-	...(data.value?.unassigned ? [{key: 'unassigned', person: data.value.unassigned}] : []),
-])
+const blocks = computed(() => {
+	const unassigned = data.value?.unassigned
+	return [
+		...(data.value?.people ?? []).map(person => ({key: `user-${person.user?.id}`, person})),
+		...(unassigned && (unassigned.tasks?.length || unassigned.ideas)
+			? [{key: 'unassigned', person: unassigned}]
+			: []),
+	]
+})
 
 function stats(totals: WorkloadTotals | undefined) {
 	return [
 		t('admin.workload.hours', {hours: totals?.hours ?? 0}),
-		`${t('task.size.unset')}: ${totals?.unestimated ?? 0}`,
-		`${t('task.size.long')}: ${totals?.long ?? 0}`,
-		`${t('admin.workload.ideas')}: ${totals?.ideas ?? 0}`,
+		t('admin.workload.unestimated', {count: totals?.unestimated ?? 0}),
+		t('admin.workload.long', {count: totals?.long ?? 0}),
+		t('admin.workload.ideas', {count: totals?.ideas ?? 0}),
 	]
 }
 </script>

@@ -67,7 +67,7 @@ func (w *WorkloadTotals) add(t *WorkloadTask) {
 		w.Unestimated++
 	case TaskSizeLong:
 		w.Long++
-	case 1, 4, 8, 20, 40:
+	default:
 		w.Hours += t.Size
 	}
 }
@@ -115,16 +115,19 @@ func GetWorkload(s *xorm.Session) (*Workload, error) {
 	}
 	users, err := user.GetUsersByIDs(s, userIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not load assigned users: %w", err)
 	}
 
 	statusTasks := make([]*Task, 0, len(tasks))
 	for _, t := range tasks {
-		statusTasks = append(statusTasks, &Task{ID: t.ID, ProjectID: t.ProjectID})
+		statusTasks = append(statusTasks, &Task{
+			ID:        t.ID,
+			ProjectID: t.ProjectID,
+		})
 	}
 	titleByTask, err := loadStatusTitles(s, statusTasks)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not load task statuses: %w", err)
 	}
 
 	slices.SortFunc(tasks, func(a, b *WorkloadTask) int {
@@ -148,7 +151,10 @@ func GetWorkload(s *xorm.Session) (*Workload, error) {
 				continue
 			}
 			if people[id] == nil {
-				people[id] = &WorkloadPerson{User: u, Tasks: []*WorkloadTask{}}
+				people[id] = &WorkloadPerson{
+					User:  u,
+					Tasks: []*WorkloadTask{},
+				}
 			}
 			blocks = append(blocks, people[id])
 		}

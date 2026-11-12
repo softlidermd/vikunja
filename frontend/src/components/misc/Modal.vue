@@ -373,6 +373,7 @@ $modal-width: 1024px;
 	.modal-header {
 		font-size: 2rem;
 		font-weight: 700;
+		padding-inline-end: 2.5rem;
 	}
 
 	.button {

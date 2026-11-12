@@ -150,7 +150,12 @@ func addIdeaBucket20261111120000(tx *xorm.Engine, view *projectView2026111112000
 		if minPosition > 0 {
 			position = minPosition / 2
 		}
-		idea = &bucket20261111120000{Title: "Idea", ProjectViewID: view.ID, Position: position, CreatedByID: ownerID}
+		idea = &bucket20261111120000{
+			Title:         "Idea",
+			ProjectViewID: view.ID,
+			Position:      position,
+			CreatedByID:   ownerID,
+		}
 		if _, err := tx.Insert(idea); err != nil {
 			return fmt.Errorf("could not add the Idea bucket to view %d: %w", view.ID, err)
 		}

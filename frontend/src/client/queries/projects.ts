@@ -154,9 +154,16 @@ function partitionProjects(projects: Project[]): ProjectListResult {
 	return result
 }
 
-async function fetchAllProjects(): Promise<ProjectListResult> {
+async function fetchAllProjects(flags: {
+	is_archived?: boolean,
+	all_projects?: boolean,
+}): Promise<ProjectListResult> {
 	const projects = await fetchAllPages(async page => (await projectsList({
-		query: {is_archived: true, expand: 'permissions', page},
+		query: {
+			...flags,
+			expand: 'permissions',
+			page,
+		},
 	})).data)
 	return partitionProjects(projects)
 }
@@ -164,7 +171,7 @@ async function fetchAllProjects(): Promise<ProjectListResult> {
 export function projectsQuery() {
 	return queryOptions({
 		queryKey: projectKeys.list(),
-		queryFn: fetchAllProjects,
+		queryFn: () => fetchAllProjects({is_archived: true}),
 		staleTime: 5 * 60 * 1000,
 	})
 }
@@ -173,9 +180,7 @@ export function projectsQuery() {
 export function allProjectsQuery() {
 	return queryOptions({
 		queryKey: projectKeys.allProjects(),
-		queryFn: async () => partitionProjects(await fetchAllPages(async page => (await projectsList({
-			query: {all_projects: true, expand: 'permissions', page},
-		})).data)),
+		queryFn: () => fetchAllProjects({all_projects: true}),
 		staleTime: 5 * 60 * 1000,
 	})
 }

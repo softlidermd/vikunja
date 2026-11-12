@@ -17,6 +17,7 @@
 package models
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -111,7 +112,7 @@ func plannedBucketID(s *xorm.Session, view *ProjectView, skipBucketID int64) (in
 		Cols("id", "title").
 		Find(&buckets)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not load buckets of view %d: %w", view.ID, err)
 	}
 
 	defaultID := view.DefaultBucketID

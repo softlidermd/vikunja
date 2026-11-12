@@ -1578,7 +1578,9 @@
 			"companyTotal": "Всего по компании",
 			"unassigned": "Без исполнителя",
 			"hours": "{hours} ч",
-			"ideas": "Идеи",
+			"unestimated": "Не оценено: {count}",
+			"long": "Длительные: {count}",
+			"ideas": "Идеи: {count}",
 			"empty": "Нет открытых задач"
 		},
 		"labels": {

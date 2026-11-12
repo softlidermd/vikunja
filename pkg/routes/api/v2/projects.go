@@ -87,7 +87,7 @@ func init() { AddRouteRegistrar(RegisterProjectRoutes) }
 
 func projectsList(ctx context.Context, in *struct {
 	ListParams
-	Expand     string `query:"expand" enum:"permissions" doc:"If set to \"permissions\", each returned project includes the max permission the requesting user has on it (max_permission). Currently only \"permissions\" is supported."`
+	Expand      string `query:"expand" enum:"permissions" doc:"If set to \"permissions\", each returned project includes the max permission the requesting user has on it (max_permission). Currently only \"permissions\" is supported."`
 	IsArchived  bool   `query:"is_archived" doc:"If true, also returns archived projects."`
 	AllProjects bool   `query:"all_projects" doc:"Instance admins only: include every project. Ignored for other users."`
 	Format      string `query:"format" enum:"html,markdown" doc:"How rich-text fields are exchanged. See the API description."`

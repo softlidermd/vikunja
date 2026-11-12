@@ -48,8 +48,12 @@ const minimumPriority = computed(() => {
 
 <style lang="scss" scoped>
 .priority-label {
-	padding-inline: .375rem;
 	inline-size: auto !important; // To override the width set in tasks
+
+	// Medium is plain text, not a chip.
+	&:not([data-priority="2"]) {
+		padding-inline: .375rem;
+	}
 }
 
 .icon {

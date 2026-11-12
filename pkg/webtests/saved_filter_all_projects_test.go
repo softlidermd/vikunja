@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 package webtests
 
 import (
@@ -32,7 +31,7 @@ func TestSavedFilterAllProjects_ProjectsEndpoint(t *testing.T) {
 	require.NoError(t, err)
 
 	maxPermissionOfProject1 := func(t *testing.T) (found bool, maxPermission int) {
-		rec := humaRequest(t, e, http.MethodGet, "/api/v2/projects?all_projects=true&expand=permissions&s=1", "", humaTokenFor(t, &testuser2), "")
+		rec := humaRequest(t, e, http.MethodGet, "/api/v2/projects?all_projects=true&expand=permissions&q=1", "", humaTokenFor(t, &testuser2), "")
 		require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 		var body struct {
 			Items []struct {

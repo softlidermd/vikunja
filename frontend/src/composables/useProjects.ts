@@ -57,12 +57,14 @@ const useSharedProjects = createSharedComposable(() => {
 	])
 	// Admins also look up projects shared with nobody, e.g. tasks in an all-projects filter. Navigation stays on the own list.
 	const authStore = useAuthStore()
+	const isAdmin = computed(() => authStore.info?.is_admin === true)
 	const allProjects = useQuery(computed(() => ({
 		...allProjectsQuery(),
-		enabled: authStore.info?.is_admin === true,
+		enabled: isAdmin.value,
 	})), queryClient)
 	const projects = computed(() => Object.fromEntries([
-		...(allProjects.data.value?.projects ?? []),
+		// Cached data outlives a lost admin flag (logout, demotion), so gate the merge too.
+		...(isAdmin.value ? allProjects.data.value?.projects ?? [] : []),
 		...projectsArray.value,
 	].map(project => [project.id, project])))
 	const rootProjects = computed(() => sortByPosition(realProjects.value.filter(project =>

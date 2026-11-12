@@ -1780,7 +1780,9 @@
       "companyTotal": "Company total",
       "unassigned": "Unassigned",
       "hours": "{hours} h",
-      "ideas": "Ideas",
+      "unestimated": "Not estimated: {count}",
+      "long": "Long-running: {count}",
+      "ideas": "Ideas: {count}",
       "empty": "No open tasks"
     },
     "labels": {
