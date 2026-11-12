@@ -1,4 +1,3 @@
-import type {Page} from '@playwright/test'
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
@@ -7,19 +6,6 @@ import {UserFactory} from '../../factories/user'
 import {UserProjectFactory} from '../../factories/users_project'
 import {createDefaultViews, createProjects} from './prepareProjects'
 import {createTasksWithPriorities, createTasksWithSearch} from '../../support/filterTestHelpers'
-
-// Priority is hidden by default.
-async function showPriorityColumn(page: Page) {
-	const columns = page.getByRole('button', {
-		name: 'Columns',
-		exact: true,
-	})
-	await columns.click()
-	await page.locator('.columns-filter').getByText('Priority', {
-		exact: true,
-	}).click()
-	await columns.click()
-}
 
 test.describe('Project View Table', () => {
 	test('Should show a table with tasks', async ({authenticatedPage: page}) => {
@@ -47,11 +33,11 @@ test.describe('Project View Table', () => {
 		// Click the Columns button to open the column selector
 		await page.locator('.project-table .filter-container .button').filter({hasText: 'Columns'}).click()
 
-		// Click Priority checkbox to enable Priority column (click on the text like Cypress does)
-		await page.locator('.project-table .filter-container .card.columns-filter .card-content').getByText('Priority').click()
+		// Click Start Date checkbox to enable Start Date column (click on the text like Cypress does)
+		await page.locator('.project-table .filter-container .card.columns-filter .card-content').getByText('Start Date').click()
 
-		// Wait for Priority checkbox to be checked
-		await expect(page.getByRole('checkbox', {name: 'Checkbox Priority'})).toBeChecked()
+		// Wait for Start Date checkbox to be checked
+		await expect(page.getByRole('checkbox', {name: 'Checkbox Start Date'})).toBeChecked()
 
 		// Click Done checkbox to disable Done column (click on the text like Cypress does)
 		await page.locator('.project-table .filter-container .card.columns-filter .card-content').getByText('Done', {exact: true}).click()
@@ -59,8 +45,8 @@ test.describe('Project View Table', () => {
 		// Wait for Done checkbox to be unchecked
 		await expect(page.getByRole('checkbox', {name: 'Checkbox Done', exact: true})).not.toBeChecked()
 
-		// Verify Priority column is now visible
-		await expect(page.locator('.project-table table.table th').filter({hasText: 'Priority'})).toBeVisible()
+		// Verify Start Date column is now visible
+		await expect(page.locator('.project-table table.table th').filter({hasText: 'Start Date'})).toBeVisible()
 		// Verify Done column is now hidden
 		await expect(page.locator('.project-table table.table th').filter({hasText: /^Done$/})).not.toBeVisible()
 	})
@@ -75,7 +61,6 @@ test.describe('Project View Table', () => {
 			done: (i: number) => i > priorities.length,
 		})
 		await page.goto('/projects/1/3')
-		await showPriorityColumn(page)
 
 		for (const task of tasks) {
 			const row = page.locator('.project-table tbody tr').filter({
@@ -98,7 +83,6 @@ test.describe('Project View Table', () => {
 			priority: 0,
 		})
 		await page.goto('/projects/1/3')
-		await showPriorityColumn(page)
 		const row = page.locator('.project-table tbody tr').filter({
 			has: page.getByRole('link', {name: task.title, exact: true}),
 		})
@@ -137,7 +121,6 @@ test.describe('Project View Table', () => {
 			priority: 3,
 		})
 		await page.goto('/projects/1/3')
-		await showPriorityColumn(page)
 		const row = page.locator('.project-table tbody tr').filter({
 			has: page.getByRole('link', {name: task.title, exact: true}),
 		})

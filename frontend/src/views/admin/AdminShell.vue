@@ -2,6 +2,7 @@
 	<SideNavShell
 		:navigation-items="navigationItems"
 		exact
+		wide
 	/>
 </template>
 

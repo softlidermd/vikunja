@@ -11,14 +11,15 @@
 				<h2 class="workload__name">
 					{{ $t('admin.workload.companyTotal') }}
 				</h2>
-				<ul class="workload__stats">
-					<li
+				<div class="tags workload__stats">
+					<span
 						v-for="(stat, index) in stats(data.total)"
 						:key="index"
+						class="tag"
 					>
 						{{ stat }}
-					</li>
-				</ul>
+					</span>
+				</div>
 			</section>
 			<section
 				v-for="block in blocks"
@@ -29,14 +30,15 @@
 				<h2 class="workload__name">
 					{{ block.person.user ? getDisplayName(block.person.user) : $t('admin.workload.unassigned') }}
 				</h2>
-				<ul class="workload__stats">
-					<li
+				<div class="tags workload__stats">
+					<span
 						v-for="(stat, index) in stats(block.person)"
 						:key="index"
+						class="tag"
 					>
 						{{ stat }}
-					</li>
-				</ul>
+					</span>
+				</div>
 				<div
 					v-if="block.person.tasks?.length"
 					class="has-horizontal-overflow"
@@ -57,21 +59,27 @@
 								v-for="task in block.person.tasks"
 								:key="task.id"
 							>
-								<td>{{ task.project_title }}</td>
-								<td>
+								<td class="is-nowrap">
+									{{ task.project_title }}
+								</td>
+								<td class="workload__title">
 									<RouterLink :to="{name: 'task.detail', params: {id: task.id}}">
 										{{ task.title }}
 									</RouterLink>
 								</td>
-								<td>{{ task.status }}</td>
-								<td>
+								<td class="is-nowrap">
+									{{ task.status }}
+								</td>
+								<td class="is-nowrap">
 									<PriorityLabel
 										:priority="task.priority ?? 0"
 										:show-all="true"
 									/>
 								</td>
-								<td>{{ $t(taskSizeLabelKey(task.size ?? 0)) }}</td>
-								<td>
+								<td class="is-nowrap">
+									{{ $t(taskSizeLabelKey(task.size ?? 0)) }}
+								</td>
+								<td class="is-nowrap">
 									<TimeDisplay :date="parseDateOrNull(task.due_date)" />
 								</td>
 							</tr>
@@ -136,10 +144,17 @@ function stats(totals: WorkloadTotals | undefined) {
 }
 
 .workload__stats {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.25rem 1rem;
 	margin-block-end: 0.75rem;
-	color: var(--grey-600);
+}
+
+// Short columns stay on one line; the title takes the remaining width.
+.is-nowrap,
+th {
+	white-space: nowrap;
+}
+
+.workload__title {
+	inline-size: 100%;
+	min-inline-size: 16rem;
 }
 </style>

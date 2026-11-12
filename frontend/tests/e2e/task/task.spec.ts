@@ -1431,13 +1431,6 @@ test.describe('Task', () => {
 			expect((await stored.json()).size).toBe(8)
 
 			await page.goto(`/projects/${projects[0].id}/3`)
-			const columns = page.getByRole('button', {
-				name: 'Columns',
-				exact: true,
-			})
-			await columns.click()
-			await page.locator('.columns-filter').getByText('Effort', {exact: true}).click()
-			await columns.click()
 			await expect(page.locator('.project-table tbody td select[aria-label="Effort"] option:checked')).toHaveText('1 day')
 
 			await page.goto(`/projects/${projects[0].id}/4`)

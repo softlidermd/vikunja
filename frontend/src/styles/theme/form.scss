@@ -67,6 +67,11 @@
   height: 100%;
 }
 
+// The fixed height above would make a small select overflow its 2.5em wrapper.
+.select.is-small select:not([multiple]) {
+  height: 2.5em;
+}
+
 // Buttons icons
 .button .icon.is-small {
   margin-inline-end: 0.05rem !important;

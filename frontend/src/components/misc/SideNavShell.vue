@@ -1,6 +1,9 @@
 <template>
-	<div class="content-widescreen">
-		<div class="side-nav-shell">
+	<div :class="{'content-widescreen': !wide}">
+		<div
+			class="side-nav-shell"
+			:class="{'is-wide': wide}"
+		>
 			<nav class="navigation">
 				<ul>
 					<li
@@ -69,9 +72,12 @@ withDefaults(defineProps<{
 	navigationItems: SideNavItem[]
 	extraLinks?: SideNavExtraLink[]
 	exact?: boolean
+	// Full width with a narrow menu, for pages with wide tables.
+	wide?: boolean
 }>(), {
 	extraLinks: () => [],
 	exact: false,
+	wide: false,
 })
 
 const route = useRoute()
@@ -121,6 +127,19 @@ function isAliasActive(item: SideNavItem) {
 		inline-size: 100%;
 		padding-inline-start: 0;
 		padding-block-start: 1rem;
+	}
+}
+
+@media screen and (min-width: $tablet + 1px) {
+	.is-wide {
+		.navigation {
+			flex: 0 0 12rem;
+		}
+
+		.view {
+			flex: 1;
+			min-inline-size: 0;
+		}
 	}
 }
 </style>
