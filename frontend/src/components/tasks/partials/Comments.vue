@@ -116,6 +116,11 @@
 							captureEditDraft(c)
 							editComment(taskId)
 						}"
+						@discard="() => {
+							cancelPendingEdit()
+							isCommentEdit = false
+							delete commentDrafts[c.id]
+						}"
 					/>
 					<Reactions 
 						:model-value="c.reactions"

@@ -55,3 +55,33 @@ test('comment composer draft survives closing the task modal', async ({authentic
 	await expect(page.locator('.comments .tiptap[contenteditable="true"]')).toHaveText('Draft comment')
 	await expect(page.locator('.comments').getByRole('button', {name: 'Comment', exact: true})).toBeVisible()
 })
+
+test('Esc on a comment edit discards the change and never autosaves it', async ({authenticatedPage: page, apiContext, userToken}) => {
+	const [project] = await ProjectFactory.create(1)
+	await createDefaultViews(project.id)
+	const [task] = await TaskFactory.create(1, {project_id: project.id})
+	const headers = {Authorization: `Bearer ${userToken}`}
+	await page.goto(`/tasks/${task.id}`)
+	await page.locator('.task-view .comments .tiptap__collapsed').click()
+	await page.locator('.comments .tiptap[contenteditable="true"]').fill('Original comment')
+	await page.locator('.comments').getByRole('button', {name: 'Comment', exact: true}).click()
+	const row = page.locator('.comments .comment[id^="comment-"]')
+	await expect(row).toContainText('Original comment')
+
+	await row.getByRole('button', {name: 'Edit', exact: true}).click()
+	const editor = row.locator('.tiptap[contenteditable="true"]')
+	await editor.press('End')
+	await editor.pressSequentially(' discarded')
+	await expect(editor).toContainText('Original comment discarded')
+	await editor.press('Escape')
+	await expect(row).not.toContainText('discarded')
+
+	// Longer than the 5s autosave delay.
+	await page.waitForTimeout(6000)
+	await page.reload()
+	await expect(row).toContainText('Original comment')
+	await expect(row).not.toContainText('discarded')
+	const stored = await apiContext.get(`tasks/${task.id}/comments`, {headers})
+	expect(stored.ok()).toBeTruthy()
+	expect(await stored.json()).toEqual([expect.objectContaining({comment: '<p>Original comment</p>'})])
+})

@@ -90,8 +90,6 @@ test.describe('Task detail layout', () => {
 		await page.keyboard.press('Escape')
 		await expect(deleteItem).toBeHidden()
 		await expect(more.locator('.dropdown-trigger')).toBeFocused()
-		// Closing the dialog navigates away; give that a moment to happen if Esc leaked through.
-		await page.waitForTimeout(500)
 		await expect(page.locator('.task-view')).toBeVisible()
 		await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`))
 	})

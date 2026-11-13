@@ -284,6 +284,13 @@ const isEditing = computed(() => internalMode.value === 'edit' && props.isEditEn
 const contentHasChanged = ref<boolean>(false)
 const isCollapsed = computed(() => props.collapseWhenEmpty && props.isEditEnabled && !isEditing.value && isEditorContentEmpty(modelValue.value))
 
+// Collapsing hides the focused editor; hand focus to the placeholder button instead of letting it drop to <body>.
+watch(isCollapsed, async collapsed => {
+	if (!collapsed || !tiptapInstanceRef.value?.contains(document.activeElement)) return
+	await nextTick()
+	tiptapInstanceRef.value?.querySelector<HTMLElement>('.tiptap__collapsed')?.focus()
+})
+
 // TipTap crashes when inserting an image into an empty editor.
 // To work around this, we're inserting an element first, then insert the image, then remove the element.
 const UPLOAD_PLACEHOLDER_ELEMENT = '<p>UPLOAD_PLACEHOLDER</p>'
@@ -702,7 +709,13 @@ async function setReplyContent(value: string) {
 	editor.value.commands.focus('end')
 }
 
-defineExpose({setReplyContent})
+// Shows the given value even when the model already holds it (after an autosave the model matches the server, so no watcher fires).
+function reset(value: string) {
+	lastSavedState = value
+	setModeAndValue(value)
+}
+
+defineExpose({setReplyContent, reset})
 
 
 // See https://github.com/github/hotkey/discussions/85#discussioncomment-5214660
@@ -859,15 +872,14 @@ watch(
 	inline-size: 100%;
 	min-block-size: 2.375rem;
 	padding: .375rem .75rem;
-	border: 1px solid var(--grey-200);
+	border: 1px solid var(--input-border-color);
 	border-radius: $radius;
-	color: var(--grey-400);
+	color: var(--input-placeholder-color);
 	text-align: start;
-	transition: border-color $transition, color $transition;
+	transition: border-color $transition;
 
 	&:hover {
-		border-color: var(--grey-300);
-		color: var(--grey-500);
+		border-color: var(--input-hover-border-color);
 	}
 
 	&:focus-visible {

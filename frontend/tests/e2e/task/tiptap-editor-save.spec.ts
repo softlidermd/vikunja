@@ -178,6 +178,7 @@ test.describe('TipTap Editor Save', () => {
 				await description.locator('[data-cy="cancelEditor"]').click()
 			}
 			await expect(description.locator('.tiptap__collapsed')).toBeVisible()
+			await expect(description.locator('.tiptap__collapsed')).toBeFocused()
 
 			// Longer than the 5s autosave delay.
 			await page.waitForTimeout(6000)
@@ -187,4 +188,25 @@ test.describe('TipTap Editor Save', () => {
 			expect((await stored.json()).description ?? '').not.toContain('Discard me')
 		})
 	}
+
+	test('Cancel after an autosave keeps showing the saved description', async ({authenticatedPage: page, apiContext, userToken}) => {
+		const [task] = await TaskFactory.create(1, {id: 1, description: ''})
+		await page.goto(`/tasks/${task.id}`)
+
+		const description = page.locator('.task-view .details.content.description')
+		await description.locator('.tiptap__collapsed').click({timeout: 10000})
+		const editor = description.locator('.tiptap__editor .tiptap.ProseMirror')
+		await editor.fill('Hello')
+		// The 5s autosave.
+		await expect(description.locator('h2 span.is-small.has-text-success')).toContainText('Saved!', {timeout: 10000})
+
+		await description.locator('[data-cy="cancelEditor"]').click()
+		await expect(description.locator('.tiptap__collapsed')).toHaveCount(0)
+		await expect(editor).toHaveText('Hello')
+
+		await page.reload()
+		await expect(editor).toHaveText('Hello', {timeout: 10000})
+		const stored = await apiContext.get(`tasks/${task.id}`, {headers: {Authorization: `Bearer ${userToken}`}})
+		expect((await stored.json()).description).toBe('<p>Hello</p>')
+	})
 })

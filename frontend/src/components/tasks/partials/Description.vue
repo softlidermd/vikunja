@@ -37,6 +37,7 @@
 			aria-live="polite"
 		>{{ saveStateAnnouncement }}</span>
 		<Editor
+			ref="editorRef"
 			v-model="description"
 			class="tiptap__task-description"
 			:is-edit-enabled="canWrite"
@@ -87,6 +88,7 @@ const emit = defineEmits<{
 }>()
 
 const description = ref<string>('')
+const editorRef = ref<{reset: (value: string) => void} | null>(null)
 const hasChanges = ref(false)
 watch(
 	() => [props.modelValue.id, props.modelValue.description] as const,
@@ -196,6 +198,7 @@ function onDiscard() {
 	}
 	hasChanges.value = false
 	description.value = props.modelValue.description ?? ''
+	editorRef.value?.reset(description.value)
 }
 
 onBeforeUnmount(async () => {

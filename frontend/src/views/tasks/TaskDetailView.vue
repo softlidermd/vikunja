@@ -1302,7 +1302,7 @@ function setRelatedTasksActive() {
 	color: var(--text);
 	background-color: var(--site-background) !important;
 
-	@media screen and (width <= calc(#{$desktop} + 1px)) {
+	@media screen and (max-width: $tablet) {
 		border-radius: 0;
 	}
 }
@@ -1506,7 +1506,6 @@ h2 .button {
 
 .details {
 	padding-block-end: 0.75rem;
-	flex-flow: row wrap;
 	margin-block-end: 0;
 
 	.none {
