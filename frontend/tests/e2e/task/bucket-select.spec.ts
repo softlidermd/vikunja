@@ -204,8 +204,13 @@ test.describe('Task Bucket Select', () => {
 
 	test('Renders the bucket dropdown above the remove assignee buttons', async ({authenticatedPage: page}) => {
 		const {project, view, task} = await createKanbanTaskInBucket()
-		// The dropdown is right-aligned to the bucket name in the breadcrumb, so it
-		// only reaches over the assignee avatars once the row is long enough.
+		// The dropdown opens below the bucket name in the top row; with a few more
+		// buckets it is tall enough to reach over the assignees in the properties strip.
+		await BucketFactory.create(4, {
+			id: (i: number) => 10 + i,
+			project_view_id: view.id,
+		}, false)
+		// The avatar row must also extend under the dropdown horizontally.
 		// Start at 100 to keep the fixture's logged-in user (ID 1).
 		const users = await UserFactory.create(12, {
 			id: (i: number) => 100 + i,
@@ -220,7 +225,7 @@ test.describe('Task Bucket Select', () => {
 		await page.locator('.kanban .bucket .tasks .task').filter({hasText: task.title}).click()
 		await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`))
 
-		const removeButtons = page.locator('.task-view .column.assignees .remove-assignee')
+		const removeButtons = page.locator('.task-view .property.assignees .remove-assignee')
 		await expect(removeButtons).toHaveCount(users.length)
 
 		await page.locator('.task-view .subtitle .bucket-name').click()
@@ -266,6 +271,7 @@ test.describe('Task Bucket Select', () => {
 		await expect(page.locator('.global-notification')).toContainText('Success')
 
 		// Action buttons should still be visible
-		await expect(page.locator('.task-view .action-buttons .button').filter({hasText: 'Done'})).toBeVisible()
+		await expect(page.locator('.task-view [data-cy="taskDetail.done"]')).toBeVisible()
+		await expect(page.locator('.task-view [data-cy="taskDetail.more"] .dropdown-trigger')).toBeVisible()
 	})
 })

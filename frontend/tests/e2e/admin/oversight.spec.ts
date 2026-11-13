@@ -95,7 +95,7 @@ test.describe('Admin oversight', () => {
 		await expect(page.locator('[data-testid="workload-total"]')).toContainText('12 h')
 
 		await workerBlock.getByRole('link', {name: 'Worker task'}).click()
-		const sizeSelect = page.locator('.task-view .columns.details .column').filter({hasText: 'Effort'}).locator('.select select')
+		const sizeSelect = page.locator('.task-view .properties .property').filter({hasText: 'Effort'}).locator('.select select')
 		await sizeSelect.selectOption('1 week')
 		await expect(page.locator('.global-notification')).toContainText('Success')
 		await page.keyboard.press('Escape')

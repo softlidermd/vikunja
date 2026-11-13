@@ -27,6 +27,7 @@ test.describe('Mention in task comment', () => {
 
 		// Wait for comment input editor to be visible (the editable one)
 		const commentEditor = page.locator('.task-view .comments .media.comment .tiptap__editor .tiptap.ProseMirror[contenteditable="true"]')
+		await page.locator('.task-view .comments .tiptap__collapsed').click()
 		await expect(commentEditor).toBeVisible({timeout: 10000})
 
 		// Click to focus the editor
@@ -63,6 +64,7 @@ test.describe('Mention in task comment', () => {
 		await page.goto('/tasks/1')
 
 		const commentEditor = page.locator('.task-view .comments .media.comment .tiptap__editor .tiptap.ProseMirror[contenteditable="true"]')
+		await page.locator('.task-view .comments .tiptap__collapsed').click()
 		await expect(commentEditor).toBeVisible({timeout: 10000})
 		await commentEditor.click()
 		await commentEditor.pressSequentially(`@${member.username.substring(0, 8)}`, {delay: 50})
@@ -80,6 +82,7 @@ test.describe('Mention in task comment', () => {
 
 		// Wait for comment input editor to be visible (the editable one)
 		const commentEditor = page.locator('.task-view .comments .media.comment .tiptap__editor .tiptap.ProseMirror[contenteditable="true"]')
+		await page.locator('.task-view .comments .tiptap__collapsed').click()
 		await expect(commentEditor).toBeVisible({timeout: 10000})
 
 		// Click to focus the editor

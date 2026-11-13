@@ -89,6 +89,7 @@ test.describe('Comment sort order', () => {
 
 		// Add a new comment
 		const newCommentEditor = page.locator('.task-view .comments .media.comment .tiptap__editor .tiptap.ProseMirror[contenteditable="true"]')
+		await page.locator('.task-view .comments .tiptap__collapsed').click()
 		await expect(newCommentEditor).toBeVisible({timeout: 10000})
 		await newCommentEditor.click()
 		await newCommentEditor.fill('Brand new comment')
@@ -116,6 +117,7 @@ test.describe('Comment sort order', () => {
 
 		// Add a new comment (the editor is at the bottom)
 		const newCommentEditor = page.locator('.task-view .comments .media.comment .tiptap__editor .tiptap.ProseMirror[contenteditable="true"]')
+		await page.locator('.task-view .comments .tiptap__collapsed').click()
 		await expect(newCommentEditor).toBeVisible({timeout: 10000})
 		await newCommentEditor.click()
 		await newCommentEditor.fill('Scroll test comment')

@@ -1,5 +1,6 @@
 import type {Task, Bucket} from '../../../src/client/generated'
 import {test, expect} from '../../support/fixtures'
+import {openTaskAction} from '../../support/taskDetail'
 import {ProjectFactory} from '../../factories/project'
 import {ProjectViewFactory} from '../../factories/project_view'
 import {TaskFactory} from '../../factories/task'
@@ -66,7 +67,7 @@ test('unassigning a task drops its card from an open "assigned to me" saved filt
 	const card = page.locator('.kanban .task').filter({hasText: task.title})
 	await expect(card).toBeVisible()
 	await card.getByText(task.title, {exact: true}).click()
-	await page.locator('.task-view .column.assignees .multiselect .input-wrapper span.assignee .remove-assignee').click()
+	await page.locator('.task-view .property.assignees .multiselect .input-wrapper span.assignee .remove-assignee').click()
 	await expect(page.locator('.global-notification')).toContainText('Success')
 
 	// The board stays mounted behind the task modal, so only a refetch can drop the card.
@@ -105,7 +106,7 @@ test('moving a favourite task to another project keeps it in Favorites and drops
 	await expect(card).toBeVisible()
 	await card.click()
 
-	await page.locator('.task-view .action-buttons .button').filter({hasText: /^Move$/}).click()
+	await openTaskAction(page, 'more', 'Move')
 	const projectInput = page.locator('.task-view .content.details .field .multiselect.control .input-wrapper input')
 	await expect(projectInput).toBeVisible({timeout: 5000})
 	await projectInput.click()

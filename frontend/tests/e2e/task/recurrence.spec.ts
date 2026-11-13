@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskAction} from '../../support/taskDetail'
 import {ProjectFactory} from '../../factories/project'
 import {TaskFactory} from '../../factories/task'
 
@@ -16,7 +17,7 @@ test.describe('Task recurrence', () => {
 		await page.goto(`/tasks/${task.id}`)
 
 		// Reveal the RepeatAfter component (hidden until the user activates it)
-		await page.getByRole('button', {name: 'Set Repeating Interval'}).click()
+		await openTaskAction(page, 'addProperty', 'Set Repeating Interval')
 
 		const save = page.waitForResponse(r =>
 			new URL(r.url()).pathname.endsWith(`/tasks/${task.id}`) && r.request().method() === 'PATCH',
@@ -43,7 +44,7 @@ test.describe('Task recurrence', () => {
 		const completed = page.waitForResponse(r =>
 			new URL(r.url()).pathname.endsWith(`/tasks/${task.id}`) && r.request().method() === 'PATCH',
 		)
-		await page.locator('.task-view .action-buttons .button').filter({hasText: 'Mark task done!'}).click()
+		await page.locator('.task-view [data-cy="taskDetail.done"]').click()
 		await completed
 
 		// Fetch fresh state from the API to verify the backend regenerated the task.
@@ -66,7 +67,7 @@ test.describe('Task recurrence', () => {
 		await page.goto(`/tasks/${task.id}`)
 
 		// Reveal the RepeatAfter component (hidden until the user activates it)
-		await page.getByRole('button', {name: 'Set Repeating Interval'}).click()
+		await openTaskAction(page, 'addProperty', 'Set Repeating Interval')
 
 		await expect(page.locator('#repeatMode')).toBeVisible()
 		// Amount input is visible in the default repeat mode

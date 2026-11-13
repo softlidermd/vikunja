@@ -121,8 +121,9 @@ test.describe('Editor image alt text', () => {
 		await page.waitForLoadState('networkidle')
 
 		const description = page.locator('.task-view .details.content.description')
+		await description.locator('.tiptap__collapsed').click({timeout: 30_000})
 		const editor = description.locator('.tiptap__editor .tiptap.ProseMirror')
-		await expect(editor).toBeVisible({timeout: 30_000})
+		await expect(editor).toBeVisible()
 
 		const uploadPromise = page.waitForResponse(r =>
 			r.url().includes(`/api/v2/tasks/${tasks[0].id}/attachments`) && r.request().method() === 'POST',
@@ -148,8 +149,9 @@ test.describe('Editor image alt text', () => {
 		await page.waitForLoadState('networkidle')
 
 		const description = page.locator('.task-view .details.content.description')
+		await description.locator('.tiptap__collapsed').click({timeout: 30_000})
 		const editor = description.locator('.tiptap__editor .tiptap.ProseMirror')
-		await expect(editor).toBeVisible({timeout: 30_000})
+		await expect(editor).toBeVisible()
 
 		const uploadPromise = page.waitForResponse(r =>
 			r.url().includes(`/api/v2/tasks/${tasks[0].id}/attachments`) && r.request().method() === 'POST',

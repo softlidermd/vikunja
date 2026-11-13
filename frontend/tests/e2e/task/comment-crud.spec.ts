@@ -9,6 +9,7 @@ test('comment create, edit and delete persist after reload', async ({authenticat
 	const [task] = await TaskFactory.create(1, {project_id: project.id})
 	const headers = {Authorization: `Bearer ${userToken}`}
 	await page.goto(`/tasks/${task.id}`)
+	await page.locator('.task-view .comments .tiptap__collapsed').click()
 	await page.locator('.comments .tiptap[contenteditable="true"]').fill('Original comment')
 	await page.locator('.comments').getByRole('button', {name: 'Comment', exact: true}).click()
 	const row = page.locator('.comments .comment[id^="comment-"]')
@@ -29,9 +30,28 @@ test('comment create, edit and delete persist after reload', async ({authenticat
 	await page.getByRole('dialog').getByRole('button', {name: 'Do it!'}).click()
 	await expect(row).toHaveCount(0)
 	await page.reload()
-	await expect(page.locator('.comments').getByRole('button', {name: 'Comment', exact: true})).toBeVisible()
+	await expect(page.locator('.comments .tiptap__collapsed')).toBeVisible()
 	await expect(row).toHaveCount(0)
 	stored = await apiContext.get(`tasks/${task.id}/comments`, {headers})
 	expect(stored.ok()).toBeTruthy()
 	expect(await stored.json()).toEqual([])
+})
+
+test('comment composer draft survives closing the task modal', async ({authenticatedPage: page}) => {
+	const [project] = await ProjectFactory.create(1)
+	const views = await createDefaultViews(project.id)
+	const [task] = await TaskFactory.create(1, {project_id: project.id})
+	await page.goto(`/projects/${project.id}/${views[0].id}`)
+	const openTask = () => page.locator('.tasks .task .tasktext').filter({hasText: task.title}).first().click()
+
+	await openTask()
+	await page.locator('.task-view .comments .tiptap__collapsed').click()
+	await page.locator('.comments .tiptap[contenteditable="true"]').fill('Draft comment')
+	await page.locator('.task-detail-view-modal .modal-close-anchor .close').click()
+	await expect(page.locator('.task-view')).toHaveCount(0)
+
+	await openTask()
+	await expect(page.locator('.task-view .comments .tiptap__collapsed')).toHaveCount(0)
+	await expect(page.locator('.comments .tiptap[contenteditable="true"]')).toHaveText('Draft comment')
+	await expect(page.locator('.comments').getByRole('button', {name: 'Comment', exact: true})).toBeVisible()
 })

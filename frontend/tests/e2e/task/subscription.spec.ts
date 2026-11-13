@@ -9,14 +9,19 @@ test('task subscription survives reload and can be removed', async ({authenticat
 	const [task] = await TaskFactory.create(1, {project_id: project.id})
 	const headers = {Authorization: `Bearer ${userToken}`}
 	await page.goto(`/tasks/${task.id}`)
-	const actions = page.locator('.task-view .action-buttons')
-	await actions.getByRole('button', {name: 'Subscribe', exact: true}).click()
-	await expect(actions.getByRole('button', {name: 'Unsubscribe', exact: true})).toBeVisible()
+	const more = page.locator('.task-view [data-cy="taskDetail.more"]')
+	// Each item closes the menu, so reopen it before every assertion.
+	const menuItem = async (name: string) => {
+		await more.locator('.dropdown-trigger').click()
+		return more.getByRole('button', {name, exact: true})
+	}
+	await (await menuItem('Subscribe')).click()
+	await expect(await menuItem('Unsubscribe')).toBeVisible()
 	await page.reload()
-	await actions.getByRole('button', {name: 'Unsubscribe', exact: true}).click()
-	await expect(actions.getByRole('button', {name: 'Subscribe', exact: true})).toBeVisible()
+	await (await menuItem('Unsubscribe')).click()
+	await expect(await menuItem('Subscribe')).toBeVisible()
 	await page.reload()
-	await expect(actions.getByRole('button', {name: 'Subscribe', exact: true})).toBeVisible()
+	await expect(await menuItem('Subscribe')).toBeVisible()
 	const stored = await apiContext.get(`tasks/${task.id}`, {headers})
 	expect(stored.ok()).toBeTruthy()
 	expect((await stored.json()).subscription).toBeFalsy()

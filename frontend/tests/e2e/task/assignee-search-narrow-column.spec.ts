@@ -1,11 +1,15 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskAction} from '../../support/taskDetail'
 import {ProjectFactory} from '../../factories/project'
 import {TaskFactory} from '../../factories/task'
 import {UserFactory} from '../../factories/user'
 import {UserProjectFactory} from '../../factories/users_project'
 
-test.describe('Assignee search results in a narrow column', () => {
-	test('Shows the avatar and name of every result when the assignees column is narrow', async ({authenticatedPage: page}) => {
+// The detail columns used to split the row evenly, so every extra attribute squeezed the
+// assignees column (#3709). The properties strip now wraps instead; this guards the same
+// symptom: with every property set, the assignee results must stay readable.
+test.describe('Assignee search results in a crowded properties strip', () => {
+	test('Shows the avatar and name of every result when every property is set', async ({authenticatedPage: page}) => {
 		await page.setViewportSize({width: 1280, height: 800})
 
 		// Don't truncate, and start at 100, to keep the fixture's logged-in user (ID 1)
@@ -13,15 +17,16 @@ test.describe('Assignee search results in a narrow column', () => {
 			id: (i: number) => 100 + i,
 		}, false)
 		const projects = await ProjectFactory.create(1)
-		// The detail columns split the row evenly, so every extra attribute
-		// squeezes the assignees column further (#3709).
 		const tasks = await TaskFactory.create(1, {
 			id: 1,
 			project_id: projects[0].id,
 			priority: 3,
 			percent_done: 0.5,
+			size: 4,
+			repeat_after: 86_400,
 			due_date: new Date(Date.now() + 86_400_000).toISOString(),
 			start_date: new Date(Date.now() + 43_200_000).toISOString(),
+			end_date: new Date(Date.now() + 172_800_000).toISOString(),
 		})
 		await UserProjectFactory.create(3, {
 			project_id: projects[0].id,
@@ -29,9 +34,10 @@ test.describe('Assignee search results in a narrow column', () => {
 		})
 
 		await page.goto(`/tasks/${tasks[0].id}`)
-		await page.locator('[data-cy="taskDetail.assign"]').click()
+		await expect(page.locator('.task-view .properties .property')).toHaveCount(7)
+		await openTaskAction(page, 'addProperty', 'Assign to User')
 
-		const multiselect = page.locator('.task-view .column.assignees .multiselect')
+		const multiselect = page.locator('.task-view .property.assignees .multiselect')
 		await multiselect.locator('input').click()
 		await expect(multiselect.locator('.search-results')).toBeVisible({timeout: 5000})
 

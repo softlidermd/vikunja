@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskAction} from '../../support/taskDetail'
 import dayjs from 'dayjs'
 import type {Page} from '@playwright/test'
 
@@ -32,15 +33,14 @@ async function openDueDateSheet(page: Page) {
 
 	await page.goto(`/tasks/${TASK_ID}`)
 
-	const setDueDateButton = page.locator('.task-view .action-buttons .button').filter({hasText: 'Set Due Date'})
-	await expect(setDueDateButton).toBeVisible({timeout: 10000})
+	await expect(page.locator('.task-view [data-cy="taskDetail.addProperty"]')).toBeVisible({timeout: 10000})
 	expect(await page.evaluate(() => {
 		const container = document.querySelector('.task-detail-view-modal .modal-container')
 		return container !== null && container.scrollHeight > container.clientHeight
 	})).toBe(true)
-	await setDueDateButton.click()
+	await openTaskAction(page, 'addProperty', 'Set Due Date')
 
-	const datepickerShow = page.locator('.task-view .columns.details .column').filter({hasText: 'Due Date'}).locator('.date-input .datepicker .show')
+	const datepickerShow = page.locator('.task-view .properties .property').filter({hasText: 'Due Date'}).locator('.date-input .datepicker .show')
 	await expect(datepickerShow).toBeVisible()
 
 	const panel = page.locator('.bottom-sheet__panel')

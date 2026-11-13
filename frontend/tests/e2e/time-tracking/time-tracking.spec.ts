@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskAction} from '../../support/taskDetail'
 import type {Page, Locator} from '@playwright/test'
 
 import {ProjectFactory} from '../../factories/project'
@@ -30,7 +31,7 @@ async function selectTask(form: Locator, title: string) {
 // Open the time-tracking section on a task detail page.
 async function openTaskTimeTracking(page: Page, taskId: number): Promise<Locator> {
 	await page.goto(`/tasks/${taskId}`)
-	await page.locator('[data-cy="taskTrackTimeAction"]').click()
+	await openTaskAction(page, 'more', 'Track time')
 	const section = page.locator('.task-time-tracking')
 	await expect(section).toBeVisible()
 	return section
