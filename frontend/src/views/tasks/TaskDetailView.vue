@@ -157,293 +157,245 @@
 			</div>
 
 			<div class="properties">
-				<div
+				<TaskPropertyChip
 					v-if="activeFields.assignees"
+					:ref="e => setChipRef('assignees', e)"
 					class="property assignees"
+					:label="$t('task.attributes.assignees')"
+					:can-write="canWrite"
+					@remove="clearField('assignees')"
 				>
-					<!-- Assignees -->
-					<div class="detail-title">
-						<Icon icon="users" />
-						{{ $t('task.attributes.assignees') }}
-					</div>
+					<template #value>
+						<span
+							v-if="task.assignees?.length"
+							class="chip-avatars"
+						>
+							<User
+								v-for="user in task.assignees.slice(0, 3)"
+								:key="user.id"
+								:user="user"
+								:avatar-size="20"
+								:show-username="false"
+							/>
+						</span>
+						{{ assigneeSummary }}
+					</template>
 					<EditAssignees
-						v-if="canWrite"
 						:ref="e => setFieldRef('assignees', e)"
 						v-model="task.assignees"
+						class="chip-editor"
 						:project-id="task.project_id"
 						:task-id="task.id"
+						inline
 					/>
-					<AssigneeList
-						v-else
-						:assignees="task.assignees ?? []"
-						class="mbs-2"
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.priority"
+					:ref="e => setChipRef('priority', e)"
+					close-on-change
+					class="property"
+					:label="$t('task.attributes.priority')"
+					:can-write="canWrite"
+					@remove="clearField('priority')"
+				>
+					<template #value>
+						<span
+							class="chip-priority"
+							:data-priority="task.priority"
+						>{{ $t(`task.priority.${PRIORITY_KEYS[task.priority ?? 0] ?? 'unset'}`) }}</span>
+					</template>
+					<PrioritySelect
+						:ref="e => setFieldRef('priority', e)"
+						v-model="task.priority"
+						@update:modelValue="setPriority"
 					/>
-				</div>
-				<CustomTransition
-					name="flash-background"
-					appear
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.dueDate"
+					class="property date-input"
+					:class="{'is-overdue': isOverdue}"
+					:label="$t('task.attributes.dueDate')"
+					:can-write="canWrite"
+					:remove-label="$t('task.detail.removeDueDate')"
+					@remove="clearField('dueDate')"
 				>
-					<div
-						v-if="activeFields.priority"
-						class="property"
-					>
-						<!-- Priority -->
-						<div class="detail-title">
-							<Icon icon="exclamation-circle" />
-							{{ $t('task.attributes.priority') }}
-						</div>
-						<PrioritySelect
-							:ref="e => setFieldRef('priority', e)"
-							v-model="task.priority"
-							:disabled="!canWrite"
-							@update:modelValue="setPriority"
+					<template #value>
+						<Datepicker
+							ref="dueDatePicker"
+							v-model="dueDateInput"
+							:choose-date-label="$t('task.detail.chooseDueDate')"
+							empty-label="—"
+							:title="$t('task.attributes.dueDate')"
+							:disabled="taskBusy || !canWrite"
+							@closeOnChange="saveTask()"
 						/>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
+					</template>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.startDate"
+					class="property date-input"
+					:label="$t('task.attributes.startDate')"
+					:can-write="canWrite"
+					:remove-label="$t('task.detail.removeStartDate')"
+					@remove="clearField('startDate')"
 				>
-					<div
-						v-if="activeFields.size"
-						class="property"
-					>
-						<div class="detail-title">
-							<Icon icon="ruler-horizontal" />
-							{{ $t('task.attributes.size') }}
-						</div>
-						<SizeSelect
-							:ref="e => setFieldRef('size', e)"
-							v-model="task.size"
-							:disabled="!canWrite"
-							@update:modelValue="setSize"
+					<template #value>
+						<Datepicker
+							ref="startDatePicker"
+							v-model="startDateInput"
+							:choose-date-label="$t('task.detail.chooseStartDate')"
+							empty-label="—"
+							:title="$t('task.attributes.startDate')"
+							:disabled="taskBusy || !canWrite"
+							@closeOnChange="saveTask()"
 						/>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
+					</template>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.endDate"
+					class="property date-input"
+					:label="$t('task.attributes.endDate')"
+					:can-write="canWrite"
+					:remove-label="$t('task.detail.removeEndDate')"
+					@remove="clearField('endDate')"
 				>
-					<div
-						v-if="activeFields.dueDate"
-						class="property"
-					>
-						<!-- Due Date -->
-						<div class="detail-title">
-							<Icon icon="calendar" />
-							{{ $t('task.attributes.dueDate') }}
-						</div>
-						<div class="date-input">
-							<Datepicker
-								ref="dueDatePicker"
-								v-model="dueDateInput"
-								:choose-date-label="$t('task.detail.chooseDueDate')"
-								:title="$t('task.attributes.dueDate')"
-								:disabled="taskBusy || !canWrite"
-								@closeOnChange="saveTask()"
-							/>
-							<BaseButton
-								v-if="task.due_date && canWrite"
-								class="remove"
-								:aria-label="$t('task.detail.removeDueDate')"
-								@click="() => {task.due_date = '';saveTask()}"
-							>
-								<span class="icon is-small">
-									<Icon icon="times" />
-								</span>
-							</BaseButton>
-						</div>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.percentDone"
-						class="property"
-					>
-						<!-- Progress -->
-						<div class="detail-title">
-							<Icon icon="percent" />
-							{{ $t('task.attributes.percentDone') }}
-						</div>
-						<PercentDoneSelect
-							:ref="e => setFieldRef('percentDone', e)"
-							v-model="task.percent_done"
-							:disabled="!canWrite"
-							@update:modelValue="setPercentDone"
+					<template #value>
+						<Datepicker
+							ref="endDatePicker"
+							v-model="endDateInput"
+							:choose-date-label="$t('task.detail.chooseEndDate')"
+							empty-label="—"
+							:title="$t('task.attributes.endDate')"
+							:disabled="taskBusy || !canWrite"
+							@closeOnChange="saveTask()"
 						/>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.startDate"
-						class="property"
-					>
-						<!-- Start Date -->
-						<div class="detail-title">
-							<Icon icon="play" />
-							{{ $t('task.attributes.startDate') }}
-						</div>
-						<div class="date-input">
-							<Datepicker
-								ref="startDatePicker"
-								v-model="startDateInput"
-								:choose-date-label="$t('task.detail.chooseStartDate')"
-								:title="$t('task.attributes.startDate')"
-								:disabled="taskBusy || !canWrite"
-								@closeOnChange="saveTask()"
-							/>
-							<BaseButton
-								v-if="task.start_date && canWrite"
-								class="remove"
-								:aria-label="$t('task.detail.removeStartDate')"
-								@click="() => {task.start_date = '';saveTask()}"
-							>
-								<span class="icon is-small">
-									<Icon icon="times" />
-								</span>
-							</BaseButton>
-						</div>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.endDate"
-						class="property"
-					>
-						<!-- End Date -->
-						<div class="detail-title">
-							<Icon icon="stop" />
-							{{ $t('task.attributes.endDate') }}
-						</div>
-						<div class="date-input">
-							<Datepicker
-								ref="endDatePicker"
-								v-model="endDateInput"
-								:choose-date-label="$t('task.detail.chooseEndDate')"
-								:title="$t('task.attributes.endDate')"
-								:disabled="taskBusy || !canWrite"
-								@closeOnChange="saveTask()"
-							/>
-							<BaseButton
-								v-if="task.end_date && canWrite"
-								class="remove"
-								:aria-label="$t('task.detail.removeEndDate')"
-								@click="() => {task.end_date = '';saveTask()}"
-							>
-								<span class="icon is-small">
-									<Icon icon="times" />
-								</span>
-							</BaseButton>
-						</div>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.reminders"
-						class="property"
-					>
-						<!-- Reminders -->
-						<div class="detail-title">
-							<Icon :icon="['far', 'clock']" />
-							{{ $t('task.attributes.reminders') }}
-						</div>
-						<Reminders
-							:ref="e => setFieldRef('reminders', e)"
-							v-model="task.reminders"
-							:default-relative-to="remindersDefaultRelativeTo"
-							:disabled="!canWrite"
-							@update:modelValue="saveTask()"
-						/>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.repeatAfter"
-						class="property"
-					>
-						<!-- Repeat after -->
-						<div class="is-flex is-justify-content-space-between">
-							<div class="detail-title">
-								<Icon icon="history" />
-								{{ $t('task.attributes.repeat') }}
-							</div>
-							<BaseButton
-								v-if="canWrite"
-								class="remove"
-								:aria-label="$t('task.detail.removeRepeat')"
-								@click="removeRepeatAfter"
-							>
-								<span class="icon is-small">
-									<Icon icon="times" />
-								</span>
-							</BaseButton>
-						</div>
-						<RepeatAfter
-							:ref="e => setFieldRef('repeatAfter', e)"
-							:model-value="task"
-							:disabled="!canWrite"
-							@update:modelValue="saveTask($event)"
-						/>
-					</div>
-				</CustomTransition>
-				<CustomTransition
-					name="flash-background"
-					appear
-				>
-					<div
-						v-if="activeFields.color"
-						class="property"
-					>
-						<!-- Color -->
-						<div class="detail-title">
-							<Icon icon="fill-drip" />
-							{{ $t('task.attributes.color') }}
-						</div>
-						<ColorPicker
-							:ref="e => setFieldRef('color', e)"
-							v-model="taskColor"
-							menu-position="bottom"
-							@update:modelValue="saveTask()"
-						/>
-					</div>
-				</CustomTransition>
-
-				<!-- Labels -->
-				<div
+					</template>
+				</TaskPropertyChip>
+				<TaskPropertyChip
 					v-if="activeFields.labels"
+					:ref="e => setChipRef('labels', e)"
 					class="property labels-list"
+					:label="$t('task.attributes.labels')"
+					:can-write="canWrite"
+					@remove="clearField('labels')"
 				>
-					<div class="detail-title">
-						<span class="icon is-grey">
-							<Icon icon="tags" />
-						</span>
-						{{ $t('task.attributes.labels') }}
-					</div>
+					<template #value>
+						<span
+							v-for="label in task.labels"
+							:key="label.id"
+							class="chip-label"
+							:style="getLabelStyles(label)"
+						>{{ label.title }}</span>
+					</template>
 					<EditLabels
 						:ref="e => setFieldRef('labels', e)"
 						v-model="task.labels"
+						class="chip-editor"
 						:project-id="task.project_id"
-						:disabled="!canWrite"
 						:task-id="taskId"
 						:creatable="!authStore.isLinkShareAuth"
 						:creation-disabled-message="authStore.isLinkShareAuth ? $t('task.label.linkShareCannotCreate') : ''"
+						inline
 					/>
-				</div>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.size"
+					:ref="e => setChipRef('size', e)"
+					close-on-change
+					class="property"
+					:label="$t('task.attributes.size')"
+					:can-write="canWrite"
+					@remove="clearField('size')"
+				>
+					<template #value>
+						{{ $t(taskSizeLabelKey(task.size ?? 0)) }}
+					</template>
+					<SizeSelect
+						:ref="e => setFieldRef('size', e)"
+						v-model="task.size"
+						@update:modelValue="setSize"
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.percentDone"
+					:ref="e => setChipRef('percentDone', e)"
+					close-on-change
+					class="property"
+					:label="$t('task.attributes.percentDone')"
+					:can-write="canWrite"
+					@remove="clearField('percentDone')"
+				>
+					<template #value>
+						<span
+							class="chip-progress"
+							aria-hidden="true"
+						><span :style="{inlineSize: `${(task.percent_done ?? 0) * 100}%`}" /></span>
+						{{ Math.round((task.percent_done ?? 0) * 100) }}%
+					</template>
+					<PercentDoneSelect
+						:ref="e => setFieldRef('percentDone', e)"
+						v-model="task.percent_done"
+						@update:modelValue="setPercentDone"
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.reminders"
+					:ref="e => setChipRef('reminders', e)"
+					class="property"
+					:label="$t('task.attributes.reminders')"
+					:can-write="canWrite"
+					@remove="clearField('reminders')"
+				>
+					<template #value>
+						{{ task.reminders?.length || '' }}
+					</template>
+					<Reminders
+						:ref="e => setFieldRef('reminders', e)"
+						v-model="task.reminders"
+						:default-relative-to="remindersDefaultRelativeTo"
+						@update:modelValue="saveTask()"
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.repeatAfter"
+					:ref="e => setChipRef('repeatAfter', e)"
+					class="property"
+					:label="$t('task.attributes.repeat')"
+					:can-write="canWrite"
+					:remove-label="$t('task.detail.removeRepeat')"
+					@remove="clearField('repeatAfter')"
+				>
+					<template #value>
+						{{ repeatSummary }}
+					</template>
+					<RepeatAfter
+						:ref="e => setFieldRef('repeatAfter', e)"
+						:model-value="task"
+						@update:modelValue="saveTask($event)"
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					v-if="activeFields.color"
+					:ref="e => setChipRef('color', e)"
+					close-on-change
+					class="property"
+					:label="$t('task.attributes.color')"
+					:can-write="canWrite"
+					@remove="clearField('color')"
+				>
+					<template #value>
+						<ColorBubble
+							v-if="taskColor"
+							class="chip-swatch"
+							:color="getHexColor(taskColor)"
+						/>
+					</template>
+					<ColorPicker
+						:ref="e => setFieldRef('color', e)"
+						v-model="taskColor"
+						@update:modelValue="saveTask()"
+					/>
+				</TaskPropertyChip>
 				<Dropdown
 					v-if="canWrite"
 					v-cy="'taskDetail.addProperty'"
@@ -501,17 +453,29 @@
 				<Description
 					:model-value="task"
 					:can-write="canWrite"
+				>
+					<!-- Without reactions, adding one is a quiet icon in the description header instead of a lone row. -->
+					<template
+						v-if="canWrite && !hasReactions"
+						#actions
+					>
+						<Reactions
+							:model-value="task.reactions"
+							entity-kind="tasks"
+							:entity-id="task.id"
+							class="reactions--quiet d-print-none"
+						/>
+					</template>
+				</Description>
+				<Reactions
+					v-if="hasReactions"
+					:model-value="task.reactions"
+					entity-kind="tasks"
+					:entity-id="task.id"
+					class="details d-print-none"
+					:disabled="!canWrite"
 				/>
 			</div>
-
-			<!-- Reactions -->
-			<Reactions
-				:model-value="task.reactions"
-				entity-kind="tasks"
-				:entity-id="task.id"
-				class="details d-print-none"
-				:disabled="!canWrite"
-			/>
 
 			<!-- Attachments -->
 			<div
@@ -633,7 +597,9 @@ import {klona} from 'klona/lite'
 
 import {useTask} from '@/composables/useTask'
 import {canAutoFocus} from '@/directives/focus'
-import {createTaskDraft, mergeTask} from '@/helpers/task'
+import {createTaskDraft, getHexColor, mergeTask, parseRepeatAfter} from '@/helpers/task'
+import {getDisplayName} from '@/helpers/user'
+import {useLabelStyles} from '@/composables/useLabelStyles'
 
 import type {Task as ITask} from '@/client/generated'
 import type {IconProp} from '@fortawesome/fontawesome-svg-core'
@@ -666,13 +632,14 @@ import ProjectSearch from '@/components/tasks/partials/ProjectSearch.vue'
 import PercentDoneSelect from '@/components/tasks/partials/PercentDoneSelect.vue'
 import PrioritySelect from '@/components/tasks/partials/PrioritySelect.vue'
 import SizeSelect from '@/components/tasks/partials/SizeSelect.vue'
-import type {TaskSize} from '@/constants/taskSizes'
+import {taskSizeLabelKey, type TaskSize} from '@/constants/taskSizes'
 import RelatedTasks from '@/components/tasks/partials/RelatedTasks.vue'
 import Reminders from '@/components/tasks/partials/Reminders.vue'
 import RepeatAfter from '@/components/tasks/partials/RepeatAfter.vue'
 import TaskSubscription from '@/components/misc/Subscription.vue'
-import CustomTransition from '@/components/misc/CustomTransition.vue'
-import AssigneeList from '@/components/tasks/partials/AssigneeList.vue'
+import TaskPropertyChip from '@/components/tasks/partials/TaskPropertyChip.vue'
+import User from '@/components/misc/User.vue'
+import ColorBubble from '@/components/misc/ColorBubble.vue'
 import BucketSelect from '@/components/tasks/partials/BucketSelect.vue'
 import Reactions from '@/components/input/Reactions.vue'
 
@@ -690,6 +657,8 @@ import {
 	useFavoriteTaskMutation,
 	useDuplicateTaskMutation,
 	useMarkTaskReadMutation,
+	useRemoveTaskAssigneeMutation,
+	useRemoveTaskLabelMutation,
 } from '@/client/queries/taskMutations'
 import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
@@ -720,6 +689,9 @@ const favoriteTask = useFavoriteTaskMutation()
 const duplicateTask = useDuplicateTaskMutation()
 const markTaskRead = useMarkTaskReadMutation()
 const subscriptionMutation = useSetTaskSubscriptionMutation()
+const removeAssigneeMutation = useRemoveTaskAssigneeMutation()
+const removeLabelMutation = useRemoveTaskLabelMutation()
+const {getLabelStyles} = useLabelStyles()
 const taskMutating = computed(() => [
 	updateTask,
 	deleteTaskMutation,
@@ -785,6 +757,33 @@ const endDateInput = computed({
 	},
 })
 const hasAttachments = computed(() => (task.value.attachments?.length ?? 0) > 0)
+const hasReactions = computed(() => Object.keys(task.value.reactions ?? {}).length > 0)
+
+// Chip values for the properties strip
+const PRIORITY_KEYS = ['unset', 'low', 'medium', 'high', 'urgent', 'doNow']
+const assigneeSummary = computed(() => {
+	const assignees = task.value.assignees ?? []
+	return assignees.length > 2
+		? t('task.detail.assigneeCount', {count: assignees.length})
+		: assignees.map(user => getDisplayName(user)).join(', ')
+})
+const isOverdue = computed(() => {
+	const due = parseDateOrNull(task.value.due_date)
+	return !task.value.done && due !== null && due < new Date()
+})
+const repeatSummary = computed(() => {
+	if (task.value.repeat_mode === TASK_REPEAT_MODES.REPEAT_MODE_MONTH) {
+		return t('task.repeat.monthly')
+	}
+	const {amount, type} = parseRepeatAfter(task.value.repeat_after ?? 0)
+	if (amount === 1 && (type === 'days' || type === 'weeks')) {
+		return t(type === 'days' ? 'task.repeat.everyDay' : 'task.repeat.everyWeek')
+	}
+	// The editor only offers hours, days and weeks; other units only come from the API.
+	return amount > 0 && ['hours', 'days', 'weeks'].includes(type)
+		? `${t('task.repeat.each')} ${amount} ${t(`task.repeat.${type}`).toLowerCase()}`
+		: ''
+})
 const remindersDefaultRelativeTo = computed(() => {
 	if (parseDateOrNull(task.value.due_date)) {
 		return REMINDER_PERIOD_RELATIVE_TO_TYPES.DUEDATE
@@ -1083,9 +1082,27 @@ function setFieldRef(name: FieldType, e: Element | ComponentPublicInstance | nul
 	activeFieldElements[name] = element instanceof HTMLElement ? element : null
 }
 
+// Property chips whose editor lives in a popover
+const chipRefs: Partial<Record<FieldType, InstanceType<typeof TaskPropertyChip>>> = {}
+
+function setChipRef(name: FieldType, e: Element | ComponentPublicInstance | null) {
+	if (e instanceof Element || e === null) {
+		delete chipRefs[name]
+		return
+	}
+	chipRefs[name] = e as InstanceType<typeof TaskPropertyChip>
+}
+
 function setFieldActive(fieldName: keyof typeof activeFields) {
 	activeFields[fieldName] = true
 	nextTick(() => {
+		const chip = chipRefs[fieldName]
+		if (chip) {
+			scrollIntoView(chip.$el, 'instant')
+			chip.open()
+			return
+		}
+
 		let datepicker: InstanceType<typeof Datepicker> | null = null
 		switch (fieldName) {
 			case 'dueDate':
@@ -1252,6 +1269,54 @@ async function setPercentDone(percentDone: number) {
 	return saveTask(newTask)
 }
 
+// A chip's ×: clear the value like the old per-field remove buttons did, then hide the chip.
+async function clearField(field: FieldType) {
+	activeFields[field] = false
+	const id = task.value.id!
+	switch (field) {
+		case 'assignees':
+			for (const user of task.value.assignees ?? []) {
+				await removeAssigneeMutation.mutateAsync({user: {...user, id: user.id!}, taskId: id})
+			}
+			task.value.assignees = []
+			return
+		case 'labels':
+			for (const label of task.value.labels ?? []) {
+				await removeLabelMutation.mutateAsync({label: {...label, id: label.id!}, taskId: id})
+			}
+			task.value.labels = []
+			return
+		case 'priority':
+			if (task.value.priority === PRIORITIES.UNSET) return
+			return setPriority(PRIORITIES.UNSET)
+		case 'size':
+			if (!task.value.size) return
+			return setSize(0)
+		case 'percentDone':
+			if (!task.value.percent_done) return
+			return setPercentDone(0)
+		case 'reminders':
+			if (!task.value.reminders?.length) return
+			task.value.reminders = []
+			return saveTask()
+		case 'repeatAfter':
+			if (!task.value.repeat_after && task.value.repeat_mode === TASK_REPEAT_MODES.REPEAT_MODE_DEFAULT) return
+			return removeRepeatAfter()
+		case 'color':
+			if (!taskColor.value) return
+			taskColor.value = ''
+			return saveTask()
+		case 'dueDate':
+		case 'startDate':
+		case 'endDate': {
+			const key = ({dueDate: 'due_date', startDate: 'start_date', endDate: 'end_date'} as const)[field]
+			if (!task.value[key]) return
+			task.value[key] = ''
+			return saveTask()
+		}
+	}
+}
+
 async function removeRepeatAfter() {
 	task.value.repeat_after = 0
 	task.value.repeat_mode = TASK_REPEAT_MODES.REPEAT_MODE_DEFAULT
@@ -1300,7 +1365,7 @@ function setRelatedTasksActive() {
 	border-radius: $radius;
 	padding: 1rem;
 	color: var(--text);
-	background-color: var(--site-background) !important;
+	background-color: var(--white) !important;
 
 	@media screen and (max-width: $tablet) {
 		border-radius: 0;
@@ -1318,7 +1383,6 @@ function setRelatedTasksActive() {
 
 .task-topbar {
 	display: flex;
-	flex-wrap: wrap;
 	align-items: center;
 	gap: .5rem;
 	margin-block-end: .5rem;
@@ -1330,6 +1394,7 @@ function setRelatedTasksActive() {
 }
 
 .task-topbar__actions {
+	flex: none;
 	display: flex;
 	align-items: center;
 	gap: .25rem;
@@ -1365,10 +1430,14 @@ function setRelatedTasksActive() {
 	justify-content: center;
 	inline-size: 1.75rem;
 	block-size: 1.75rem;
-	margin-block-start: .45rem; // centre on the first line of the title
+	margin-block-start: .6rem; // centre on the first line of the title
+
+	@media screen and (max-width: $tablet) {
+		margin-block-start: .35rem;
+	}
 	border: 2px solid var(--grey-300);
 	border-radius: 100%;
-	color: transparent;
+	color: var(--grey-400);
 	transition: all $transition;
 
 	&:hover,
@@ -1389,44 +1458,209 @@ function setRelatedTasksActive() {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: .375rem;
-	margin-block: .75rem;
-	padding-block-end: .75rem;
+	gap: .5rem;
+	margin-block: .875rem;
+	padding-block-end: 1.125rem;
 	border-block-end: 1px solid var(--grey-200);
 }
 
-.property {
-	display: inline-flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: .375rem;
-	max-inline-size: 100%;
-	min-inline-size: 0;
-	border: 1px solid var(--grey-200);
-	border-radius: $radius;
-	padding: .125rem .5rem;
+// Line the chips up with the title text, past the done circle.
+.task-title-row:has(.done-toggle) + .properties {
+	@media screen and (min-width: $tablet) {
+		padding-inline-start: 2.6rem;
+	}
+}
 
-	.detail-title {
-		font-size: .75rem;
-		color: var(--grey-500);
-		white-space: nowrap;
+.chip-avatars {
+	display: inline-flex;
+
+	> .user:not(:first-child) {
+		margin-inline-start: -.375rem;
 	}
 
-	&.assignees,
-	&.labels-list {
-		flex: 1 1 16rem;
+	:deep(.avatar-wrapper) {
+		margin-inline-end: 0;
+	}
+
+	:deep(.avatar) {
+		box-sizing: content-box;
+		border: 2px solid var(--grey-50);
+	}
+}
+
+.chip-priority {
+	&[data-priority="3"] {
+		color: var(--priority-3-text);
+	}
+
+	&[data-priority="4"],
+	&[data-priority="5"] {
+		color: var(--priority-4-text);
+	}
+}
+
+.chip-label {
+	padding: .1875rem .5rem;
+	border-radius: 1rem;
+	font-size: .75rem;
+}
+
+.chip-progress {
+	inline-size: 3rem;
+	block-size: .375rem;
+	border-radius: 3px;
+	background: var(--grey-200);
+	overflow: hidden;
+
+	> span {
+		display: block;
+		block-size: 100%;
+		background: var(--primary);
+	}
+}
+
+.chip-swatch {
+	inline-size: .875rem;
+	block-size: .875rem;
+}
+
+// Popover editors: the search field on top, its results right under it, the chosen items below.
+.chip-editor.multiselect {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .375rem;
+	// The popover sizes to its content; the search editors get a fixed ~300px.
+	inline-size: 18.5rem;
+
+	.bottom-sheet & {
+		inline-size: 100%;
+	}
+
+	:deep(.control),
+	:deep(.input-wrapper) {
+		display: contents;
+	}
+
+	:deep(.input-wrapper .input) {
+		flex: 1 0 100%;
+		max-inline-size: none !important;
+		min-block-size: 2.25rem;
+		padding-inline: calc(.75em - 1px);
+		border: 1px solid var(--input-border-color) !important;
+		border-radius: $radius;
+		background: var(--white);
+		font-size: .8125rem;
+
+		&:focus {
+			border-color: var(--primary) !important;
+		}
+	}
+
+	&.has-search-results :deep(.input-wrapper .input) {
+		border-color: var(--primary) !important;
+		border-radius: $radius $radius 0 0;
+	}
+
+	:deep(.search-results) {
+		flex: 1 0 100%;
+		margin-block-start: calc(-.375rem - 1px);
+	}
+
+	// labels' tags and the assignee list
+	:deep(.input-wrapper > :not(.input)) {
+		order: 1;
+	}
+
+	:deep(.assignees-list) {
+		flex: 1 0 100%;
+		flex-direction: column;
+	}
+
+	:deep(.assignees-list .assignee) {
+		display: flex;
+		align-items: center;
+		gap: .5rem;
+		margin: 0 !important;
+		padding: .25rem;
+		border-radius: $radius;
+
+		&:hover {
+			background: var(--grey-100);
+		}
+	}
+
+	:deep(.assignees-list .user) {
+		flex: 1;
+		min-inline-size: 0;
+		margin: 0 !important;
+	}
+
+	:deep(.assignees-list .avatar) {
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
+		border: 0;
+	}
+
+	// AssigneeList hides the names on desktop
+	:deep(.assignees-list .user .username) {
+		display: inline;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: .875rem;
+	}
+
+	:deep(.remove-assignee) {
+		position: static;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
+		border-radius: $radius;
+		background: transparent;
+		color: var(--text-muted);
+
+		&:hover {
+			background: var(--grey-200);
+			color: var(--danger);
+		}
+	}
+}
+
+// The datepicker's own trigger is the chip's value.
+.date-input :deep(.datepicker .show) {
+	margin: 0;
+	padding: 0;
+	inline-size: auto;
+	color: inherit;
+	white-space: nowrap;
+
+	&:hover {
+		background: transparent;
+	}
+}
+
+.property.is-overdue {
+	border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+	background: color-mix(in srgb, var(--danger) 7%, var(--white));
+
+	:deep(.datepicker .show) {
+		color: var(--danger-text);
 	}
 }
 
 .add-property__trigger {
 	display: inline-flex;
 	align-items: center;
-	gap: .25rem;
+	gap: .375rem;
+	block-size: 1.875rem;
+	padding-inline: .75rem;
 	border: 1px dashed var(--grey-300);
 	border-radius: $radius;
-	padding: .25rem .625rem;
-	font-size: .875rem;
-	color: var(--grey-500);
+	font-size: .8125rem;
+	color: var(--grey-600);
 
 	&:hover,
 	&[aria-expanded="true"] {
@@ -1453,11 +1687,34 @@ function setRelatedTasksActive() {
 }
 
 .subtitle {
+	display: flex;
+	align-items: center;
+	gap: .25rem;
+	min-inline-size: 0;
+	white-space: nowrap;
 	color: var(--grey-500);
 	margin-block-end: 0;
 
+	// Long project names truncate so ★ ⋯ stay on the breadcrumb's row.
 	a {
+		min-inline-size: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		color: var(--grey-800);
+	}
+}
+
+// Borderless until hovered, like the mockup's collapsed description line.
+.description :deep(.tiptap__collapsed) {
+	border-color: transparent;
+
+	&:hover {
+		border-color: var(--input-border-color);
+		background: var(--grey-50);
+	}
+
+	&:focus-visible {
+		border-color: var(--primary);
 	}
 }
 
@@ -1469,38 +1726,35 @@ h2 .button {
 	color: var(--grey-400);
 }
 
-.date-input {
-	display: flex;
-	align-items: center;
-}
+// Just the add button in the description header, shown on hover or focus.
+.reactions--quiet {
+	position: relative;
+	display: inline-flex;
+	opacity: 0;
 
-.remove {
-	color: var(--danger);
-	vertical-align: middle;
-	padding-inline-start: .5rem;
-	line-height: 1;
-}
+	.description:hover &,
+	&:focus-within,
+	&:has(.emoji-picker) {
+		opacity: 1;
+	}
 
-:deep(.datepicker) {
-	inline-size: 100%;
+	@media (hover: none) {
+		opacity: 1;
+	}
 
-	.show {
-		color: var(--text);
-		padding: .25rem .5rem;
-		transition: background-color $transition;
-		border-radius: $radius;
-		display: block;
-		margin: .1rem 0;
-		inline-size: 100%;
-		text-align: start;
+	:deep(.reaction-button) {
+		margin: 0;
+		border-color: transparent;
+		background: transparent;
 
 		&:hover {
-			background: var(--white);
+			border-color: var(--grey-300);
 		}
 	}
 
-	&.disabled .show:hover {
-		background: transparent;
+	:deep(.emoji-picker) {
+		inset-block-start: 100%;
+		inset-inline-end: 0;
 	}
 }
 
@@ -1513,20 +1767,7 @@ h2 .button {
 	}
 }
 
-.labels-list,
-.assignees {
-	:deep(.multiselect) {
-		.input-wrapper {
-			&:not(:focus-within, :hover) {
-				background: transparent;
-				border-color: transparent;
-			}
-		}
-	}
-}
-
 :deep(.details),
-:deep(.properties),
 :deep(.heading) {
 	.input:not(.has-defaults),
 	.textarea,

@@ -19,7 +19,7 @@ test.describe('Editor toolbar keyboard navigation', () => {
 		const description = page.locator('.task-view .details.content.description')
 
 		// Entering edit mode is what renders (v-show) the toolbar.
-		const editButton = description.locator('.tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = description.locator('.description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 

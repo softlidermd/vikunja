@@ -45,7 +45,7 @@ test.describe('Editor image alt text', () => {
 
 		const description = page.locator('.task-view .details.content.description')
 
-		const editButton = description.locator('.tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = description.locator('.description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 
@@ -90,7 +90,7 @@ test.describe('Editor image alt text', () => {
 
 		const description = page.locator('.task-view .details.content.description')
 
-		const editButton = description.locator('.tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = description.locator('.description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 

@@ -122,9 +122,12 @@
 							delete commentDrafts[c.id]
 						}"
 					/>
-					<Reactions 
+					<!-- Without reactions, adding one is a quiet icon at the end of the action line. -->
+					<Reactions
+						v-if="canWrite || Object.keys(c.reactions ?? {}).length > 0"
 						:model-value="c.reactions"
 						class="mbs-2 d-print-none"
+						:class="{'comment-reactions--quiet': Object.keys(c.reactions ?? {}).length === 0}"
 						entity-kind="comments"
 						:entity-id="c.id"
 						:task-id="taskId"
@@ -179,6 +182,7 @@
 								}"
 								:upload-callback="attachmentUpload"
 								:placeholder="$t('task.comment.placeholder')"
+								:collapsed-placeholder="$t('task.comment.collapsedPlaceholder')"
 								:enable-mentions="true"
 								:project-id="projectId"
 								:storage-key="commentStorageKey"
@@ -545,6 +549,42 @@ function getCommentUrl(commentId: string) {
 </script>
 
 <style lang="scss" scoped>
+.media-content:has(> .comment-reactions--quiet) {
+	position: relative;
+}
+
+.comment-reactions--quiet {
+	position: absolute;
+	inset-block-end: 0;
+	inset-inline-end: 0;
+	margin: 0;
+	opacity: 0;
+
+	.comment:hover &,
+	&:focus-within,
+	&:has(.emoji-picker) {
+		opacity: 1;
+	}
+
+	@media (hover: none) {
+		opacity: 1;
+	}
+
+	:deep(.reaction-button) {
+		margin: 0;
+		border-color: transparent;
+		background: transparent;
+
+		&:hover {
+			border-color: var(--grey-300);
+		}
+	}
+
+	:deep(.emoji-picker) {
+		inset-inline-end: 0;
+	}
+}
+
 .media {
 	align-items: flex-start;
 	display: flex;

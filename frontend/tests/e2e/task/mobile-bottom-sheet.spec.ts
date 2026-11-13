@@ -40,7 +40,7 @@ async function openDueDateSheet(page: Page) {
 	})).toBe(true)
 	await openTaskAction(page, 'addProperty', 'Set Due Date')
 
-	const datepickerShow = page.locator('.task-view .properties .property').filter({hasText: 'Due Date'}).locator('.date-input .datepicker .show')
+	const datepickerShow = page.locator('.task-view .properties .property').filter({hasText: 'Due Date'}).locator('.datepicker .show')
 	await expect(datepickerShow).toBeVisible()
 
 	const panel = page.locator('.bottom-sheet__panel')

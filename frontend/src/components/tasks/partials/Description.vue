@@ -29,6 +29,17 @@
 					{{ $t('misc.saved') }}
 				</span>
 			</CustomTransition>
+			<span class="description-actions">
+				<slot name="actions" />
+				<BaseButton
+					v-if="canWrite && !editorRef?.isEditing"
+					class="description-edit d-print-none"
+					@click="editorRef?.setEditAndFocus()"
+				>
+					<Icon icon="pen" />
+					{{ $t('input.editor.edit') }}
+				</BaseButton>
+			</span>
 		</h2>
 		<!-- Outside the h2 so the heading keeps a stable accessible name -->
 		<span
@@ -43,6 +54,8 @@
 			:is-edit-enabled="canWrite"
 			:upload-callback="uploadCallback"
 			:placeholder="$t('task.description.placeholder')"
+			:collapsed-placeholder="$t('task.description.collapsedPlaceholder')"
+			hide-edit-button
 			:show-save="true"
 			edit-shortcut="KeyE"
 			:enable-discard-shortcut="true"
@@ -66,6 +79,7 @@ import {ref, computed, watch, onBeforeUnmount} from 'vue'
 import {useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
+import BaseButton from '@/components/base/BaseButton.vue'
 import CustomTransition from '@/components/misc/CustomTransition.vue'
 // Not AsyncEditor: this only renders inside the lazily loaded task view, and an async editor mounts after
 // the task modal has painted, so the modal visibly grows.
@@ -88,7 +102,7 @@ const emit = defineEmits<{
 }>()
 
 const description = ref<string>('')
-const editorRef = ref<{reset: (value: string) => void} | null>(null)
+const editorRef = ref<{reset: (value: string) => void, setEditAndFocus: () => void, isEditing: boolean} | null>(null)
 const hasChanges = ref(false)
 watch(
 	() => [props.modelValue.id, props.modelValue.description] as const,
@@ -275,6 +289,43 @@ function uploadCallback(files: File[] | FileList): Promise<string[]> {
 </script>
 
 <style lang="scss" scoped>
+.task-section-title {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+.description-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: .5rem;
+	margin-inline-start: auto;
+}
+
+// Same look as the comments' sort toggle.
+.description-edit {
+	display: inline-flex;
+	align-items: center;
+	gap: .25rem;
+	font-size: .75rem;
+	font-weight: normal;
+	color: var(--grey-500);
+
+	&:hover {
+		color: var(--grey-700);
+	}
+}
+
+// Without the edit link below, the last block's margin is just a gap.
+.tiptap__task-description :deep(.ProseMirror > :last-child) {
+	margin-block-end: 0;
+}
+
+// The editor keeps an empty paragraph after a trailing list; in preview it is only a blank line.
+.tiptap__task-description :deep(.ProseMirror[contenteditable="false"] > p:last-child:has(> br.ProseMirror-trailingBreak:only-child)) {
+	display: none;
+}
+
 .tiptap__task-description {
 	// The exact amount of pixels we need to make the description icon align with the buttons and the form inside the editor.
 	// The icon is not exactly the same length on all sides so we need to hack our way around it.

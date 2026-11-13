@@ -39,7 +39,7 @@ test.describe('Related tasks quick add magic', () => {
 
 		await relatedTaskLink.click()
 		await expect(page).toHaveURL(/\/tasks\/\d+/)
-		await expect(page.locator('.task-view .properties .labels-list .multiselect .input-wrapper span.tag').filter({hasText: 'Urgent'}))
+		await expect(page.locator('.task-view .properties .labels-list .chip-label').filter({hasText: 'Urgent'}))
 			.toBeVisible({timeout: 10000})
 	})
 

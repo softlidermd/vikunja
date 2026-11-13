@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskProperty} from '../../support/taskDetail'
 import {LabelFactory} from '../../factories/labels'
 import {LabelTaskFactory} from '../../factories/label_task'
 import {BucketFactory} from '../../factories/bucket'
@@ -191,6 +192,7 @@ test.describe('Link share: label picker', () => {
 
 		await page.goto(`/tasks/${task.id}#share-auth-token=${share.hash}`)
 
+		await openTaskProperty(page, 'Labels')
 		const labelInput = page.locator('.task-view .properties .labels-list .multiselect input')
 		await expect(labelInput).toBeVisible()
 		await labelInput.fill('label-that-does-not-exist')

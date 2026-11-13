@@ -26,7 +26,7 @@ test.describe('Emoji Autocomplete', () => {
 		await page.goto(`/tasks/${tasks[0].id}`)
 		await page.waitForLoadState('networkidle')
 
-		const editButton = page.locator('.task-view .details.content.description .tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = page.locator('.task-view .details.content.description .description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 
@@ -67,7 +67,7 @@ test.describe('Emoji Autocomplete', () => {
 		await page.goto(`/tasks/${tasks[0].id}`)
 		await page.waitForLoadState('networkidle')
 
-		const editButton = page.locator('.task-view .details.content.description .tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = page.locator('.task-view .details.content.description .description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 

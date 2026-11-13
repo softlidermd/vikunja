@@ -9,7 +9,7 @@
 			@click="setEditAndFocus"
 		>
 			<slot name="collapsed-icon" />
-			{{ placeholder }}
+			{{ collapsedPlaceholder || placeholder }}
 		</BaseButton>
 		<div
 			v-show="!isCollapsed"
@@ -137,7 +137,7 @@
 		>
 
 		<ul
-			v-if="bottomActions.length === 0 && !isEditing && isEditEnabled && !isCollapsed"
+			v-if="bottomActions.length === 0 && !isEditing && isEditEnabled && !isCollapsed && !hideEditButton"
 			class="tiptap__editor-actions d-print-none"
 		>
 			<li>
@@ -241,6 +241,10 @@ const props = withDefaults(defineProps<{
 	bottomActions?: BottomAction[],
 	showSave?: boolean,
 	placeholder?: string,
+	// Shorter text for the collapsed one-line button; the open editor keeps `placeholder`.
+	collapsedPlaceholder?: string,
+	// The parent shows its own edit button (exposed setEditAndFocus/isEditing), so drop the one below the content.
+	hideEditButton?: boolean,
 	editShortcut?: string,
 	enableDiscardShortcut?: boolean,
 	enableMentions?: boolean,
@@ -253,6 +257,8 @@ const props = withDefaults(defineProps<{
 	bottomActions: () => [],
 	showSave: false,
 	placeholder: '',
+	collapsedPlaceholder: '',
+	hideEditButton: false,
 	editShortcut: '',
 	enableDiscardShortcut: false,
 	enableMentions: false,
@@ -715,7 +721,7 @@ function reset(value: string) {
 	setModeAndValue(value)
 }
 
-defineExpose({setReplyContent, reset})
+defineExpose({setReplyContent, reset, setEditAndFocus, isEditing})
 
 
 // See https://github.com/github/hotkey/discussions/85#discussioncomment-5214660

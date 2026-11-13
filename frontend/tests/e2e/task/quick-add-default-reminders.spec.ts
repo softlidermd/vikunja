@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskProperty} from '../../support/taskDetail'
 import {ProjectFactory} from '../../factories/project'
 import {UserFactory} from '../../factories/user'
 import {createDefaultViews} from '../project/prepareProjects'
@@ -39,7 +40,8 @@ test.describe('Quick add default reminders', () => {
 		await expect(taskLink).toBeVisible({timeout: 10000})
 		await taskLink.click()
 
-		// Reminders section auto-expands when the task already has reminders.
+		// The reminders chip shows when the task already has reminders.
+		await openTaskProperty(page, 'Reminders')
 		const reminderInput = page.locator('.task-view .properties .reminder-input').first()
 		await expect(reminderInput).toBeVisible({timeout: 10000})
 		await expect(reminderInput).toContainText('2 hours before Due Date')

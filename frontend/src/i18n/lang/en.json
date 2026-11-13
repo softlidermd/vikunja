@@ -1161,6 +1161,8 @@
       "removeStartDate": "Remove start date",
       "removeEndDate": "Remove end date",
       "removeRepeat": "Remove repeat interval",
+      "removeProperty": "Remove {property}",
+      "assigneeCount": "{count} assignees",
       "removeAssignee": "Remove {user} as assignee",
       "move": "Move task to a different project",
       "done": "Mark task done!",
@@ -1278,6 +1280,7 @@
       "edited": "edited {date}",
       "creating": "Creating comment…",
       "placeholder": "Add your comment, hit '/' for more options…",
+      "collapsedPlaceholder": "Write a comment…",
       "comment": "Comment",
       "delete": "Delete this comment",
       "deleteText1": "Are you sure you want to delete this comment?",
@@ -1300,7 +1303,8 @@
       "1week": "1 week"
     },
     "description": {
-      "placeholder": "Enter a description, hit '/' for more options…"
+      "placeholder": "Enter a description, hit '/' for more options…",
+      "collapsedPlaceholder": "Add a description…"
     },
     "assignee": {
       "placeholder": "Type to assign a user…",

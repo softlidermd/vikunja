@@ -1,6 +1,6 @@
 import type {Task, Bucket} from '../../../src/client/generated'
 import {test, expect} from '../../support/fixtures'
-import {openTaskAction} from '../../support/taskDetail'
+import {openTaskAction, openTaskProperty} from '../../support/taskDetail'
 import {ProjectFactory} from '../../factories/project'
 import {ProjectViewFactory} from '../../factories/project_view'
 import {TaskFactory} from '../../factories/task'
@@ -67,6 +67,7 @@ test('unassigning a task drops its card from an open "assigned to me" saved filt
 	const card = page.locator('.kanban .task').filter({hasText: task.title})
 	await expect(card).toBeVisible()
 	await card.getByText(task.title, {exact: true}).click()
+	await openTaskProperty(page, 'Assignees')
 	await page.locator('.task-view .property.assignees .multiselect .input-wrapper span.assignee .remove-assignee').click()
 	await expect(page.locator('.global-notification')).toContainText('Success')
 

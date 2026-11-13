@@ -43,7 +43,7 @@ test.describe('Editor link prompt inside the Kanban task popup', () => {
 		await expect(dialog).toBeVisible()
 		await expect(dialog.locator('.task-view')).toBeVisible()
 
-		const editButton = dialog.locator('.details.content.description .tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = dialog.locator('.details.content.description .description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 
@@ -100,7 +100,7 @@ test.describe('Editor link prompt inside the Kanban task popup', () => {
 		await expect(dialog).toBeVisible()
 		await expect(dialog.locator('.task-view')).toBeVisible()
 
-		const editButton = dialog.locator('.details.content.description .tiptap button.done-edit').filter({hasText: 'Edit'})
+		const editButton = dialog.locator('.details.content.description .description-edit').filter({hasText: 'Edit'})
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 

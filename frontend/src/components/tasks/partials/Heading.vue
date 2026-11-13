@@ -180,11 +180,21 @@ async function cancel(element: HTMLInputElement) {
 }
 
 .title.input {
-	// 1.75rem is the font-size, 1.125 is the line-height, .3rem padding everywhere, 1px border around the whole thing.
-	min-block-size: calc(1.75rem * 1.125 + .6rem + 2px);
+	// 1.75rem is the font-size, 1.3 is the line-height, .3rem padding everywhere, 1px border around the whole thing.
+	min-block-size: calc(1.75rem * 1.3 + .6rem + 2px);
+	font-family: $family-sans-serif;
 	font-size: 1.75rem;
+	font-weight: 600 !important;
+	line-height: 1.3;
+	letter-spacing: -.01em;
 	margin: 0;
 	overflow-wrap: anywhere;
+	// Headings balance their lines globally, which wraps a long title at ~70% of the free width.
+	text-wrap: wrap;
+
+	@media screen and (max-width: $tablet) {
+		font-size: 1.3125rem;
+	}
 }
 
 .task-meta {

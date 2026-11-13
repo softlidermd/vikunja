@@ -5,7 +5,7 @@ import {BucketFactory} from '../../factories/bucket'
 import {createDefaultViews} from '../project/prepareProjects'
 
 async function openDescriptionEditor(page) {
-	const editButton = page.locator('.task-view .details.content.description .tiptap button.done-edit').filter({hasText: 'Edit'})
+	const editButton = page.locator('.task-view .details.content.description .description-edit').filter({hasText: 'Edit'})
 	await expect(editButton).toBeVisible({timeout: 10000})
 	await editButton.click()
 

@@ -41,7 +41,7 @@ test.describe('TipTap Editor Save', () => {
 		await page.waitForLoadState('networkidle')
 
 		// Click edit button to enter edit mode
-		const editButton = page.locator('.task-view .details.content.description .tiptap button.done-edit')
+		const editButton = page.locator('.task-view .details.content.description .description-edit')
 		await expect(editButton).toBeVisible({timeout: 10000})
 		await editButton.click()
 
@@ -81,7 +81,7 @@ test.describe('TipTap Editor Save', () => {
 		}
 
 		// If no errors, the edit button should be visible (mode transition completed)
-		await expect(page.locator('.task-view .details.content.description .tiptap button.done-edit')).toBeVisible({timeout: 5000})
+		await expect(page.locator('.task-view .details.content.description .description-edit')).toBeVisible({timeout: 5000})
 	})
 
 	test('Should not crash when rapidly toggling edit mode (issue #1770)', async ({authenticatedPage: page}) => {
@@ -110,7 +110,7 @@ test.describe('TipTap Editor Save', () => {
 		// Perform multiple edit/save cycles to stress test the mode transitions
 		for (let i = 0; i < 3; i++) {
 			// Enter edit mode - click edit button or double-click the editor
-			const editButton = page.locator('.task-view .details.content.description .tiptap button.done-edit')
+			const editButton = page.locator('.task-view .details.content.description .description-edit')
 			const isEditButtonVisible = await editButton.isVisible().catch(() => false)
 
 			if (isEditButtonVisible) {
@@ -157,7 +157,7 @@ test.describe('TipTap Editor Save', () => {
 			}
 
 			// Verify mode transition completed (edit button should be visible)
-			await expect(page.locator('.task-view .details.content.description .tiptap button.done-edit')).toBeVisible({timeout: 5000})
+			await expect(page.locator('.task-view .details.content.description .description-edit')).toBeVisible({timeout: 5000})
 		}
 	})
 

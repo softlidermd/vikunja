@@ -202,7 +202,7 @@ test.describe('Task Bucket Select', () => {
 		await expect(dropdownMenu).toBeHidden()
 	})
 
-	test('Renders the bucket dropdown above the remove assignee buttons', async ({authenticatedPage: page}) => {
+	test('Renders the bucket dropdown above the property chips', async ({authenticatedPage: page}) => {
 		const {project, view, task} = await createKanbanTaskInBucket()
 		// The dropdown opens below the bucket name in the top row; with a few more
 		// buckets it is tall enough to reach over the assignees in the properties strip.
@@ -225,8 +225,9 @@ test.describe('Task Bucket Select', () => {
 		await page.locator('.kanban .bucket .tasks .task').filter({hasText: task.title}).click()
 		await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`))
 
-		const removeButtons = page.locator('.task-view .property.assignees .remove-assignee')
-		await expect(removeButtons).toHaveCount(users.length)
+		// The remove-assignee buttons live in the chip popover now; the chip row itself sits under the dropdown.
+		const removeButtons = page.locator('.task-view .properties .property-chip__body, .task-view .properties .property-chip__remove, .task-view .add-property__trigger')
+		await expect(removeButtons.first()).toBeVisible()
 
 		await page.locator('.task-view .subtitle .bucket-name').click()
 		const dropdownMenu = page.locator('.task-view .subtitle .dropdown-menu')

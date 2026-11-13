@@ -1,4 +1,5 @@
 import {test, expect} from '../../support/fixtures'
+import {openTaskProperty} from '../../support/taskDetail'
 import {UserFactory} from '../../factories/user'
 import {ProjectFactory} from '../../factories/project'
 import {ProjectViewFactory} from '../../factories/project_view'
@@ -95,9 +96,11 @@ test.describe('Admin oversight', () => {
 		await expect(page.locator('[data-testid="workload-total"]')).toContainText('12 h')
 
 		await workerBlock.getByRole('link', {name: 'Worker task'}).click()
+		await openTaskProperty(page, 'Effort')
 		const sizeSelect = page.locator('.task-view .properties .property').filter({hasText: 'Effort'}).locator('.select select')
 		await sizeSelect.selectOption('1 week')
 		await expect(page.locator('.global-notification')).toContainText('Success')
+		// Picking a size closes the property popover, so Escape closes the task dialog.
 		await page.keyboard.press('Escape')
 		await expect(page.locator('.task-view')).toHaveCount(0)
 		await expect(page).toHaveURL(/\/admin\/workload$/)

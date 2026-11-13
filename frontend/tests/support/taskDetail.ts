@@ -18,3 +18,10 @@ export async function pressTaskShortcut(page: Page, key: string) {
 	await page.locator('.task-view .heading p.created').click()
 	await page.locator('body').press(key)
 }
+
+/**
+ * Opens the popover of a property chip (e.g. 'Labels', 'Effort') so its editor can be used.
+ */
+export async function openTaskProperty(page: Page, name: string) {
+	await page.locator('.task-view .properties .property').filter({hasText: name}).locator('.property-chip__body').click()
+}
