@@ -1184,6 +1184,8 @@
       "organization": "Organization",
       "management": "Management",
       "dateAndTime": "Date and time",
+      "addProperty": "Property",
+      "moreActions": "More actions",
       "delete": {
         "header": "Delete this task",
         "text1": "Are you sure you want to remove this task?",

@@ -33,7 +33,7 @@
 			'is-open': openValue,
 		}"
 		:style="floatingStyle"
-		@toggle="onToggle"
+		@beforetoggle="onToggle"
 	>
 		<slot
 			name="content"
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import {computed, onScopeDispose, ref, watch, watchEffect} from 'vue'
-import {onClickOutside, onKeyStroke} from '@vueuse/core'
+import {onClickOutside, onKeyStroke, useEventListener} from '@vueuse/core'
 import {autoUpdate, computePosition, flip, offset, shift, size, type Placement} from '@floating-ui/dom'
 
 import Modal from '@/components/misc/Modal.vue'
@@ -102,6 +102,10 @@ function close() {
 // A light dismiss closes the popup on pointerup, so a trigger click that is still to come would
 // reopen what the same interaction closed.
 let closedByLightDismiss = false
+// A key press starts a new interaction: Enter right after an Escape dismiss can beat the reset timer.
+useEventListener(document, 'keydown', () => {
+	closedByLightDismiss = false
+}, {capture: true})
 
 function toggle() {
 	if (closedByLightDismiss) {
@@ -135,6 +139,7 @@ function onToggle(event: Event) {
 	}
 
 	// Outside click or Escape: the browser closed the popover, so mirror it into our state.
+	// beforetoggle, not toggle: toggle is queued, so a reopen in between would be closed again.
 	closedByLightDismiss = true
 	setTimeout(() => {
 		closedByLightDismiss = false

@@ -1,8 +1,12 @@
 <template>
 	<div
+		v-if="canWrite || !isEmpty"
 		:class="{'d-print-none': isEmpty}"
 	>
-		<h2 class="task-section-title">
+		<h2
+			v-if="!isEditorContentEmpty(props.modelValue.description ?? '') || saveState"
+			class="task-section-title"
+		>
 			<span class="icon is-grey">
 				<Icon icon="align-left" />
 			</span>
@@ -44,9 +48,15 @@
 			:enable-mentions="true"
 			:project-id="modelValue.project_id"
 			:storage-key="descriptionStorageKey"
+			collapse-when-empty
 			@update:modelValue="saveWithDelay"
 			@save="save"
-		/>
+			@discard="onDiscard"
+		>
+			<template #collapsed-icon>
+				<Icon icon="align-left" />
+			</template>
+		</Editor>
 	</div>
 </template>
 
@@ -177,6 +187,15 @@ async function saveWithDelay() {
 	changeTimeout.value = setTimeout(async () => {
 		await save()
 	}, 5000)
+}
+
+// An autosave already in flight is kept as the saved baseline; only the pending one is dropped.
+function onDiscard() {
+	if (changeTimeout.value !== null) {
+		clearTimeout(changeTimeout.value)
+	}
+	hasChanges.value = false
+	description.value = props.modelValue.description ?? ''
 }
 
 onBeforeUnmount(async () => {

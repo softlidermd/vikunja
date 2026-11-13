@@ -1036,6 +1036,8 @@
 			"organization": "Организация",
 			"management": "Управление",
 			"dateAndTime": "Дата и время",
+			"addProperty": "Свойство",
+			"moreActions": "Ещё действия",
 			"delete": {
 				"header": "Удалить задачу",
 				"text1": "Удалить эту задачу?",

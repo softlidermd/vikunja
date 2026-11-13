@@ -1,21 +1,5 @@
 <template>
 	<div class="heading">
-		<div class="tw:flex tw:items-center md:tw:items-stretch tw:flex-col tw:gap-1 task-properties">
-			<div class="tw:flex tw:items-center tw:gap-2">
-				<ColorBubble
-					v-if="task.hex_color !== ''"
-					:color="getHexColor(task.hex_color)"
-				/>
-				<BaseButton @click="copyUrl">
-					<span class="title task-id">
-						{{ textIdentifier }}
-					</span>
-				</BaseButton>
-			</div>
-			<Done
-				:is-done="task.done"
-			/>
-		</div>
 		<h1
 			class="title input"
 			:class="{'disabled': !canWrite}"
@@ -30,25 +14,41 @@
 		>
 			{{ (task.title ?? '').trim() }}
 		</h1>
-		<CustomTransition name="fade">
-			<span
-				v-if="loading && saving"
-				class="is-inline-flex is-align-items-center"
-			>
-				<span class="loader is-inline-block mie-2" />
-				{{ $t('misc.saving') }}
-			</span>
-			<span
-				v-else-if="!loading && showSavedMessage"
-				class="has-text-success is-inline-flex is-align-content-center"
-			>
-				<Icon
-					icon="check"
-					class="mie-2"
-				/>
-				{{ $t('misc.saved') }}
-			</span>
-		</CustomTransition>
+		<div class="task-meta">
+			<ColorBubble
+				v-if="task.hex_color !== ''"
+				:color="getHexColor(task.hex_color)"
+			/>
+			<BaseButton @click="copyUrl">
+				<span class="task-id">
+					{{ textIdentifier }}
+				</span>
+			</BaseButton>
+			<Done
+				:is-done="task.done"
+				variant="small"
+			/>
+			<slot />
+			<CustomTransition name="fade">
+				<span
+					v-if="loading && saving"
+					class="is-inline-flex is-align-items-center"
+				>
+					<span class="loader is-inline-block mie-2" />
+					{{ $t('misc.saving') }}
+				</span>
+				<span
+					v-else-if="!loading && showSavedMessage"
+					class="has-text-success is-inline-flex is-align-content-center"
+				>
+					<Icon
+						icon="check"
+						class="mie-2"
+					/>
+					{{ $t('misc.saved') }}
+				</span>
+			</CustomTransition>
+		</div>
 	</div>
 </template>
 
@@ -174,44 +174,36 @@ async function cancel(element: HTMLInputElement) {
 
 <style lang="scss" scoped>
 .heading {
-	display: flex;
-	justify-content: flex-start;
+	flex: 1;
+	min-inline-size: 0;
 	text-transform: none;
-	align-items: center;
-
-	@media screen and (max-width: $tablet) {
-		flex-direction: column;
-		align-items: start;
-	}
-}
-
-.title {
-	margin-block-end: 0;
 }
 
 .title.input {
-	// 1.8rem is the font-size, 1.125 is the line-height, .3rem padding everywhere, 1px border around the whole thing.
-	min-block-size: calc(1.8rem * 1.125 + .6rem + 2px);
-	margin-inline-end: 0;
-
-	@media screen and (max-width: $tablet) {
-		margin: 0 -.3rem .5rem; // the title has 0.3rem padding - this make the text inside of it align with the rest
-	}
+	// 1.75rem is the font-size, 1.125 is the line-height, .3rem padding everywhere, 1px border around the whole thing.
+	min-block-size: calc(1.75rem * 1.125 + .6rem + 2px);
+	font-size: 1.75rem;
+	margin: 0;
+	overflow-wrap: anywhere;
 }
 
-.title.task-id {
-	color: var(--grey-400);
+.task-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .25rem .5rem;
+	padding-inline-start: .3rem; // align with the title text inside its padding
+	font-size: .75rem;
+	color: var(--text-muted);
+}
+
+.task-id {
+	color: var(--grey-500);
 	white-space: nowrap;
 }
 
 .color-bubble {
 	block-size: .75rem;
 	inline-size: .75rem;
-}
-
-.task-properties {
-	@media screen and (max-width: $tablet) {
-		flex-direction: row;
-	}
 }
 </style>

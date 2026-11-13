@@ -26,7 +26,7 @@
 
 		<CustomTransition name="fade">
 			<div
-				v-if="initialMount || open"
+				v-if="eager || initialMount || open"
 				v-show="open"
 				ref="dropdownMenu"
 				class="dropdown-menu"
@@ -50,6 +50,8 @@ import CustomTransition from '@/components/misc/CustomTransition.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 
 defineProps({
+	// mount the menu content before the first open
+	eager: {type: Boolean, default: false},
 	triggerIcon: {type: [String, Array, Object] as PropType<IconProp>, default: 'ellipsis-h'},
 	triggerLabel: {type: String, default: undefined},
 })
@@ -59,6 +61,7 @@ const emit = defineEmits<{
 }>()
 
 defineSlots<{
+	// a custom trigger's root must carry the `dropdown-trigger` class and bind :aria-expanded to `open`
 	'trigger': (props: {
 		close: () => void,
 		toggleOpen: () => void, 
@@ -117,6 +120,7 @@ function onKeydown(e: KeyboardEvent) {
 		return
 	}
 	e.stopPropagation()
+	e.preventDefault() // keep a surrounding <dialog> from getting cancel
 	close()
 	focusTrigger()
 }
@@ -175,7 +179,7 @@ onClickOutside(dropdown, (e) => {
 	box-shadow: var(--shadow-md);
 }
 
-.dropdown-divider {
+.dropdown-content :deep(.dropdown-divider) {
 	background-color: var(--border-light);
 	border: none;
 	display: block;

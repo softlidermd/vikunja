@@ -177,13 +177,17 @@
 								:enable-mentions="true"
 								:project-id="projectId"
 								:storage-key="commentStorageKey"
+								collapse-when-empty
 								@save="addComment()"
 							/>
 						</div>
-						<div class="field">
+						<div
+							v-if="!isEditorContentEmpty(newCommentText)"
+							class="field"
+						>
 							<XButton
 								:loading="loading && !isCommentEdit"
-								:aria-disabled="newCommentText === '' || creating"
+								:aria-disabled="creating"
 								@click="addComment()"
 							>
 								{{ $t('task.comment.comment') }}
@@ -242,6 +246,7 @@ import {generateAttachmentUrl} from '@/helpers/attachments'
 import {useUploadAttachmentsMutation} from '@/client/queries/attachments'
 import {formatDateLong, formatDisplayDate} from '@/helpers/time/formatDate'
 import {clearEditorDraft} from '@/helpers/editorDraftStorage'
+import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
 import {getDisplayName} from '@/helpers/user'
 import {useConfigStore} from '@/stores/config'
 import {useAuthStore} from '@/stores/auth'
@@ -427,7 +432,7 @@ const editorActive = ref(true)
 const creating = ref(false)
 
 async function addComment() {
-	if (!newCommentText.value || creating.value) return
+	if (isEditorContentEmpty(newCommentText.value) || creating.value) return
 	const taskId = props.taskId
 	const text = newCommentText.value
 	creating.value = true

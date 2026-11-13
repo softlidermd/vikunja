@@ -29,22 +29,30 @@ import Popup from './Popup.vue'
 // drives into an attribute the tests can assert on.
 const POPOVER_OPEN = 'popover-open'
 
+// The browser fires beforetoggle synchronously and queues toggle as a task.
+function dispatchBeforeToggle(element: HTMLElement, newState: 'open' | 'closed') {
+	element.dispatchEvent(Object.assign(new Event('beforetoggle'), {newState}))
+}
+
 function dispatchToggle(element: HTMLElement, newState: 'open' | 'closed') {
 	element.dispatchEvent(Object.assign(new Event('toggle'), {newState}))
 }
 
 HTMLElement.prototype.showPopover = function showPopover(this: HTMLElement) {
+	dispatchBeforeToggle(this, 'open')
 	this.setAttribute(POPOVER_OPEN, '')
 	dispatchToggle(this, 'open')
 }
 
 HTMLElement.prototype.hidePopover = function hidePopover(this: HTMLElement) {
+	dispatchBeforeToggle(this, 'closed')
 	this.removeAttribute(POPOVER_OPEN)
 	dispatchToggle(this, 'closed')
 }
 
 // What the browser does on an outside click or Escape.
 function lightDismiss(element: HTMLElement) {
+	dispatchBeforeToggle(element, 'closed')
 	element.removeAttribute(POPOVER_OPEN)
 	dispatchToggle(element, 'closed')
 }
@@ -162,6 +170,40 @@ describe('Popup', () => {
 
 		expect(wrapper.emitted('update:open')).toEqual([[false]])
 		expect(wrapper.find('.popup').attributes(POPOVER_OPEN)).toBeUndefined()
+
+		wrapper.unmount()
+	})
+
+	it('stays open when the trigger reopens it before the toggle event of an Escape dismiss arrives', async () => {
+		const wrapper = mount(Popup, {...mountOptions, props: {open: true}})
+		await flushPromises()
+		const popup = wrapper.find('.popup').element as HTMLElement
+
+		dispatchBeforeToggle(popup, 'closed')
+		popup.removeAttribute(POPOVER_OPEN)
+		await new Promise(resolve => setTimeout(resolve)) // a separate key press, after the dismiss settled
+		await wrapper.find('.trigger').trigger('click')
+		dispatchToggle(popup, 'closed') // the queued event of the Escape dismiss
+		await flushPromises()
+
+		expect(wrapper.emitted('update:open')).toEqual([[false], [true]])
+		expect(popup.getAttribute(POPOVER_OPEN)).toBe('')
+
+		wrapper.unmount()
+	})
+
+	it('reopens from the keyboard right after an Escape dismiss', async () => {
+		const wrapper = mount(Popup, {...mountOptions, props: {open: true}})
+		await flushPromises()
+		const popup = wrapper.find('.popup').element as HTMLElement
+
+		lightDismiss(popup)
+		// Chrome runs input before timers, so the Enter can arrive before any setTimeout(0) fires.
+		document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))
+		await wrapper.find('.trigger').trigger('click')
+
+		expect(wrapper.emitted('update:open')).toEqual([[false], [true]])
+		expect(popup.getAttribute(POPOVER_OPEN)).toBe('')
 
 		wrapper.unmount()
 	})

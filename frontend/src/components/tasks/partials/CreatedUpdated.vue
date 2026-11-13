@@ -13,7 +13,7 @@
 			</i18n-t>
 		</time>
 		<template v-if="+new Date(task.created ?? 0) !== +new Date(task.updated ?? 0)">
-			<br>
+			·
 			<time
 				v-tooltip="updatedFormatted"
 				:datetime="formatISO(task.updated)"
@@ -27,7 +27,7 @@
 			</time>
 		</template>
 		<template v-if="task.done">
-			<br>
+			·
 			<time
 				v-tooltip="doneFormatted"
 				:datetime="formatISO(task.done_at)"
@@ -64,6 +64,6 @@ const doneFormatted = computed(() => formatDateLong(props.task.done_at))
 .created {
 	font-size: .75rem;
 	color: var(--text-muted);
-	text-align: end;
+	margin: 0;
 }
 </style>

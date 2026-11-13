@@ -282,9 +282,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
-$modal-margin: 4rem;
-$modal-width: 1024px;
-
 .modal-dialog {
 	// Reset UA dialog styles
 	padding: 0;
@@ -419,24 +416,26 @@ $modal-width: 1024px;
 // used e.g. for <TaskDetailViewModal>
 .scrolling .modal-content {
 	inline-size: 100%;
-	margin: $modal-margin auto;
 
 	max-block-size: none; // reset bulma
 	overflow: visible; // reset bulma
 
-	// Wide on big screens while leaving a strip of backdrop on both sides to click away; no narrower than before.
-	@media not print {
-		max-inline-size: min(1400px, max(#{$modal-width}, calc(100vw - 16rem)));
-	}
-
+	// margin:auto in the flex container centers a short card; a tall one starts at the top and scrolls .modal-container
 	@media screen and (min-width: $tablet) {
-		max-block-size: none; // reset bulma
-		margin: $modal-margin auto; // reset bulma
-		inline-size: 100%;
+		margin: auto;
+		inline-size: calc(100% - 2rem);
+		max-inline-size: 860px;
 	}
 
-	@media screen and (max-width: $desktop), print {
+	@media screen and (max-width: $tablet), print {
 		margin: 0;
+	}
+}
+
+@media screen and (min-width: $tablet) {
+	.scrolling .modal-container {
+		display: flex;
+		padding-block: 2rem;
 	}
 }
 

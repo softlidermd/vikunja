@@ -3,7 +3,16 @@
 		ref="tiptapInstanceRef"
 		class="tiptap"
 	>
+		<BaseButton
+			v-if="isCollapsed"
+			class="tiptap__collapsed"
+			@click="setEditAndFocus"
+		>
+			<slot name="collapsed-icon" />
+			{{ placeholder }}
+		</BaseButton>
 		<div
+			v-show="!isCollapsed"
 			class="tiptap__wrapper"
 			:class="{'tiptap__wrapper-is-editing': isEditing}"
 		>
@@ -128,7 +137,7 @@
 		>
 
 		<ul
-			v-if="bottomActions.length === 0 && !isEditing && isEditEnabled"
+			v-if="bottomActions.length === 0 && !isEditing && isEditEnabled && !isCollapsed"
 			class="tiptap__editor-actions d-print-none"
 		>
 			<li>
@@ -169,17 +178,28 @@
 				</BaseButton>
 			</li>
 		</ul>
-		<XButton
+		<div
 			v-else-if="isEditing && showSave"
-			v-cy="'saveEditor'"
-			class="mbs-4"
-			variant="secondary"
-			:shadow="false"
-			:disabled="!contentHasChanged"
-			@click="bubbleSave"
+			class="tiptap__save-actions mbs-4"
 		>
-			{{ $t('misc.save') }}
-		</XButton>
+			<XButton
+				v-cy="'saveEditor'"
+				variant="secondary"
+				:shadow="false"
+				:disabled="!contentHasChanged"
+				@click="bubbleSave"
+			>
+				{{ $t('misc.save') }}
+			</XButton>
+			<XButton
+				v-if="enableDiscardShortcut"
+				v-cy="'cancelEditor'"
+				variant="tertiary"
+				@click="exitEditMode"
+			>
+				{{ $t('misc.cancel') }}
+			</XButton>
+		</div>
 	</div>
 </template>
 
@@ -226,6 +246,7 @@ const props = withDefaults(defineProps<{
 	enableMentions?: boolean,
 	projectId?: number,
 	storageKey?: string,
+	collapseWhenEmpty?: boolean,
 }>(), {
 	uploadCallback: undefined,
 	isEditEnabled: true,
@@ -237,9 +258,10 @@ const props = withDefaults(defineProps<{
 	enableMentions: false,
 	projectId: 0,
 	storageKey: '',
+	collapseWhenEmpty: false,
 })
 
-const emit = defineEmits(['save'])
+const emit = defineEmits(['save', 'discard'])
 
 provide(taskLinkCurrentProjectIdKey, computed(() => props.projectId || undefined))
 
@@ -260,6 +282,7 @@ type Mode = 'edit' | 'preview'
 const internalMode = ref<Mode>('preview')
 const isEditing = computed(() => internalMode.value === 'edit' && props.isEditEnabled)
 const contentHasChanged = ref<boolean>(false)
+const isCollapsed = computed(() => props.collapseWhenEmpty && props.isEditEnabled && !isEditing.value && isEditorContentEmpty(modelValue.value))
 
 // TipTap crashes when inserting an image into an empty editor.
 // To work around this, we're inserting an element first, then insert the image, then remove the element.
@@ -433,6 +456,8 @@ function exitEditMode() {
 	if (isEditing.value) {
 		internalMode.value = 'preview'
 	}
+
+	emit('discard')
 }
 
 async function setEditIfApplicable(event: MouseEvent) {
@@ -460,6 +485,13 @@ function setEdit(focus: boolean = true) {
 	if (focus) {
 		editor.value?.commands.focus()
 	}
+}
+
+// The wrapper is v-show'd, so focus only works once it is visible; mobile keyboards need that within the same gesture.
+async function setEditAndFocus() {
+	setEdit(false)
+	await nextTick()
+	editor.value?.commands.focus('end')
 }
 
 onBeforeUnmount(() => {
@@ -647,7 +679,7 @@ onBeforeUnmount(() => {
 })
 
 function setModeAndValue(value: string) {
-	internalMode.value = isEditorContentEmpty(value) ? 'edit' : 'preview'
+	internalMode.value = isEditorContentEmpty(value) && !props.collapseWhenEmpty ? 'edit' : 'preview'
 	editor.value?.commands.setContent(value, {
 		...defaultSetContentOptions,
 		emitUpdate: false,
@@ -820,6 +852,35 @@ watch(
 </script>
 
 <style lang="scss">
+.tiptap__collapsed {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	inline-size: 100%;
+	min-block-size: 2.375rem;
+	padding: .375rem .75rem;
+	border: 1px solid var(--grey-200);
+	border-radius: $radius;
+	color: var(--grey-400);
+	text-align: start;
+	transition: border-color $transition, color $transition;
+
+	&:hover {
+		border-color: var(--grey-300);
+		color: var(--grey-500);
+	}
+
+	&:focus-visible {
+		border-color: var(--primary);
+	}
+}
+
+.tiptap__save-actions {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
 .tiptap__wrapper {
 	// Transparent until focused so the box size never changes and the page stays flat, same pattern as .input.title
 	border: 1px solid transparent;
