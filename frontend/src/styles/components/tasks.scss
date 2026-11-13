@@ -69,3 +69,37 @@
 .is-max-width-desktop .tasks .task {
 	max-width: $desktop;
 }
+
+// An add-reaction control that stays out of the way until its .reactions-host is hovered or it is focused.
+// Placement is up to the caller.
+.reactions--quiet {
+	opacity: 0;
+	pointer-events: none;
+
+	// .reactions doubles the specificity to beat Reactions.vue's scoped button style.
+	&.reactions .reaction-button {
+		margin: 0;
+		border-color: transparent;
+		background: transparent;
+
+		&:hover {
+			border-color: var(--grey-300);
+		}
+	}
+
+	.emoji-picker {
+		inset-inline-end: 0;
+	}
+
+	.reactions-host:hover &,
+	&:focus-within,
+	&:has(.emoji-picker) {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	@media (hover: none) {
+		opacity: 1;
+		pointer-events: auto;
+	}
+}

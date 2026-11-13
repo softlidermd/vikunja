@@ -79,3 +79,27 @@ test('a reaction added in the task detail survives navigating away and back', as
 	expect(afterRemoval.ok()).toBeTruthy()
 	expect(Object.keys(await afterRemoval.json())).toEqual([SEEDED_REACTION])
 })
+
+test('the first reaction can be added to a task without description or reactions', async ({authenticatedPage: page, apiContext, userToken}) => {
+	const [project] = await ProjectFactory.create(1)
+	await createDefaultViews(project.id)
+	const [task] = await TaskFactory.create(1, {id: 1, project_id: project.id, description: ''})
+
+	await page.goto(`/tasks/${task.id}`)
+	const description = page.locator('.task-view .details.content.description')
+	await expect(description.locator('.tiptap__collapsed')).toBeVisible()
+	// The add button stays out of the way until the description area is hovered.
+	await description.hover()
+	await description.getByRole('button', {name: 'Add your reaction'}).click()
+	const picker = page.locator('.emoji-picker')
+	await expect(picker).toBeVisible()
+	await picker.locator('input.search').fill('thumbs up')
+	const option = picker.locator('#search-results [role="option"]').first()
+	await expect(option).toBeVisible()
+	const added = (await option.textContent())?.trim()
+	await option.click()
+
+	await expect(page.locator('.task-view .reactions.details .reaction-button').filter({hasText: added!})).toBeVisible()
+	const stored = await apiContext.get(`tasks/${task.id}/reactions`, {headers: {Authorization: `Bearer ${userToken}`}})
+	expect(Object.keys(await stored.json())).toEqual([added])
+})

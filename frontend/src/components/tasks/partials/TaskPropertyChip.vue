@@ -30,14 +30,19 @@
 					role="dialog"
 					:aria-label="label"
 					@change="onChange"
+					@keydown="onKeydown"
+					@pointerdown="keyedSelect = false"
 				>
 					<slot />
 				</div>
 			</template>
 		</Popup>
+		<!-- Editors with their own trigger (the datepicker): a click on the label opens them too. -->
 		<span
 			v-else
 			class="property-chip__body"
+			:class="{'is-clickable': canWrite}"
+			@click="canWrite && emit('activate')"
 		>
 			<span class="property-chip__label">{{ label }}</span>
 			<span class="property-chip__value"><slot name="value" /></span>
@@ -74,6 +79,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
 	remove: []
+	activate: []
 }>()
 
 const isOpen = ref(false)
@@ -82,29 +88,56 @@ const trigger = ref<InstanceType<typeof BaseButton> | null>(null)
 const triggerEl = computed<HTMLElement | null>(() => trigger.value?.$el ?? null)
 const panel = ref<HTMLElement | null>(null)
 
-watch(isOpen, async open => {
-	await nextTick()
+// Sync, so a close still sees where focus was before the popover hid.
+watch(isOpen, open => {
 	if (open) {
-		const field = panel.value?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea')
-			?? panel.value?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
-		// On mobile a focused text field pops the keyboard over the sheet.
-		if (field && (canAutoFocus() || !field.matches('input[type="text"], textarea'))) {
-			field.focus()
+		nextTick(() => {
+			const field = panel.value?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea')
+				?? panel.value?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
+			// On mobile a focused text field pops the keyboard over the sheet.
+			if (field && (canAutoFocus() || !field.matches('input[type="text"], textarea'))) {
+				field.focus()
+			}
+		})
+		return
+	}
+	// Hiding the popover would drop focus to the body; hand it back to the chip.
+	if (panel.value?.contains(document.activeElement)) {
+		nextTick(() => triggerEl.value?.focus({preventScroll: true}))
+	}
+}, {flush: 'sync'})
+
+// Chrome and Firefox on Windows fire `change` on every arrow press on a closed select, so after keyboard
+// browsing the popover waits for Enter instead of closing on the first step.
+let keyedSelect = false
+const SELECT_BROWSE_KEYS = ['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']
+
+function onKeydown(event: KeyboardEvent) {
+	if (!(event.target instanceof HTMLSelectElement)) {
+		keyedSelect = false
+		return
+	}
+	if (event.key === 'Enter') {
+		keyedSelect = false
+		if (props.closeOnChange) {
+			event.preventDefault()
+			closeAndFocusChip()
 		}
 		return
 	}
-	// The hidden popover drops focus to the body; hand it back to the chip.
-	if (!document.activeElement || document.activeElement === document.body) {
-		triggerEl.value?.focus()
-	}
-})
+	keyedSelect = SELECT_BROWSE_KEYS.includes(event.key) || event.key.length === 1
+}
 
 function onChange() {
-	if (!props.closeOnChange) {
-		return
+	if (props.closeOnChange && !keyedSelect) {
+		closeAndFocusChip()
 	}
+}
+
+// A picked value finishes the job, so go back to the chip even if focus had wandered off the select.
+function closeAndFocusChip() {
 	isOpen.value = false
-	triggerEl.value?.focus()
+	nextTick(() => triggerEl.value?.focus({preventScroll: true}))
 }
 
 defineExpose({
@@ -151,6 +184,10 @@ defineExpose({
 	white-space: nowrap;
 }
 
+.property-chip__body.is-clickable {
+	cursor: pointer;
+}
+
 .property-chip__label {
 	color: var(--text-muted);
 }
@@ -160,6 +197,9 @@ defineExpose({
 	align-items: center;
 	gap: .375rem;
 	min-inline-size: 0;
+	// Room for a focused value's (the datepicker trigger's) focus ring inside the clip.
+	margin: -2px;
+	padding: 2px;
 	overflow: hidden;
 	font-weight: 600;
 

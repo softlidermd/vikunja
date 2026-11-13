@@ -10,10 +10,10 @@ vi.mock('vue-i18n', () => ({useI18n: () => ({t: (key: string) => key})}))
 
 import TaskPropertyChip from './TaskPropertyChip.vue'
 
-function mountChip(canWrite: boolean) {
+function mountChip(canWrite: boolean, closeOnChange = false) {
 	return mount(TaskPropertyChip, {
 		attachTo: document.body,
-		props: {label: 'Priority', canWrite},
+		props: {label: 'Priority', canWrite, closeOnChange},
 		slots: {
 			value: () => 'High',
 			default: () => h('div', [h('button', {class: 'first-button'}), h('select', {class: 'editor'})]),
@@ -33,6 +33,42 @@ describe('TaskPropertyChip', () => {
 		await flushPromises()
 
 		expect(document.activeElement?.classList.contains('editor')).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('closes after a mouse pick and hands focus back to the chip', async () => {
+		const wrapper = mountChip(true, true)
+		;(wrapper.vm as unknown as {open: () => void}).open()
+		await flushPromises()
+		const select = wrapper.find('select.editor')
+		const trigger = wrapper.find('.property-chip__body')
+		expect(trigger.attributes('aria-expanded')).toBe('true')
+
+		await select.trigger('pointerdown')
+		await select.trigger('change')
+		await flushPromises()
+
+		expect(trigger.attributes('aria-expanded')).toBe('false')
+		expect(document.activeElement).toBe(trigger.element)
+		wrapper.unmount()
+	})
+
+	it('stays open while browsing the select with the keyboard and closes on Enter', async () => {
+		const wrapper = mountChip(true, true)
+		;(wrapper.vm as unknown as {open: () => void}).open()
+		await flushPromises()
+		const select = wrapper.find('select.editor')
+		const trigger = wrapper.find('.property-chip__body')
+
+		await select.trigger('keydown', {key: 'ArrowDown'})
+		await select.trigger('change')
+		await flushPromises()
+		expect(trigger.attributes('aria-expanded')).toBe('true')
+
+		await select.trigger('keydown', {key: 'Enter'})
+		await flushPromises()
+		expect(trigger.attributes('aria-expanded')).toBe('false')
+		expect(document.activeElement).toBe(trigger.element)
 		wrapper.unmount()
 	})
 

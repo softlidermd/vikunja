@@ -737,6 +737,7 @@ function setFocusToEditor(event: KeyboardEvent) {
 	if (shortcutString !== props.editShortcut ||
 		target.tagName.toLowerCase() === 'input' ||
 		target.tagName.toLowerCase() === 'textarea' ||
+		target.tagName.toLowerCase() === 'select' ||
 		target.contentEditable === 'true') {
 		return
 	}

@@ -1,9 +1,6 @@
 <template>
 	<div class="attachments">
 		<h2 class="task-section-title">
-			<span class="icon is-grey">
-				<Icon icon="paperclip" />
-			</span>
 			{{ $t('task.attachment.title') }}
 		</h2>
 

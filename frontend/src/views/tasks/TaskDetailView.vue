@@ -181,7 +181,6 @@
 						{{ assigneeSummary }}
 					</template>
 					<EditAssignees
-						:ref="e => setFieldRef('assignees', e)"
 						v-model="task.assignees"
 						class="chip-editor"
 						:project-id="task.project_id"
@@ -205,7 +204,6 @@
 						>{{ $t(`task.priority.${PRIORITY_KEYS[task.priority ?? 0] ?? 'unset'}`) }}</span>
 					</template>
 					<PrioritySelect
-						:ref="e => setFieldRef('priority', e)"
 						v-model="task.priority"
 						@update:modelValue="setPriority"
 					/>
@@ -218,6 +216,7 @@
 					:can-write="canWrite"
 					:remove-label="$t('task.detail.removeDueDate')"
 					@remove="clearField('dueDate')"
+					@activate="dueDatePicker?.open()"
 				>
 					<template #value>
 						<Datepicker
@@ -238,6 +237,7 @@
 					:can-write="canWrite"
 					:remove-label="$t('task.detail.removeStartDate')"
 					@remove="clearField('startDate')"
+					@activate="startDatePicker?.open()"
 				>
 					<template #value>
 						<Datepicker
@@ -258,6 +258,7 @@
 					:can-write="canWrite"
 					:remove-label="$t('task.detail.removeEndDate')"
 					@remove="clearField('endDate')"
+					@activate="endDatePicker?.open()"
 				>
 					<template #value>
 						<Datepicker
@@ -288,7 +289,6 @@
 						>{{ label.title }}</span>
 					</template>
 					<EditLabels
-						:ref="e => setFieldRef('labels', e)"
 						v-model="task.labels"
 						class="chip-editor"
 						:project-id="task.project_id"
@@ -311,7 +311,6 @@
 						{{ $t(taskSizeLabelKey(task.size ?? 0)) }}
 					</template>
 					<SizeSelect
-						:ref="e => setFieldRef('size', e)"
 						v-model="task.size"
 						@update:modelValue="setSize"
 					/>
@@ -333,7 +332,6 @@
 						{{ Math.round((task.percent_done ?? 0) * 100) }}%
 					</template>
 					<PercentDoneSelect
-						:ref="e => setFieldRef('percentDone', e)"
 						v-model="task.percent_done"
 						@update:modelValue="setPercentDone"
 					/>
@@ -347,10 +345,12 @@
 					@remove="clearField('reminders')"
 				>
 					<template #value>
-						{{ task.reminders?.length || '' }}
+						<!-- Read-only users get no popover, so show the times themselves. -->
+						{{ canWrite
+							? task.reminders?.length || ''
+							: (task.reminders ?? []).map(r => formatDateShort(r.reminder)).join(', ') }}
 					</template>
 					<Reminders
-						:ref="e => setFieldRef('reminders', e)"
 						v-model="task.reminders"
 						:default-relative-to="remindersDefaultRelativeTo"
 						@update:modelValue="saveTask()"
@@ -369,7 +369,6 @@
 						{{ repeatSummary }}
 					</template>
 					<RepeatAfter
-						:ref="e => setFieldRef('repeatAfter', e)"
 						:model-value="task"
 						@update:modelValue="saveTask($event)"
 					/>
@@ -391,7 +390,6 @@
 						/>
 					</template>
 					<ColorPicker
-						:ref="e => setFieldRef('color', e)"
 						v-model="taskColor"
 						@update:modelValue="saveTask()"
 					/>
@@ -449,7 +447,7 @@
 			<ChecklistSummary :task="task" />
 
 			<!-- Description -->
-			<div class="details content description">
+			<div class="details content description reactions-host">
 				<Description
 					:model-value="task"
 					:can-write="canWrite"
@@ -463,7 +461,7 @@
 							:model-value="task.reactions"
 							entity-kind="tasks"
 							:entity-id="task.id"
-							class="reactions--quiet d-print-none"
+							class="reactions--quiet description-reactions d-print-none"
 						/>
 					</template>
 				</Description>
@@ -474,6 +472,14 @@
 					:entity-id="task.id"
 					class="details d-print-none"
 					:disabled="!canWrite"
+				/>
+				<!-- No description header to hold it: tuck the add button into the collapsed description line. -->
+				<Reactions
+					v-else-if="canWrite && isEditorContentEmpty(task.description ?? '')"
+					:model-value="task.reactions"
+					entity-kind="tasks"
+					:entity-id="task.id"
+					class="reactions--quiet description-reactions--corner d-print-none"
 				/>
 			</div>
 
@@ -504,9 +510,6 @@
 				class="content details mbe-0"
 			>
 				<h2 class="task-section-title">
-					<span class="icon is-grey">
-						<Icon icon="sitemap" />
-					</span>
 					{{ $t('task.attributes.relatedTasks') }}
 				</h2>
 				<RelatedTasks
@@ -525,9 +528,6 @@
 				class="content details"
 			>
 				<h2 class="task-section-title">
-					<span class="icon is-grey">
-						<Icon icon="list" />
-					</span>
 					{{ $t('task.detail.move') }}
 				</h2>
 				<div class="field has-addons">
@@ -599,6 +599,8 @@ import {useTask} from '@/composables/useTask'
 import {canAutoFocus} from '@/directives/focus'
 import {createTaskDraft, getHexColor, mergeTask, parseRepeatAfter} from '@/helpers/task'
 import {getDisplayName} from '@/helpers/user'
+import {formatDateShort} from '@/helpers/time/formatDate'
+import {isEditorContentEmpty} from '@/helpers/editorContentEmpty'
 import {useLabelStyles} from '@/composables/useLabelStyles'
 
 import type {Task as ITask} from '@/client/generated'
@@ -657,6 +659,8 @@ import {
 	useFavoriteTaskMutation,
 	useDuplicateTaskMutation,
 	useMarkTaskReadMutation,
+	useAddTaskAssigneeMutation,
+	useAddTaskLabelMutation,
 	useRemoveTaskAssigneeMutation,
 	useRemoveTaskLabelMutation,
 } from '@/client/queries/taskMutations'
@@ -689,7 +693,9 @@ const favoriteTask = useFavoriteTaskMutation()
 const duplicateTask = useDuplicateTaskMutation()
 const markTaskRead = useMarkTaskReadMutation()
 const subscriptionMutation = useSetTaskSubscriptionMutation()
+const addAssigneeMutation = useAddTaskAssigneeMutation()
 const removeAssigneeMutation = useRemoveTaskAssigneeMutation()
+const addLabelMutation = useAddTaskLabelMutation()
 const removeLabelMutation = useRemoveTaskLabelMutation()
 const {getLabelStyles} = useLabelStyles()
 const taskMutating = computed(() => [
@@ -1055,23 +1061,8 @@ watch(taskQuery.error, cause => {
 	visible.value = true
 })
 
-const activeFieldElements: { [id in FieldType]: HTMLElement | null } = reactive({
-	assignees: null,
-	attachments: null,
-	color: null,
-	dueDate: null,
-	endDate: null,
-	labels: null,
-	moveProject: null,
-	percentDone: null,
-	priority: null,
-	relatedTasks: null,
-	reminders: null,
-	repeatAfter: null,
-	size: null,
-	startDate: null,
-	timeTracking: null,
-})
+// Fields whose element setFieldActive focuses and scrolls to; chips handle their own.
+const activeFieldElements: Partial<Record<FieldType, HTMLElement | null>> = reactive({})
 
 const dueDatePicker = useTemplateRef<InstanceType<typeof Datepicker>>('dueDatePicker')
 const startDatePicker = useTemplateRef<InstanceType<typeof Datepicker>>('startDatePicker')
@@ -1115,14 +1106,14 @@ function setFieldActive(fieldName: keyof typeof activeFields) {
 				datepicker = endDatePicker.value
 				break
 		}
-		const el: HTMLElement | null = datepicker?.$el ?? activeFieldElements[fieldName]
+		const el: HTMLElement | null = datepicker?.$el ?? activeFieldElements[fieldName] ?? null
 
 		if (!el) {
 			return
 		}
 
 		// On mobile the picker would pop up the keyboard.
-		if (canAutoFocus() || !['labels', 'assignees', 'moveProject'].includes(fieldName)) {
+		if (canAutoFocus() || fieldName !== 'moveProject') {
 			el.focus()
 		}
 
@@ -1271,21 +1262,11 @@ async function setPercentDone(percentDone: number) {
 
 // A chip's ×: clear the value like the old per-field remove buttons did, then hide the chip.
 async function clearField(field: FieldType) {
+	if (field === 'assignees' || field === 'labels') {
+		return clearList(field)
+	}
 	activeFields[field] = false
-	const id = task.value.id!
 	switch (field) {
-		case 'assignees':
-			for (const user of task.value.assignees ?? []) {
-				await removeAssigneeMutation.mutateAsync({user: {...user, id: user.id!}, taskId: id})
-			}
-			task.value.assignees = []
-			return
-		case 'labels':
-			for (const label of task.value.labels ?? []) {
-				await removeLabelMutation.mutateAsync({label: {...label, id: label.id!}, taskId: id})
-			}
-			task.value.labels = []
-			return
 		case 'priority':
 			if (task.value.priority === PRIORITIES.UNSET) return
 			return setPriority(PRIORITIES.UNSET)
@@ -1315,6 +1296,46 @@ async function clearField(field: FieldType) {
 			return saveTask()
 		}
 	}
+}
+
+// Removes every assignee or label one by one. The mutations update the task cache, which the
+// draft follows, so there is nothing to write back here (and the open task may have changed by then).
+async function clearList(field: 'assignees' | 'labels') {
+	const taskId = task.value.id!
+	const assignees = field === 'assignees' ? [...(task.value.assignees ?? [])] : []
+	const labels = field === 'labels' ? [...(task.value.labels ?? [])] : []
+	try {
+		for (const user of assignees) {
+			await removeAssigneeMutation.mutateAsync({user: {...user, id: user.id!}, taskId})
+		}
+		for (const label of labels) {
+			await removeLabelMutation.mutateAsync({label: {...label, id: label.id!}, taskId})
+		}
+	} catch {
+		// The mutation already showed the error; keep the chip so the rest can be retried.
+		return
+	}
+	if (task.value.id === taskId) {
+		activeFields[field] = false
+	}
+	success({message: t('task.detail.updateSuccess')}, [{
+		title: t('task.undo'),
+		callback: async () => {
+			try {
+				for (const user of assignees) {
+					await addAssigneeMutation.mutateAsync({user: {...user, id: user.id!}, taskId})
+				}
+				for (const label of labels) {
+					await addLabelMutation.mutateAsync({label: {...label, id: label.id!}, taskId})
+				}
+			} catch {
+				// Toasted by the mutation.
+			}
+			if (task.value.id === taskId) {
+				activeFields[field] = true
+			}
+		},
+	}])
 }
 
 async function removeRepeatAfter() {
@@ -1722,39 +1743,28 @@ h2 .button {
 	vertical-align: middle;
 }
 
-.icon.is-grey {
-	color: var(--grey-400);
-}
-
-// Just the add button in the description header, shown on hover or focus.
-.reactions--quiet {
+// Quiet add-reaction buttons (see .reactions--quiet in styles/components/tasks.scss)
+.description-reactions {
 	position: relative;
 	display: inline-flex;
-	opacity: 0;
-
-	.description:hover &,
-	&:focus-within,
-	&:has(.emoji-picker) {
-		opacity: 1;
-	}
-
-	@media (hover: none) {
-		opacity: 1;
-	}
-
-	:deep(.reaction-button) {
-		margin: 0;
-		border-color: transparent;
-		background: transparent;
-
-		&:hover {
-			border-color: var(--grey-300);
-		}
-	}
 
 	:deep(.emoji-picker) {
 		inset-block-start: 100%;
-		inset-inline-end: 0;
+	}
+}
+
+.description {
+	position: relative;
+}
+
+.description-reactions--corner {
+	position: absolute;
+	inset-block-start: .5rem;
+	inset-inline-end: .5rem;
+
+	// Only next to the collapsed line; an open editor has its toolbar there.
+	.description:not(:has(.tiptap__collapsed)) & {
+		display: none;
 	}
 }
 

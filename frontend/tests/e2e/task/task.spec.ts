@@ -901,6 +901,35 @@ test.describe('Task', () => {
 			await expect(labelWrapper).not.toContainText(labels[0].title)
 		})
 
+		test('Clears all labels with the chip × and restores them with Undo', async ({authenticatedPage: page, apiContext, userToken}) => {
+			const tasks = await TaskFactory.create(1, {
+				id: 1,
+				project_id: 1,
+			})
+			const labels = await LabelFactory.create(2)
+			await LabelTaskFactory.create(2, {
+				task_id: tasks[0].id,
+				label_id: (i: number) => labels[i - 1].id,
+			})
+			const storedLabelIds = async () => {
+				const resp = await apiContext.get(`tasks/${tasks[0].id}`, {headers: {Authorization: `Bearer ${userToken}`}})
+				return ((await resp.json()).labels ?? []).map((l: {id: number}) => l.id).sort()
+			}
+
+			await page.goto(`/tasks/${tasks[0].id}`)
+			const chip = page.locator('.task-view .properties .property.labels-list')
+			await expect(chip).toContainText(labels[0].title)
+			await chip.getByRole('button', {name: 'Remove Labels'}).click()
+			await expect(chip).toHaveCount(0)
+			await expect.poll(storedLabelIds).toEqual([])
+
+			await page.locator('.global-notification').getByRole('button', {name: 'Undo'}).click()
+			await expect(chip).toBeVisible()
+			await expect.poll(storedLabelIds).toEqual(labels.map(l => l.id).sort())
+			await page.reload()
+			await expect(chip).toContainText(labels[1].title)
+		})
+
 		test('Can open due date with keyboard shortcut in task detail', async ({authenticatedPage: page}) => {
 			const tasks = await TaskFactory.create(1, {
 				id: 1,

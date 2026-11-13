@@ -10,9 +10,6 @@
 			:class="{'d-print-none': comments.length === 0}"
 		>
 			<span>
-				<span class="icon is-grey">
-					<Icon :icon="['far', 'comments']" />
-				</span>
 				{{ $t('task.comment.title') }}
 				<!-- In the heading, not above the list: a line there pushes the new comment box down and back. -->
 				<span
@@ -36,7 +33,7 @@
 				v-for="c in comments"
 				:id="`comment-${c.id}`"
 				:key="c.id"
-				class="media comment"
+				class="media comment reactions-host"
 			>
 				<figure class="media-left is-hidden-mobile">
 					<UserAvatar
@@ -127,7 +124,7 @@
 						v-if="canWrite || Object.keys(c.reactions ?? {}).length > 0"
 						:model-value="c.reactions"
 						class="mbs-2 d-print-none"
-						:class="{'comment-reactions--quiet': Object.keys(c.reactions ?? {}).length === 0}"
+						:class="{'reactions--quiet comment-reactions--quiet': Object.keys(c.reactions ?? {}).length === 0}"
 						entity-kind="comments"
 						:entity-id="c.id"
 						:task-id="taskId"
@@ -558,31 +555,6 @@ function getCommentUrl(commentId: string) {
 	inset-block-end: 0;
 	inset-inline-end: 0;
 	margin: 0;
-	opacity: 0;
-
-	.comment:hover &,
-	&:focus-within,
-	&:has(.emoji-picker) {
-		opacity: 1;
-	}
-
-	@media (hover: none) {
-		opacity: 1;
-	}
-
-	:deep(.reaction-button) {
-		margin: 0;
-		border-color: transparent;
-		background: transparent;
-
-		&:hover {
-			border-color: var(--grey-300);
-		}
-	}
-
-	:deep(.emoji-picker) {
-		inset-inline-end: 0;
-	}
 }
 
 .media {

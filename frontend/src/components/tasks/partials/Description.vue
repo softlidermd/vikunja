@@ -7,9 +7,6 @@
 			v-if="!isEditorContentEmpty(props.modelValue.description ?? '') || saveState"
 			class="task-section-title"
 		>
-			<span class="icon is-grey">
-				<Icon icon="align-left" />
-			</span>
 			{{ $t('task.attributes.description') }}
 			<CustomTransition name="fade">
 				<span

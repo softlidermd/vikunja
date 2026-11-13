@@ -193,6 +193,7 @@ async function cancel(element: HTMLInputElement) {
 	text-wrap: wrap;
 
 	@media screen and (max-width: $tablet) {
+		min-block-size: calc(1.3125rem * 1.3 + .6rem + 2px);
 		font-size: 1.3125rem;
 	}
 }
