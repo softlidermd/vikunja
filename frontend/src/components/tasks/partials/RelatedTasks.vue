@@ -155,6 +155,15 @@
 						<Icon icon="trash-alt" />
 					</BaseButton>
 				</div>
+				<input
+					v-if="editEnabled && rts.kind === 'subtask'"
+					v-model="newSubtaskTitle"
+					class="input subtask-input"
+					:placeholder="$t('task.relation.subtaskPlaceholder')"
+					:aria-label="$t('task.relation.subtaskPlaceholder')"
+					:readonly="isCreatingSubtask"
+					@keydown.enter.exact="e => !e.isComposing && addSubtask()"
+				>
 			</div>
 		</div>
 		<p
@@ -205,6 +214,7 @@ import QuickAddMagic from '@/components/tasks/partials/QuickAddMagic.vue'
 
 import {error, success} from '@/message'
 import {useQuickAddTask} from '@/composables/useQuickAddTask'
+import {useCreateSubtask} from '@/composables/useCreateSubtask'
 import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
 import {playPopSound} from '@/helpers/playPop'
@@ -280,13 +290,23 @@ const mapRelationKindsTitleGetter = computed(() => ({
 	'copiedto': (count: number) => t('task.relation.kinds.copiedto', count),
 }))
 
-const mappedRelatedTasks = computed(() => Object.entries(relatedTasks.value).map(
-	([kind, tasks]) => ({
-		title: mapRelationKindsTitleGetter.value[kind as IRelationKind]((tasks ?? []).length),
-		tasks: tasks ?? [],
-		kind: kind as IRelationKind,
-	}),
-))
+const mappedRelatedTasks = computed(() => {
+	const groups = Object.entries(relatedTasks.value).map(
+		([kind, tasks]) => ({
+			title: mapRelationKindsTitleGetter.value[kind as IRelationKind]((tasks ?? []).length),
+			tasks: tasks ?? [],
+			kind: kind as IRelationKind,
+		}),
+	)
+	// An empty Subtasks group carries the add-subtask field, so the first subtask needs no relation form.
+	if (props.editEnabled && !groups.some(group => group.kind === 'subtask' && group.tasks.length > 0)) {
+		return [
+			{title: mapRelationKindsTitleGetter.value.subtask(2), tasks: [], kind: 'subtask' as IRelationKind},
+			...groups.filter(group => group.kind !== 'subtask'),
+		]
+	}
+	return groups
+})
 const mappedFoundTasks = computed(() => sortTasksForRelationSearch(foundTasks.value.filter(t => t.id !== props.taskId)))
 
 
@@ -345,6 +365,23 @@ async function createAndRelateTask(title: string) {
 	const newTask = await createNewTask({title, project_id: props.projectId})
 	newTaskRelation.task = newTask
 	await addTaskRelation()
+}
+
+const newSubtaskTitle = ref('')
+const {createSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
+
+async function addSubtask() {
+	const title = newSubtaskTitle.value.trim()
+	if (title === '' || isCreatingSubtask.value) {
+		return
+	}
+	try {
+		await createSubtask({id: props.taskId, project_id: props.projectId}, title)
+	} catch {
+		// Failed mutations already show an error toast (contextMutationOptions).
+	} finally {
+		newSubtaskTitle.value = ''
+	}
 }
 
 async function toggleTaskDone(task: ITask) {
@@ -411,6 +448,10 @@ async function toggleTaskDone(task: ITask) {
 		}
 	}
 
+}
+
+.subtask-input {
+	margin-block-start: .25rem;
 }
 
 .remove {

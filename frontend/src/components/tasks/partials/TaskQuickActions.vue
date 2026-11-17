@@ -36,7 +36,7 @@
 					role="group"
 					:aria-label="$t('task.quickActions.label', {task: task.title})"
 				>
-					<template v-if="canWrite && kanbanView && buckets.length > 0">
+					<template v-if="canWrite && showStatus && kanbanView && buckets.length > 0">
 						<p class="task-quick-actions__heading">
 							{{ $t('task.attributes.status') }}
 						</p>
@@ -52,6 +52,13 @@
 						</DropdownItem>
 						<hr class="task-quick-actions__divider">
 					</template>
+					<DropdownItem
+						v-if="canWrite"
+						icon="plus"
+						@click="close(); showAddSubtask = true"
+					>
+						{{ $t('task.quickActions.addSubtask') }}
+					</DropdownItem>
 					<DropdownItem
 						v-if="canAssign"
 						icon="user"
@@ -76,6 +83,31 @@
 				</div>
 			</template>
 		</Popup>
+
+		<Modal
+			:enabled="showAddSubtask"
+			@close="closeAddSubtask()"
+			@submit="addSubtask()"
+		>
+			<template #header>
+				<span>{{ $t('task.quickActions.addSubtask') }}</span>
+			</template>
+
+			<template #text>
+				<p class="tw:text-balance">
+					{{ task.title }}
+				</p>
+				<input
+					v-model="subtaskTitle"
+					autofocus
+					class="input"
+					:placeholder="$t('task.relation.subtaskPlaceholder')"
+					:aria-label="$t('task.relation.subtaskPlaceholder')"
+					:readonly="isCreatingSubtask"
+					@keydown.enter.exact="e => !e.isComposing && addSubtask()"
+				>
+			</template>
+		</Modal>
 
 		<Modal
 			:enabled="showDeleteModal"
@@ -115,15 +147,20 @@ import Icon from '@/components/misc/Icon'
 import Modal from '@/components/misc/Modal.vue'
 import Popup from '@/components/misc/Popup.vue'
 import {useCopyToClipboard} from '@/composables/useCopyToClipboard'
+import {useCreateSubtask} from '@/composables/useCreateSubtask'
 import {useTaskSaveQueue} from '@/composables/useTaskSaveQueue'
 import {useTaskStatus} from '@/composables/useTaskStatus'
 import {success} from '@/message'
 import {useAuthStore} from '@/stores/auth'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
 	task: Task,
 	canWrite: boolean,
-}>()
+	// Off where the row already has its own status control.
+	showStatus?: boolean,
+}>(), {
+	showStatus: true,
+})
 
 const {t} = useI18n({useScope: 'global'})
 const router = useRouter()
@@ -136,12 +173,15 @@ const {queueTaskSave} = useTaskSaveQueue()
 
 const open = ref(false)
 const showDeleteModal = ref(false)
+const showAddSubtask = ref(false)
+const subtaskTitle = ref('')
+const {createSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
 // Loaded when the trigger is pointed at, not per row up front, and before the menu opens so it does not grow under the cursor.
 const wantsBuckets = ref(false)
 
 const {kanbanView, buckets, currentBucket, moveToBucket} = useTaskStatus(
 	() => props.task,
-	() => (wantsBuckets.value || open.value) && props.canWrite,
+	() => (wantsBuckets.value || open.value) && props.canWrite && props.showStatus,
 )
 
 const trigger = ref<InstanceType<typeof BaseButton> | null>(null)
@@ -185,6 +225,25 @@ async function toggleAssignMe() {
 	await queueTaskSave(input.taskId, async () => {
 		await (remove ? removeAssignee.mutateAsync(input) : addAssignee.mutateAsync(input))
 	})
+}
+
+function closeAddSubtask() {
+	showAddSubtask.value = false
+	subtaskTitle.value = ''
+}
+
+async function addSubtask() {
+	const title = subtaskTitle.value.trim()
+	if (title === '' || isCreatingSubtask.value || props.task.id === undefined || props.task.project_id === undefined) {
+		return
+	}
+	try {
+		await createSubtask({id: props.task.id, project_id: props.task.project_id}, title)
+	} catch {
+		// Failed mutations already show an error toast (contextMutationOptions).
+	} finally {
+		closeAddSubtask()
+	}
 }
 
 async function copyLink() {

@@ -54,14 +54,14 @@ export function useQuickAddTask() {
 	const config = useConfigStore()
 	const router = useRouter()
 
-	async function findProjectId({project, projectId}: {project?: string | null, projectId: number}) {
+	async function findProjectId({project, projectId, keepProject = false}: {project?: string | null, projectId: number, keepProject?: boolean}) {
 		if (project) {
 			const {projects} = await ensureProjects()
 			const found = findProjectByExactTitle(projects, project)
 				?? projects.find(item => item.identifier?.toLowerCase() === project.toLowerCase())
 			if (found?.id) return found.id
 		}
-		const routeProjectId = Number(router.currentRoute.value.params.projectId)
+		const routeProjectId = keepProject ? 0 : Number(router.currentRoute.value.params.projectId)
 		const id = routeProjectId > 0 ? routeProjectId : projectId
 		if (id <= 0) throw new Error('NO_PROJECT')
 		return id
@@ -109,7 +109,7 @@ export function useQuickAddTask() {
 		}
 	}
 
-	async function build(input: Partial<Task>, context: ClientRequestContext) {
+	async function build(input: Partial<Task>, context: ClientRequestContext, keepProject = false) {
 		const mode = auth.settings.frontend_settings.quick_add_magic_mode
 		const parsed = parseTaskText(input.title ?? '', mode)
 		// A title that is only magic stays a literal title: nothing parsed out of it may move or decorate the task.
@@ -117,6 +117,7 @@ export function useQuickAddTask() {
 		const project_id = await findProjectId({
 			project: magicOnly ? null : parsed.project,
 			projectId: input.project_id ?? 0,
+			keepProject,
 		})
 		assertClientRequestContext(context)
 		const matches = magicOnly ? [] : await Promise.all(parsed.assignees.map(async match => {
@@ -181,9 +182,10 @@ export function useQuickAddTask() {
 		}
 	}
 
-	async function createNewTask(input: Partial<Task>) {
+	// keepProject: create in input.project_id even when the route shows another project (a subtask goes to its parent's).
+	async function createNewTask(input: Partial<Task>, {keepProject = false}: {keepProject?: boolean} = {}) {
 		const context = captureClientRequestContext()
-		const built = await build(input, context)
+		const built = await build(input, context, keepProject)
 		assertClientRequestContext(context)
 		const created = await create.mutateAsync({...built.task, project_id: built.task.project_id!})
 		let finished: Awaited<ReturnType<typeof finishTask>>

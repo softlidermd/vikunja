@@ -492,7 +492,10 @@
 		"table": {
 			"title": "Таблица",
 			"columns": "Столбцы",
-			"sortBy": "Сортировать по столбцу {column}"
+			"sortBy": "Сортировать по столбцу {column}",
+			"nestSubtasks": "Вложенные подзадачи",
+			"expandSubtasks": "Показать подзадачи «{task}»",
+			"collapseSubtasks": "Скрыть подзадачи «{task}»"
 		},
 		"kanban": {
 			"title": "Канбан",
@@ -981,7 +984,8 @@
 		"quickActions": {
 			"label": "Действия с задачей «{task}»",
 			"assignMe": "Назначить меня",
-			"unassignMe": "Снять меня"
+			"unassignMe": "Снять меня",
+			"addSubtask": "Добавить подзадачу"
 		},
 		"new": "Создать задачу",
 		"createSuccess": "Задача удалена.",
@@ -1195,6 +1199,7 @@
 			"new": "Новая связанная задача",
 			"searchPlaceholder": "Введите запрос для поиска задачи, чтобы добавить связь…",
 			"createPlaceholder": "Добавить как связанную задачу",
+			"subtaskPlaceholder": "Добавить подзадачу…",
 			"differentProject": "Эта задача принадлежит другому проекту.",
 			"noneYet": "Ещё нет связанных задач.",
 			"delete": "Удалить связь",

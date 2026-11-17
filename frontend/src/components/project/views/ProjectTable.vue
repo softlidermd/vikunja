@@ -84,6 +84,10 @@
 							<FancyCheckbox v-model="activeColumns.createdBy">
 								{{ $t('task.attributes.createdBy') }}
 							</FancyCheckbox>
+							<hr class="columns-filter__divider">
+							<FancyCheckbox v-model="nestSubtasks">
+								{{ $t('project.table.nestSubtasks') }}
+							</FancyCheckbox>
 						</Card>
 					</template>
 				</Popup>
@@ -274,7 +278,7 @@
 							</thead>
 							<tbody>
 								<tr
-									v-for="t in tasks"
+									v-for="{task: t, depth, hasChildren} in rows"
 									:key="t.id"
 									:data-progress="rowProgress(t)"
 								>
@@ -304,14 +308,29 @@
 										</RouterLink>
 									</td>
 									<td v-if="activeColumns.title">
-										<TaskGlanceTooltip :task="t">
-											<RouterLink
-												:to="taskDetailRoutes[t.id]"
-												:class="{'is-strikethrough has-text-grey': t.done}"
+										<div
+											class="title-cell"
+											:style="{paddingInlineStart: `${Math.min(depth, 4) * 1.5}rem`}"
+										>
+											<BaseButton
+												v-if="hasChildren"
+												class="subtask-toggle"
+												:class="{'is-collapsed': collapsedSubtasks.has(t.id)}"
+												:aria-expanded="collapsedSubtasks.has(t.id) ? 'false' : 'true'"
+												:aria-label="$t(collapsedSubtasks.has(t.id) ? 'project.table.expandSubtasks' : 'project.table.collapseSubtasks', {task: t.title})"
+												@click="toggleSubtasks(t.id)"
 											>
-												{{ t.title }}
-											</RouterLink>
-										</TaskGlanceTooltip>
+												<Icon icon="angle-right" />
+											</BaseButton>
+											<TaskGlanceTooltip :task="t">
+												<RouterLink
+													:to="taskDetailRoutes[t.id]"
+													:class="{'is-strikethrough has-text-grey': t.done}"
+												>
+													{{ t.title }}
+												</RouterLink>
+											</TaskGlanceTooltip>
+										</div>
 									</td>
 									<td v-if="showStatus">
 										<TaskStatusSelect
@@ -455,6 +474,7 @@
 											v-if="canWriteTask(t)"
 											:task="t"
 											can-write
+											:show-status="!showStatus"
 										/>
 									</td>
 								</tr>
@@ -550,6 +570,7 @@ import {useCurrentProject} from '@/composables/useCurrentProject'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
 import {taskSizeLabelKey} from '@/constants/taskSizes'
 import {getTaskIdentifier} from '@/helpers/task'
+import {nestTaskRows} from '@/helpers/nestTaskRows'
 import { camelCase } from 'change-case'
 import {isSavedFilterProject} from '@/client/queries/projects'
 import {useProjects} from '@/composables/useProjects'
@@ -661,6 +682,21 @@ const {
 } = taskList
 const loading = useDelayedLoading(taskList.loading)
 const tasks: Ref<TaskResponse[]> = taskList.tasks
+
+const nestSubtasks = useStorage('tableViewNestSubtasks', true)
+// shortcut: ids are never pruned, so deleted tasks linger in storage; prune if it ever grows noticeably.
+const collapsedSubtaskIds = useStorage<number[]>('tableViewCollapsedSubtasks', [])
+const collapsedSubtasks = computed(() => new Set(collapsedSubtaskIds.value))
+const rows = computed(() => nestSubtasks.value
+	// Without the title column there is no toggle to reopen a collapsed task, so show everything.
+	? nestTaskRows(tasks.value, activeColumns.value.title ? collapsedSubtasks.value : undefined)
+	: tasks.value.map(task => ({task, depth: 0, hasChildren: false})))
+
+function toggleSubtasks(id: number) {
+	collapsedSubtaskIds.value = collapsedSubtasks.value.has(id)
+		? collapsedSubtaskIds.value.filter(other => other !== id)
+		: [...collapsedSubtaskIds.value, id]
+}
 
 function taskStatusView(task: TaskResponse) {
 	return getStatusKanbanView(projectList.projects[task.project_id]?.views, undefined)
@@ -832,6 +868,23 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 	}
 
 	// One assignee per line, avatar plus name, so it is clear who it is without hovering.
+	.title-cell {
+		display: flex;
+		align-items: baseline;
+		gap: .25rem;
+	}
+
+	.subtask-toggle {
+		flex-shrink: 0;
+		color: var(--grey-500);
+		transform: rotate(90deg);
+		transition: transform $transition;
+
+		&.is-collapsed {
+			transform: none;
+		}
+	}
+
 	.table-assignees {
 		display: flex;
 		flex-direction: column;
@@ -850,6 +903,12 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		flex-direction: column;
 	}
 
+	&__divider {
+		block-size: 1px;
+		margin-block: .5rem;
+		border: none;
+		background-color: var(--border-light);
+	}
 }
 
 // The card is the only frame: the search field and the results inside it drop their own borders.

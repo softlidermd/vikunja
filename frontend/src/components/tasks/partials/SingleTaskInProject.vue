@@ -187,6 +187,7 @@
 				v-if="canEditStatus"
 				:task="task"
 				:can-write="!disabled"
+				:show-status="!showStatus"
 			/>
 
 			<BaseButton
