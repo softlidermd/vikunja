@@ -1,7 +1,7 @@
 <template>
 	<div class="task-relations">
 		<XButton
-			v-if="editEnabled"
+			v-if="editEnabled && Object.keys(relatedTasks).length > 0"
 			id="showRelatedTasksFormButton"
 			v-tooltip="$t('task.relation.add')"
 			:aria-label="$t('task.relation.add')"
@@ -13,7 +13,7 @@
 			@click="showNewRelationForm = !showNewRelationForm"
 		/>
 		<transition-group name="fade">
-			<template v-if="editEnabled && showNewRelationForm">
+			<template v-if="editEnabled && showCreate">
 				<label
 					key="label"
 					class="label"
@@ -155,15 +155,6 @@
 						<Icon icon="trash-alt" />
 					</BaseButton>
 				</div>
-				<input
-					v-if="editEnabled && rts.kind === 'subtask'"
-					v-model="newSubtaskTitle"
-					class="input subtask-input"
-					:placeholder="$t('task.relation.subtaskPlaceholder')"
-					:aria-label="$t('task.relation.subtaskPlaceholder')"
-					:readonly="isCreatingSubtask"
-					@keydown.enter.exact="e => !e.isComposing && addSubtask()"
-				>
 			</div>
 		</div>
 		<p
@@ -214,7 +205,6 @@ import QuickAddMagic from '@/components/tasks/partials/QuickAddMagic.vue'
 
 import {error, success} from '@/message'
 import {useQuickAddTask} from '@/composables/useQuickAddTask'
-import {useCreateSubtask} from '@/composables/useCreateSubtask'
 import {useProjects} from '@/composables/useProjects'
 import {useAuthStore} from '@/stores/auth'
 import {playPopSound} from '@/helpers/playPop'
@@ -243,7 +233,10 @@ const createRelation = useCreateTaskRelationMutation()
 const deleteRelation = useDeleteTaskRelationMutation()
 const isSaving = useDelayedLoading(() => createRelation.isPending.value || deleteRelation.isPending.value)
 
-const relatedTasks = computed(() => props.initialRelatedTasks ?? {})
+// Subtasks have their own section (TaskSubtasks).
+const relatedTasks = computed(() => Object.fromEntries(
+	Object.entries(props.initialRelatedTasks ?? {}).filter(([kind]) => kind !== 'subtask'),
+) as NonNullable<ITask['related_tasks']>)
 
 const newTaskRelation: TaskRelation = reactive({
 	kind: authStore.settings.frontend_settings.default_task_relation_type as IRelationKind,
@@ -252,6 +245,7 @@ const newTaskRelation: TaskRelation = reactive({
 
 
 const showNewRelationForm = ref(false)
+const showCreate = computed(() => Object.keys(relatedTasks.value).length === 0 || showNewRelationForm.value)
 
 const query = ref('')
 const taskQuery = useTasks(() => ({params: {q: query.value, sort_by: ['done']}}), {enabled: () => query.value !== ''})
@@ -289,23 +283,13 @@ const mapRelationKindsTitleGetter = computed(() => ({
 	'copiedto': (count: number) => t('task.relation.kinds.copiedto', count),
 }))
 
-const mappedRelatedTasks = computed(() => {
-	const groups = Object.entries(relatedTasks.value).map(
-		([kind, tasks]) => ({
-			title: mapRelationKindsTitleGetter.value[kind as IRelationKind]((tasks ?? []).length),
-			tasks: tasks ?? [],
-			kind: kind as IRelationKind,
-		}),
-	)
-	// An empty Subtasks group carries the add-subtask field, so the first subtask needs no relation form.
-	if (props.editEnabled && !groups.some(group => group.kind === 'subtask' && group.tasks.length > 0)) {
-		return [
-			{title: mapRelationKindsTitleGetter.value.subtask(2), tasks: [], kind: 'subtask' as IRelationKind},
-			...groups.filter(group => group.kind !== 'subtask'),
-		]
-	}
-	return groups
-})
+const mappedRelatedTasks = computed(() => Object.entries(relatedTasks.value).map(
+	([kind, tasks]) => ({
+		title: mapRelationKindsTitleGetter.value[kind as IRelationKind]((tasks ?? []).length),
+		tasks: tasks ?? [],
+		kind: kind as IRelationKind,
+	}),
+))
 const mappedFoundTasks = computed(() => sortTasksForRelationSearch(foundTasks.value.filter(t => t.id !== props.taskId)))
 
 
@@ -364,13 +348,6 @@ async function createAndRelateTask(title: string) {
 	const newTask = await createNewTask({title, project_id: props.projectId})
 	newTaskRelation.task = newTask
 	await addTaskRelation()
-}
-
-const newSubtaskTitle = ref('')
-const {submitSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
-
-function addSubtask() {
-	return submitSubtask({id: props.taskId, project_id: props.projectId}, newSubtaskTitle)
 }
 
 async function toggleTaskDone(task: ITask) {
@@ -437,10 +414,6 @@ async function toggleTaskDone(task: ITask) {
 		}
 	}
 
-}
-
-.subtask-input {
-	margin-block-start: .25rem;
 }
 
 .remove {

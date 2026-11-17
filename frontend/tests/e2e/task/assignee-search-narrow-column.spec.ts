@@ -34,7 +34,8 @@ test.describe('Assignee search results in a crowded properties strip', () => {
 		})
 
 		await page.goto(`/tasks/${tasks[0].id}`)
-		await expect(page.locator('.task-view .properties .property')).toHaveCount(7)
+		// The five always-shown tiles (assignees still empty) plus start, end, progress and repeat.
+		await expect(page.locator('.task-view .properties .property')).toHaveCount(9)
 		await openTaskAction(page, 'addProperty', 'Assign to User')
 
 		const multiselect = page.locator('.task-view .property.assignees .multiselect')

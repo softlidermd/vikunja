@@ -55,11 +55,14 @@ test.describe('Subtasks in the table view', () => {
 		const [parent] = await TaskFactory.create(1, {project_id: 1, title: 'Parent task'})
 
 		await page.goto(`/tasks/${parent.id}`)
-		const input = page.getByPlaceholder('Add a subtask…')
-		await input.fill('Detail child')
-		await input.press('Enter')
+		await page.locator('.task-view .task-subtasks__add').click()
+		// The field opens focused and stays open for the next subtask.
+		await page.keyboard.type('Detail child')
+		await page.keyboard.press('Enter')
 
-		await expect(page.locator('.related-tasks').filter({hasText: 'Detail child'})).toBeVisible()
-		await expect(input).toHaveValue('')
+		await expect(page.locator('.task-subtasks__item').filter({hasText: 'Detail child'})).toBeVisible()
+		await expect(page.getByText('Subtasks · 0 of 1')).toBeVisible()
+		await expect(page.getByPlaceholder('Add a subtask…')).toHaveValue('')
+		await expect(page.getByPlaceholder('Add a subtask…')).toBeFocused()
 	})
 })

@@ -20,12 +20,17 @@ test.describe('Task detail layout', () => {
 	test('opens every field and section with its shortcut while the menus are closed', async ({authenticatedPage: page}) => {
 		await openTitleOnlyTask(page)
 
+		// The fields the table edits inline are always shown; their shortcuts open the editor.
+		for (const [key, name] of [['KeyL', 'Labels'], ['KeyP', 'Priority'], ['KeyA', 'Assignees']] as const) {
+			await expect(property(page, name), `${name} tile`).toBeVisible()
+			await pressTaskShortcut(page, key)
+			await expect(page.getByRole('dialog', {name, exact: true}), `${key} editor`).toBeVisible()
+		}
+		await expect(property(page, 'Effort')).toBeVisible()
+		await expect(property(page, 'Due Date')).toBeVisible()
+
 		const steps = [
-			['KeyL', page.locator('.task-view .property.labels-list')],
-			['KeyP', property(page, 'Priority')],
 			['KeyC', property(page, 'Color')],
-			['KeyA', page.locator('.task-view .property.assignees')],
-			['KeyD', property(page, 'Due Date')],
 			['Alt+KeyR', property(page, 'Reminders')],
 			['KeyM', page.locator('.task-view h2').filter({hasText: 'Move task to a different project'})],
 			['KeyR', page.locator('.task-view .task-relations')],

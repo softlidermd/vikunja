@@ -1128,6 +1128,11 @@
     }
   },
   "task": {
+    "subtasks": {
+      "title": "Subtasks · {done} of {total}",
+      "add": "Subtask",
+      "hint": "Enter adds it and keeps the field for the next one · Esc closes"
+    },
     "quickActions": {
       "label": "Actions for {task}",
       "assignMe": "Assign to me",
@@ -1191,6 +1196,7 @@
       "management": "Management",
       "dateAndTime": "Date and time",
       "addProperty": "Property",
+      "moreProperties": "More",
       "moreActions": "More actions",
       "delete": {
         "header": "Delete this task",

@@ -15,6 +15,7 @@
 			<template #trigger="{toggle}">
 				<BaseButton
 					ref="trigger"
+					v-shortcut="shortcut"
 					class="property-chip__body"
 					:aria-expanded="isOpen"
 					@click="toggle()"
@@ -40,6 +41,7 @@
 		<!-- Editors with their own trigger (the datepicker): a click on the label opens them too. -->
 		<span
 			v-else
+			v-shortcut="canWrite ? shortcut : ''"
 			class="property-chip__body"
 			:class="{'is-clickable': canWrite}"
 			@click="canWrite && emit('activate')"
@@ -48,7 +50,7 @@
 			<span class="property-chip__value"><slot name="value" /></span>
 		</span>
 		<BaseButton
-			v-if="canWrite"
+			v-if="canWrite && removable"
 			v-tooltip="removeLabel || $t('task.detail.removeProperty', {property: label})"
 			class="property-chip__remove"
 			:aria-label="removeLabel || $t('task.detail.removeProperty', {property: label})"
@@ -72,9 +74,14 @@ const props = withDefaults(defineProps<{
 	removeLabel?: string
 	// For single-value editors (selects, colour): picking a value is the whole job.
 	closeOnChange?: boolean
+	// Off for the always-shown tiles while they hold no value: there is nothing to clear.
+	removable?: boolean
+	shortcut?: string
 }>(), {
 	removeLabel: '',
 	closeOnChange: false,
+	removable: true,
+	shortcut: '',
 })
 
 const emit = defineEmits<{
@@ -148,18 +155,16 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+// A tile: the label above its value, so a grid of them reads like a form.
 .property-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: .125rem;
-	max-inline-size: 100%;
-	block-size: 1.875rem;
-	padding-inline: .625rem .25rem;
+	position: relative;
+	display: flex;
+	min-inline-size: 0;
 	border: 1px solid var(--grey-200);
 	border-radius: $radius;
 	background: var(--grey-50);
 	font-size: .8125rem;
-	line-height: 1;
+	line-height: 1.3;
 	color: var(--text);
 	transition: border-color $transition;
 
@@ -167,21 +172,23 @@ defineExpose({
 	&.is-open {
 		border-color: var(--grey-300);
 	}
-
-	// Read-only chips have no remove button, so balance the padding.
-	&:not(:has(.property-chip__remove)) {
-		padding-inline-end: .625rem;
-	}
 }
 
 .property-chip__body {
-	display: inline-flex;
-	align-items: center;
-	gap: .375rem;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: .125rem;
 	min-inline-size: 0;
-	block-size: 100%;
+	padding: .375rem .625rem;
 	color: inherit;
+	text-align: start;
 	white-space: nowrap;
+
+	.property-chip:has(.property-chip__remove) & {
+		padding-inline-end: 1.75rem;
+	}
 }
 
 .property-chip__body.is-clickable {
@@ -189,30 +196,31 @@ defineExpose({
 }
 
 .property-chip__label {
+	font-size: .75rem;
 	color: var(--text-muted);
 }
 
 .property-chip__value {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
 	gap: .375rem;
-	min-inline-size: 0;
+	max-inline-size: 100%;
+	min-block-size: 1.25rem;
 	// Room for a focused value's (the datepicker trigger's) focus ring inside the clip.
 	margin: -2px;
 	padding: 2px;
 	overflow: hidden;
+	font-size: .875rem;
 	font-weight: 600;
-
-	&:empty {
-		display: none;
-	}
 }
 
 .property-chip__remove {
+	position: absolute;
+	inset-block-start: .25rem;
+	inset-inline-end: .25rem;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	flex: none;
 	inline-size: 1.375rem;
 	block-size: 1.375rem;
 	border-radius: $radius;

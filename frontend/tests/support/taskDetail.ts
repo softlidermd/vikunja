@@ -1,10 +1,23 @@
 import type {Page} from '@playwright/test'
 
+const ALWAYS_SHOWN_PROPERTIES: Record<string, string> = {
+	'Assign to User': 'Assignees',
+	'Add Labels': 'Labels',
+	'Set Priority': 'Priority',
+	'Set Effort': 'Effort',
+	'Set Due Date': 'Due Date',
+}
+
 /**
  * Opens one of the task detail menus and clicks the item with the given name.
  * The menus mount eagerly, so their items sit hidden in the DOM; getByRole skips hidden ones.
  */
 export async function openTaskAction(page: Page, menu: 'addProperty' | 'more', name: string) {
+	// These fields are always-shown tiles now, not '+ More' items: open the tile instead.
+	const tile = menu === 'addProperty' ? ALWAYS_SHOWN_PROPERTIES[name] : undefined
+	if (tile) {
+		return openTaskProperty(page, tile)
+	}
 	const dropdown = page.locator(`.task-view [data-cy="taskDetail.${menu}"]`)
 	await dropdown.locator('.dropdown-trigger').first().click()
 	await dropdown.getByRole('button', {name, exact: true}).click()

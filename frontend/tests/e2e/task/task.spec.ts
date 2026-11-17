@@ -920,11 +920,13 @@ test.describe('Task', () => {
 			const chip = page.locator('.task-view .properties .property.labels-list')
 			await expect(chip).toContainText(labels[0].title)
 			await chip.getByRole('button', {name: 'Remove Labels'}).click()
-			await expect(chip).toHaveCount(0)
+			// The tile stays, empty and with nothing left to clear.
+			await expect(chip).not.toContainText(labels[0].title)
+			await expect(chip.getByRole('button', {name: 'Remove Labels'})).toHaveCount(0)
 			await expect.poll(storedLabelIds).toEqual([])
 
 			await page.locator('.global-notification').getByRole('button', {name: 'Undo'}).click()
-			await expect(chip).toBeVisible()
+			await expect(chip).toContainText(labels[0].title)
 			await expect.poll(storedLabelIds).toEqual(labels.map(l => l.id).sort())
 			await page.reload()
 			await expect(chip).toContainText(labels[1].title)
@@ -938,10 +940,10 @@ test.describe('Task', () => {
 			await page.goto(`/tasks/${tasks[0].id}`)
 			await page.waitForLoadState('networkidle')
 
+			// Always shown; the shortcut opens its picker.
 			const dueDateColumn = page.locator('.task-view .properties .property').filter({hasText: 'Due Date'})
-			await expect(dueDateColumn).not.toBeVisible()
-			await pressTaskShortcut(page, 'd')
 			await expect(dueDateColumn).toBeVisible()
+			await pressTaskShortcut(page, 'd')
 
 			const popup = dueDateColumn.locator('.datepicker .datepicker-popup')
 			await expect(popup).toBeVisible()

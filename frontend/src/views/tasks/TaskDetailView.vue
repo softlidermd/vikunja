@@ -157,40 +157,11 @@
 			</div>
 
 			<div class="properties">
+				<!-- The fields the table edits inline are always here; the rest join once set, via + More. -->
 				<TaskPropertyChip
-					v-if="activeFields.assignees"
-					:ref="e => setChipRef('assignees', e)"
-					class="property assignees"
-					:label="$t('task.attributes.assignees')"
-					:can-write="canWrite"
-					@remove="clearField('assignees')"
-				>
-					<template #value>
-						<span
-							v-if="task.assignees?.length"
-							class="chip-avatars"
-						>
-							<User
-								v-for="user in task.assignees.slice(0, 3)"
-								:key="user.id"
-								:user="user"
-								:avatar-size="20"
-								:show-username="false"
-							/>
-						</span>
-						{{ assigneeSummary }}
-					</template>
-					<EditAssignees
-						v-model="task.assignees"
-						class="chip-editor"
-						:project-id="task.project_id"
-						:task-id="task.id"
-						inline
-					/>
-				</TaskPropertyChip>
-				<TaskPropertyChip
-					v-if="activeFields.priority"
 					:ref="e => setChipRef('priority', e)"
+					:removable="Boolean(task.priority)"
+					:shortcut="SHORTCUTS.taskDetail.priority"
 					close-on-change
 					class="property"
 					:label="$t('task.attributes.priority')"
@@ -209,7 +180,87 @@
 					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
-					v-if="activeFields.dueDate"
+					:ref="e => setChipRef('size', e)"
+					:removable="Boolean(task.size)"
+					close-on-change
+					class="property"
+					:label="$t('task.attributes.size')"
+					:can-write="canWrite"
+					@remove="clearField('size')"
+				>
+					<template #value>
+						{{ $t(taskSizeLabelKey(task.size ?? 0)) }}
+					</template>
+					<SizeSelect
+						v-model="task.size"
+						@update:modelValue="setSize"
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					:ref="e => setChipRef('assignees', e)"
+					:removable="Boolean(task.assignees?.length)"
+					:shortcut="SHORTCUTS.taskDetail.assignees"
+					class="property assignees"
+					:label="$t('task.attributes.assignees')"
+					:can-write="canWrite"
+					@remove="clearField('assignees')"
+				>
+					<template #value>
+						<span
+							v-if="task.assignees?.length"
+							class="chip-avatars"
+						>
+							<User
+								v-for="user in task.assignees.slice(0, 3)"
+								:key="user.id"
+								:user="user"
+								:avatar-size="20"
+								:show-username="false"
+							/>
+						</span>
+						{{ assigneeSummary || '—' }}
+					</template>
+					<EditAssignees
+						v-model="task.assignees"
+						class="chip-editor"
+						:project-id="task.project_id"
+						:task-id="task.id"
+						inline
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					:ref="e => setChipRef('labels', e)"
+					:removable="Boolean(task.labels?.length)"
+					:shortcut="SHORTCUTS.taskDetail.labels"
+					class="property labels-list"
+					:label="$t('task.attributes.labels')"
+					:can-write="canWrite"
+					@remove="clearField('labels')"
+				>
+					<template #value>
+						<template v-if="!task.labels?.length">
+							—
+						</template>
+						<span
+							v-for="label in task.labels"
+							:key="label.id"
+							class="chip-label"
+							:style="getLabelStyles(label)"
+						>{{ label.title }}</span>
+					</template>
+					<EditLabels
+						v-model="task.labels"
+						class="chip-editor"
+						:project-id="task.project_id"
+						:task-id="taskId"
+						:creatable="!authStore.isLinkShareAuth"
+						:creation-disabled-message="authStore.isLinkShareAuth ? $t('task.label.linkShareCannotCreate') : ''"
+						inline
+					/>
+				</TaskPropertyChip>
+				<TaskPropertyChip
+					:removable="parseDateOrNull(task.due_date) !== null"
+					:shortcut="SHORTCUTS.taskDetail.dueDate"
 					class="property date-input"
 					:class="{'is-overdue': isOverdue}"
 					:label="$t('task.attributes.dueDate')"
@@ -271,49 +322,6 @@
 							@closeOnChange="saveTask()"
 						/>
 					</template>
-				</TaskPropertyChip>
-				<TaskPropertyChip
-					v-if="activeFields.labels"
-					:ref="e => setChipRef('labels', e)"
-					class="property labels-list"
-					:label="$t('task.attributes.labels')"
-					:can-write="canWrite"
-					@remove="clearField('labels')"
-				>
-					<template #value>
-						<span
-							v-for="label in task.labels"
-							:key="label.id"
-							class="chip-label"
-							:style="getLabelStyles(label)"
-						>{{ label.title }}</span>
-					</template>
-					<EditLabels
-						v-model="task.labels"
-						class="chip-editor"
-						:project-id="task.project_id"
-						:task-id="taskId"
-						:creatable="!authStore.isLinkShareAuth"
-						:creation-disabled-message="authStore.isLinkShareAuth ? $t('task.label.linkShareCannotCreate') : ''"
-						inline
-					/>
-				</TaskPropertyChip>
-				<TaskPropertyChip
-					v-if="activeFields.size"
-					:ref="e => setChipRef('size', e)"
-					close-on-change
-					class="property"
-					:label="$t('task.attributes.size')"
-					:can-write="canWrite"
-					@remove="clearField('size')"
-				>
-					<template #value>
-						{{ $t(taskSizeLabelKey(task.size ?? 0)) }}
-					</template>
-					<SizeSelect
-						v-model="task.size"
-						@update:modelValue="setSize"
-					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
 					v-if="activeFields.percentDone"
@@ -407,7 +415,7 @@
 							@click="toggleOpen"
 						>
 							<Icon icon="plus" />
-							{{ $t('task.detail.addProperty') }}
+							{{ $t('task.detail.moreProperties') }}
 						</BaseButton>
 					</template>
 					<template #default="{close}">
@@ -483,6 +491,11 @@
 				/>
 			</div>
 
+			<TaskSubtasks
+				:task="task"
+				:can-write="canWrite"
+			/>
+
 			<!-- Attachments -->
 			<div
 				v-show="activeFields.attachments || hasAttachments"
@@ -505,9 +518,8 @@
 			</div>
 
 			<!-- Related Tasks -->
-			<!-- Always there for writers: it holds the add-subtask field. -->
 			<div
-				v-if="activeFields.relatedTasks || canWrite"
+				v-if="activeFields.relatedTasks"
 				class="content details mbe-0"
 			>
 				<h2 class="task-section-title">
@@ -518,7 +530,7 @@
 					:edit-enabled="canWrite"
 					:initial-related-tasks="task.related_tasks"
 					:project-id="task.project_id"
-					:show-no-relations-notice="!canWrite"
+					:show-no-relations-notice="true"
 					:task-id="taskId"
 				/>
 			</div>
@@ -641,6 +653,7 @@ import Reminders from '@/components/tasks/partials/Reminders.vue'
 import RepeatAfter from '@/components/tasks/partials/RepeatAfter.vue'
 import TaskSubscription from '@/components/misc/Subscription.vue'
 import TaskPropertyChip from '@/components/tasks/partials/TaskPropertyChip.vue'
+import TaskSubtasks from '@/components/tasks/partials/TaskSubtasks.vue'
 import User from '@/components/misc/User.vue'
 import ColorBubble from '@/components/misc/ColorBubble.vue'
 import BucketSelect from '@/components/tasks/partials/BucketSelect.vue'
@@ -978,20 +991,13 @@ type FieldType =
 
 // '+ Property' menu: field, label key (task.detail.actions.*), icon, shortcut
 const PROPERTY_ITEMS: {title?: string, items: {field: FieldType, label: string, icon: IconProp, shortcut?: string}[]}[] = [
-	{title: 'task.detail.organization', items: [
-		{field: 'assignees', label: 'assign', icon: 'users', shortcut: SHORTCUTS.taskDetail.assignees},
-		{field: 'labels', label: 'label', icon: 'tags', shortcut: SHORTCUTS.taskDetail.labels},
-		{field: 'priority', label: 'priority', icon: 'exclamation-circle', shortcut: SHORTCUTS.taskDetail.priority},
-	]},
 	{title: 'task.detail.dateAndTime', items: [
-		{field: 'dueDate', label: 'dueDate', icon: 'calendar', shortcut: SHORTCUTS.taskDetail.dueDate},
 		{field: 'startDate', label: 'startDate', icon: 'play'},
 		{field: 'endDate', label: 'endDate', icon: 'stop'},
 		{field: 'reminders', label: 'reminders', icon: ['far', 'clock'], shortcut: SHORTCUTS.taskDetail.reminder},
 		{field: 'repeatAfter', label: 'repeatAfter', icon: 'history'},
 	]},
 	{items: [
-		{field: 'size', label: 'size', icon: 'ruler-horizontal'},
 		{field: 'percentDone', label: 'percentDone', icon: 'percent'},
 		{field: 'color', label: 'color', icon: 'fill-drip', shortcut: SHORTCUTS.taskDetail.color},
 	]},
@@ -1025,7 +1031,7 @@ function setActiveFields() {
 	activeFields.labels = (task.value.labels?.length ?? 0) > 0
 	activeFields.percentDone = (task.value.percent_done ?? 0) > 0
 	activeFields.priority = task.value.priority !== PRIORITIES.UNSET
-	activeFields.relatedTasks = Object.keys(task.value.related_tasks ?? {}).length > 0
+	activeFields.relatedTasks = Object.keys(task.value.related_tasks ?? {}).some(kind => kind !== 'subtask')
 	activeFields.reminders = (task.value.reminders?.length ?? 0) > 0
 	activeFields.repeatAfter = (task.value.repeat_after ?? 0) > 0
 		|| task.value.repeat_mode !== TASK_REPEAT_MODES.REPEAT_MODE_DEFAULT
@@ -1477,10 +1483,14 @@ function setRelatedTasksActive() {
 }
 
 .properties {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: .5rem;
+
+	@media screen and (max-width: $tablet) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
 	margin-block: .875rem;
 	padding-block-end: 1.125rem;
 	border-block-end: 1px solid var(--grey-200);
@@ -1673,11 +1683,17 @@ function setRelatedTasksActive() {
 	}
 }
 
+.add-property {
+	display: flex;
+}
+
 .add-property__trigger {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: .375rem;
-	block-size: 1.875rem;
+	inline-size: 100%;
+	min-block-size: 3rem;
 	padding-inline: .75rem;
 	border: 1px dashed var(--grey-300);
 	border-radius: $radius;
