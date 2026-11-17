@@ -1,6 +1,7 @@
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {createProjects} from './prepareProjects'
+import {openTaskAction} from '../../support/taskDetail'
 
 async function openFilterPopup(page) {
 	await page.locator('.filter-container button').filter({hasText: 'Filters'}).click()
@@ -44,6 +45,22 @@ test.describe('Filter Persistence Across Views', () => {
 		await page.reload()
 
 		await expect(page).toHaveURL(/filter=/)
+	})
+
+	test('keeps the Table view filter after deleting a task from its modal', async ({authenticatedPage: page}) => {
+		await page.goto('/projects/1/3')
+		await openAndSetFilters(page, 'done = false')
+		await expect(page).toHaveURL(/filter=/)
+		const tableUrl = page.url()
+
+		await page.locator('.project-table tbody tr').first().locator('td a').first().click()
+		await expect(page.locator('.task-view [data-cy="taskDetail.more"] .dropdown-trigger')).toBeVisible()
+		await openTaskAction(page, 'more', 'Delete')
+		await page.locator('dialog[open] .modal-content .actions .button').filter({hasText: 'Do it!'}).click()
+
+		await expect(page.locator('.global-notification')).toContainText('Success')
+		await expect(page).toHaveURL(tableUrl)
+		await expect(page.locator('.project-table tbody tr')).toHaveCount(4)
 	})
 
 	test('should persist filters in Kanban view after page refresh', async ({authenticatedPage: page}) => {

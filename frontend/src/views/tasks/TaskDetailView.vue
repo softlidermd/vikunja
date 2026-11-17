@@ -1190,7 +1190,13 @@ const showDeleteModal = ref(false)
 async function deleteTask() {
 	await deleteTaskMutation.mutateAsync(task.value.id!)
 	success({message: t('task.detail.deleteSuccess')})
-	router.push({name: 'project.index', params: {projectId: task.value.project_id}})
+	// Like the back button: return to the project view it was opened from, keeping that view's filter and page.
+	// A fresh project route would drop them.
+	if (lastProject.value) {
+		router.back()
+	} else {
+		router.push(projectRoute.value)
+	}
 }
 
 async function toggleTaskDone() {
