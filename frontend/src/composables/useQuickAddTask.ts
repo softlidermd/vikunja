@@ -54,7 +54,11 @@ export function useQuickAddTask() {
 	const config = useConfigStore()
 	const router = useRouter()
 
-	async function findProjectId({project, projectId, keepProject = false}: {project?: string | null, projectId: number, keepProject?: boolean}) {
+	async function findProjectId({project, projectId, keepProject = false}: {
+		project?: string | null,
+		projectId: number,
+		keepProject?: boolean,
+	}) {
 		if (project) {
 			const {projects} = await ensureProjects()
 			const found = findProjectByExactTitle(projects, project)
@@ -115,7 +119,7 @@ export function useQuickAddTask() {
 		// A title that is only magic stays a literal title: nothing parsed out of it may move or decorate the task.
 		const magicOnly = !parsed.text
 		const project_id = await findProjectId({
-			project: magicOnly ? null : parsed.project,
+			project: magicOnly || keepProject ? null : parsed.project,
 			projectId: input.project_id ?? 0,
 			keepProject,
 		})
@@ -182,7 +186,8 @@ export function useQuickAddTask() {
 		}
 	}
 
-	// keepProject: create in input.project_id even when the route shows another project (a subtask goes to its parent's).
+	// keepProject: always create in input.project_id, ignoring the route and +project magic
+	// (a subtask belongs in its parent's project).
 	async function createNewTask(input: Partial<Task>, {keepProject = false}: {keepProject?: boolean} = {}) {
 		const context = captureClientRequestContext()
 		const built = await build(input, context, keepProject)

@@ -175,13 +175,15 @@ const open = ref(false)
 const showDeleteModal = ref(false)
 const showAddSubtask = ref(false)
 const subtaskTitle = ref('')
-const {createSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
+const {submitSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
 // Loaded when the trigger is pointed at, not per row up front, and before the menu opens so it does not grow under the cursor.
 const wantsBuckets = ref(false)
 
 const {kanbanView, buckets, currentBucket, moveToBucket} = useTaskStatus(
 	() => props.task,
-	() => (wantsBuckets.value || open.value) && props.canWrite && props.showStatus,
+	() => (wantsBuckets.value || open.value)
+		&& props.canWrite
+		&& props.showStatus,
 )
 
 const trigger = ref<InstanceType<typeof BaseButton> | null>(null)
@@ -233,16 +235,9 @@ function closeAddSubtask() {
 }
 
 async function addSubtask() {
-	const title = subtaskTitle.value.trim()
-	if (title === '' || isCreatingSubtask.value || props.task.id === undefined || props.task.project_id === undefined) {
-		return
-	}
-	try {
-		await createSubtask({id: props.task.id, project_id: props.task.project_id}, title)
-	} catch {
-		// Failed mutations already show an error toast (contextMutationOptions).
-	} finally {
-		closeAddSubtask()
+	const {id, project_id} = props.task
+	if (id !== undefined && project_id !== undefined && await submitSubtask({id, project_id}, subtaskTitle)) {
+		showAddSubtask.value = false
 	}
 }
 

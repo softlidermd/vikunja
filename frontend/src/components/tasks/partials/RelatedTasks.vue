@@ -1,7 +1,7 @@
 <template>
 	<div class="task-relations">
 		<XButton
-			v-if="editEnabled && Object.keys(relatedTasks).length > 0"
+			v-if="editEnabled"
 			id="showRelatedTasksFormButton"
 			v-tooltip="$t('task.relation.add')"
 			:aria-label="$t('task.relation.add')"
@@ -13,7 +13,7 @@
 			@click="showNewRelationForm = !showNewRelationForm"
 		/>
 		<transition-group name="fade">
-			<template v-if="editEnabled && showCreate">
+			<template v-if="editEnabled && showNewRelationForm">
 				<label
 					key="label"
 					class="label"
@@ -252,7 +252,6 @@ const newTaskRelation: TaskRelation = reactive({
 
 
 const showNewRelationForm = ref(false)
-const showCreate = computed(() => Object.keys(relatedTasks.value).length === 0 || showNewRelationForm.value)
 
 const query = ref('')
 const taskQuery = useTasks(() => ({params: {q: query.value, sort_by: ['done']}}), {enabled: () => query.value !== ''})
@@ -368,20 +367,10 @@ async function createAndRelateTask(title: string) {
 }
 
 const newSubtaskTitle = ref('')
-const {createSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
+const {submitSubtask, isCreating: isCreatingSubtask} = useCreateSubtask()
 
-async function addSubtask() {
-	const title = newSubtaskTitle.value.trim()
-	if (title === '' || isCreatingSubtask.value) {
-		return
-	}
-	try {
-		await createSubtask({id: props.taskId, project_id: props.projectId}, title)
-	} catch {
-		// Failed mutations already show an error toast (contextMutationOptions).
-	} finally {
-		newSubtaskTitle.value = ''
-	}
+function addSubtask() {
+	return submitSubtask({id: props.taskId, project_id: props.projectId}, newSubtaskTitle)
 }
 
 async function toggleTaskDone(task: ITask) {

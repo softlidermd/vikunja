@@ -142,6 +142,17 @@ describe('useQuickAddTask', () => {
 		expect(sdk.taskLabelsCreate).not.toHaveBeenCalled()
 	})
 
+	it('ignores a project prefix with keepProject, so a subtask stays in its parent project', async () => {
+		sdk.projectsList.mockResolvedValue({data: {items: [{id: 42, title: 'Other'}], total_pages: 1}})
+		sdk.tasksCreate.mockResolvedValue({data: {id: 7, title: 'Child', project_id: 1}})
+
+		await quickAdd().createNewTask({title: 'Child +Other', project_id: 1}, {keepProject: true})
+
+		expect(sdk.tasksCreate).toHaveBeenCalledWith(expect.objectContaining({
+			body: expect.objectContaining({project_id: 1}),
+		}))
+	})
+
 	it('does not toast per task when the same label create keeps failing in a bulk add', async () => {
 		sdk.tasksBulkCreate.mockResolvedValue({
 			data: {

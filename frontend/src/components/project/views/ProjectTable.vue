@@ -317,7 +317,10 @@
 												class="subtask-toggle"
 												:class="{'is-collapsed': collapsedSubtasks.has(t.id)}"
 												:aria-expanded="collapsedSubtasks.has(t.id) ? 'false' : 'true'"
-												:aria-label="$t(collapsedSubtasks.has(t.id) ? 'project.table.expandSubtasks' : 'project.table.collapseSubtasks', {task: t.title})"
+												:aria-label="$t(
+													collapsedSubtasks.has(t.id) ? 'project.table.expandSubtasks' : 'project.table.collapseSubtasks',
+													{task: t.title},
+												)"
 												@click="toggleSubtasks(t.id)"
 											>
 												<Icon icon="angle-right" />
@@ -867,7 +870,6 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		align-items: center;
 	}
 
-	// One assignee per line, avatar plus name, so it is clear who it is without hovering.
 	.title-cell {
 		display: flex;
 		align-items: baseline;
@@ -885,6 +887,7 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		}
 	}
 
+	// One assignee per line, avatar plus name, so it is clear who it is without hovering.
 	.table-assignees {
 		display: flex;
 		flex-direction: column;

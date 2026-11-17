@@ -32,6 +32,20 @@ describe('useCreateSubtask', () => {
 		await expect(useCreateSubtask().createSubtask({id: 7, project_id: 3}, 'child')).resolves.toMatchObject({id: 42})
 	})
 
+	it('submits once while a creation is still running and clears the title', async () => {
+		let finish: (task: object) => void = () => {}
+		createNewTask.mockReturnValue(new Promise(resolve => { finish = resolve }))
+		const {submitSubtask} = useCreateSubtask()
+		const title = ref(' child ')
+		const first = submitSubtask({id: 7, project_id: 3}, title)
+		expect(await submitSubtask({id: 7, project_id: 3}, ref('child'))).toBe(false)
+		finish({id: 42})
+		expect(await first).toBe(true)
+		expect(createNewTask).toHaveBeenCalledTimes(1)
+		expect(createNewTask).toHaveBeenCalledWith({title: 'child', project_id: 3}, {keepProject: true})
+		expect(title.value).toBe('')
+	})
+
 	it('rejects without linking when the task could not be created', async () => {
 		createNewTask.mockRejectedValue(new Error('create failed'))
 		await expect(useCreateSubtask().createSubtask({id: 7, project_id: 3}, 'child')).rejects.toThrow('create failed')

@@ -17,11 +17,16 @@ export interface NestedTaskRow<T> {
  * Siblings keep their order in `tasks` (the server sort). A subtask with several parents on the page
  * appears once, under the first one reached. Descendants of a collapsed task are left out.
  */
-export function nestTaskRows<T extends NestableTask>(tasks: T[], collapsed: ReadonlySet<number> = new Set()): NestedTaskRow<T>[] {
+export function nestTaskRows<T extends NestableTask>(
+	tasks: T[],
+	collapsed: ReadonlySet<number> = new Set(),
+): NestedTaskRow<T>[] {
 	const onPage = new Set(tasks.map(t => t.id))
 	const childIds = new Map(tasks.map(t => [t.id, new Set((t.related_tasks?.subtask ?? []).map(s => s.id))]))
-	const childrenOf = (parent: T) => tasks.filter(t => t.id !== parent.id && childIds.get(parent.id)!.has(t.id))
-	const isRoot = (t: T) => !(t.related_tasks?.parenttask ?? []).some(p => p.id !== undefined && p.id !== t.id && onPage.has(p.id))
+	const childrenOf = (parent: T) => tasks.filter(t => t.id !== parent.id
+		&& childIds.get(parent.id)!.has(t.id))
+	const isRoot = (t: T) => !(t.related_tasks?.parenttask ?? [])
+		.some(p => p.id !== undefined && p.id !== t.id && onPage.has(p.id))
 
 	const rows: NestedTaskRow<T>[] = []
 	const visited = new Set<number>()

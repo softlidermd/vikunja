@@ -505,8 +505,9 @@
 			</div>
 
 			<!-- Related Tasks -->
+			<!-- Always there for writers: it holds the add-subtask field. -->
 			<div
-				v-if="activeFields.relatedTasks"
+				v-if="activeFields.relatedTasks || canWrite"
 				class="content details mbe-0"
 			>
 				<h2 class="task-section-title">
@@ -517,7 +518,7 @@
 					:edit-enabled="canWrite"
 					:initial-related-tasks="task.related_tasks"
 					:project-id="task.project_id"
-					:show-no-relations-notice="true"
+					:show-no-relations-notice="!canWrite"
 					:task-id="taskId"
 				/>
 			</div>
