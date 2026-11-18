@@ -351,8 +351,9 @@
 													<RouterLink
 														v-tooltip="t.related_tasks.parenttask[0].title"
 														:to="{name: 'task.detail', params: {id: t.related_tasks.parenttask[0].id}}"
+														:aria-label="`${parentLabel(t, t.related_tasks.parenttask[0])} ${t.related_tasks.parenttask[0].title}`"
 													>
-														{{ getTaskIdentifier(t.related_tasks.parenttask[0]) }}
+														{{ parentLabel(t, t.related_tasks.parenttask[0]) }}
 													</RouterLink>
 												</span>
 												<TaskGlanceTooltip :task="t">
@@ -748,11 +749,20 @@ function treeLines(depth: number, continues: boolean[], hasToggle: boolean, open
 	for (let level = 0; level < levels; level++) {
 		if (continues[level]) lines.push({key: `through${level}`, class: 'is-through', level})
 	}
-	if (levels > 0) {
+	// Below the cap the row sits at its parent's indent, so an elbow would point at the wrong task.
+	if (levels > 0 && depth <= MAX_TREE_DEPTH) {
 		lines.push({key: 'elbow', class: hasToggle ? 'is-elbow has-toggle' : 'is-elbow', level: levels - 1})
 	}
 	if (open && depth < MAX_TREE_DEPTH) lines.push({key: 'down', class: 'is-down', level: levels})
 	return lines
+}
+
+// Related tasks come without their identifier, so build it from the parent's project; another
+// project's bare "#5" would read as this project's task #5.
+function parentLabel(task: TaskResponse, parent: Task) {
+	const project = projectList.projects[parent.project_id ?? 0]
+	if (project?.identifier) return `${project.identifier}-${parent.index}`
+	return !project || parent.project_id === task.project_id ? `#${parent.index}` : `${project.title} #${parent.index}`
 }
 
 function subtaskSummary(task: TaskResponse) {
@@ -972,6 +982,12 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		border-inline-start: 1.5px solid var(--grey-400);
 		pointer-events: none;
 
+		// Over the cell's bottom border, so the line reaches the next row without a notch.
+		&.is-through,
+		&.is-down {
+			inset-block-end: -1px;
+		}
+
 		// Into this row: down to its middle, then across to its title (or to its own toggle).
 		&.is-elbow {
 			inset-block-end: 50%;
@@ -1012,6 +1028,8 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 	.subtask-count {
 		flex: none;
 		padding: 0 .5rem;
+		// The border keeps it visible on a hovered row, which turns --grey-100 in dark mode.
+		border: 1px solid var(--grey-200);
 		border-radius: 999px;
 		background: var(--grey-100);
 		font-size: .75rem;
