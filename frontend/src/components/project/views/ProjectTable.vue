@@ -278,7 +278,7 @@
 							</thead>
 							<tbody>
 								<tr
-									v-for="{task: t, depth, hasChildren} in rows"
+									v-for="{task: t, depth, hasChildren, continues} in rows"
 									:key="t.id"
 									:data-progress="rowProgress(t)"
 								>
@@ -307,32 +307,72 @@
 											{{ projectList.projects[t.project_id].title }}
 										</RouterLink>
 									</td>
-									<td v-if="activeColumns.title">
+									<td
+										v-if="activeColumns.title"
+										class="title-td"
+									>
+										<span
+											v-for="line in treeLines(depth, continues, hasChildren, hasChildren && !collapsedSubtasks.has(t.id))"
+											:key="line.key"
+											class="tree-line"
+											:class="line.class"
+											:style="{'--tree-level': line.level}"
+											aria-hidden="true"
+										/>
 										<div
 											class="title-cell"
-											:style="{paddingInlineStart: `${Math.min(depth, 4) * 1.5}rem`}"
+											:style="{paddingInlineStart: `${Math.min(depth, MAX_TREE_DEPTH) * 1.5}rem`}"
 										>
-											<BaseButton
-												v-if="hasChildren"
-												class="subtask-toggle"
-												:class="{'is-collapsed': collapsedSubtasks.has(t.id)}"
-												:aria-expanded="collapsedSubtasks.has(t.id) ? 'false' : 'true'"
-												:aria-label="$t(
-													collapsedSubtasks.has(t.id) ? 'project.table.expandSubtasks' : 'project.table.collapseSubtasks',
-													{task: t.title},
-												)"
-												@click="toggleSubtasks(t.id)"
+											<span
+												v-if="nestSubtasks"
+												class="subtask-slot"
 											>
-												<Icon icon="angle-right" />
-											</BaseButton>
-											<TaskGlanceTooltip :task="t">
-												<RouterLink
-													:to="taskDetailRoutes[t.id]"
-													:class="{'is-strikethrough has-text-grey': t.done}"
+												<BaseButton
+													v-if="hasChildren"
+													class="subtask-toggle"
+													:class="{'is-collapsed': collapsedSubtasks.has(t.id)}"
+													:aria-expanded="collapsedSubtasks.has(t.id) ? 'false' : 'true'"
+													:aria-label="$t(
+														collapsedSubtasks.has(t.id) ? 'project.table.expandSubtasks' : 'project.table.collapseSubtasks',
+														{task: t.title},
+													)"
+													@click="toggleSubtasks(t.id)"
 												>
-													{{ t.title }}
-												</RouterLink>
-											</TaskGlanceTooltip>
+													<Icon icon="angle-right" />
+												</BaseButton>
+											</span>
+											<div class="title-stack">
+												<!-- At depth 0 a parent is not on the page (or nesting is off), so name it here. -->
+												<span
+													v-if="depth === 0 && t.related_tasks?.parenttask?.[0]"
+													class="subtask-of"
+												>
+													{{ $t('project.table.subtaskOf') }}
+													<RouterLink
+														v-tooltip="t.related_tasks.parenttask[0].title"
+														:to="{name: 'task.detail', params: {id: t.related_tasks.parenttask[0].id}}"
+													>
+														{{ getTaskIdentifier(t.related_tasks.parenttask[0]) }}
+													</RouterLink>
+												</span>
+												<TaskGlanceTooltip :task="t">
+													<RouterLink
+														:to="taskDetailRoutes[t.id]"
+														:class="{'is-strikethrough has-text-grey': t.done}"
+													>
+														{{ t.title }}
+													</RouterLink>
+												</TaskGlanceTooltip>
+											</div>
+											<span
+												v-if="t.related_tasks?.subtask?.length"
+												v-tooltip="subtaskSummary(t)"
+												class="subtask-count"
+												:aria-label="subtaskSummary(t)"
+												role="img"
+											>
+												{{ t.related_tasks.subtask.filter(s => s.done).length }}/{{ t.related_tasks.subtask.length }}
+											</span>
 										</div>
 									</td>
 									<td v-if="showStatus">
@@ -587,6 +627,7 @@ import {getStatusKanbanView} from '@/helpers/projectView'
 import {getTaskProgress, needsStatusBuckets} from '@/composables/useTaskStatus'
 import {bucketsQuery} from '@/client/queries/kanban'
 import {useQueries, useQuery} from '@tanstack/vue-query'
+import {useI18n} from 'vue-i18n'
 import {canAutoFocus} from '@/directives/focus'
 
 const props = defineProps<{
@@ -597,6 +638,7 @@ const props = defineProps<{
 
 const projectList = useProjects()
 const {currentProject: project} = useCurrentProject()
+const {t: translate} = useI18n({useScope: 'global'})
 
 const canWrite = computed(() => !project.value?.is_archived &&
 	typeof project.value?.max_permission === 'number' &&
@@ -693,7 +735,30 @@ const collapsedSubtasks = computed(() => new Set(collapsedSubtaskIds.value))
 const rows = computed(() => nestSubtasks.value
 	// Without the title column there is no toggle to reopen a collapsed task, so show everything.
 	? nestTaskRows(tasks.value, activeColumns.value.title ? collapsedSubtasks.value : undefined)
-	: tasks.value.map(task => ({task, depth: 0, hasChildren: false})))
+	: tasks.value.map(task => ({task, depth: 0, hasChildren: false, continues: [] as boolean[]})))
+
+// Deeper rows keep this indent, so their lines stop there too.
+const MAX_TREE_DEPTH = 4
+
+// Lines from each parent's toggle down to its subtasks: through lines for ancestors with more
+// subtasks below, an elbow into this row, and a line down to this row's own open subtasks.
+function treeLines(depth: number, continues: boolean[], hasToggle: boolean, open: boolean) {
+	const levels = Math.min(depth, MAX_TREE_DEPTH)
+	const lines: {key: string, class: string, level: number}[] = []
+	for (let level = 0; level < levels; level++) {
+		if (continues[level]) lines.push({key: `through${level}`, class: 'is-through', level})
+	}
+	if (levels > 0) {
+		lines.push({key: 'elbow', class: hasToggle ? 'is-elbow has-toggle' : 'is-elbow', level: levels - 1})
+	}
+	if (open && depth < MAX_TREE_DEPTH) lines.push({key: 'down', class: 'is-down', level: levels})
+	return lines
+}
+
+function subtaskSummary(task: TaskResponse) {
+	const subtasks = task.related_tasks?.subtask ?? []
+	return translate('task.subtasks.title', {done: subtasks.filter(s => s.done).length, total: subtasks.length})
+}
 
 function toggleSubtasks(id: number) {
 	collapsedSubtaskIds.value = collapsedSubtasks.value.has(id)
@@ -870,14 +935,25 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		align-items: center;
 	}
 
+	.title-td {
+		position: relative;
+	}
+
 	.title-cell {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: .25rem;
 	}
 
+	// Every row keeps the toggle's room, so a subtask's title really starts one indent further in.
+	.subtask-slot {
+		display: inline-flex;
+		flex: none;
+		justify-content: center;
+		inline-size: 1rem;
+	}
+
 	.subtask-toggle {
-		flex-shrink: 0;
 		color: var(--grey-500);
 		transform: rotate(90deg);
 		transition: transform $transition;
@@ -885,6 +961,63 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		&.is-collapsed {
 			transform: none;
 		}
+	}
+
+	// Each level's line runs through the centre of that level's toggle slot (the cell's .75em padding,
+	// then 1.5rem per level, then half the 1rem slot).
+	.tree-line {
+		position: absolute;
+		inset-block: 0;
+		inset-inline-start: calc(.75em + var(--tree-level) * 1.5rem + .5rem);
+		border-inline-start: 1.5px solid var(--grey-400);
+		pointer-events: none;
+
+		// Into this row: down to its middle, then across to its title (or to its own toggle).
+		&.is-elbow {
+			inset-block-end: 50%;
+			inline-size: 1.75rem;
+			border-block-end: 1.5px solid var(--grey-400);
+			border-end-start-radius: 6px;
+
+			&.has-toggle {
+				inline-size: .875rem;
+			}
+		}
+
+		// From this row's open toggle down to its first subtask.
+		&.is-down {
+			inset-block-start: calc(50% + .625rem);
+		}
+	}
+
+	.title-stack {
+		display: flex;
+		flex-direction: column;
+		min-inline-size: 0;
+	}
+
+	.subtask-of {
+		font-size: .75rem;
+		color: var(--text-muted);
+
+		a {
+			color: inherit;
+
+			&:hover {
+				color: var(--link);
+			}
+		}
+	}
+
+	.subtask-count {
+		flex: none;
+		padding: 0 .5rem;
+		border-radius: 999px;
+		background: var(--grey-100);
+		font-size: .75rem;
+		font-weight: 600;
+		color: var(--grey-700);
+		white-space: nowrap;
 	}
 
 	// One assignee per line, avatar plus name, so it is clear who it is without hovering.

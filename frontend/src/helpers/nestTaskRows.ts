@@ -9,6 +9,9 @@ export interface NestedTaskRow<T> {
 	task: T,
 	depth: number,
 	hasChildren: boolean,
+	// One entry per level above the row (length `depth`): whether the task on this row's path at that
+	// level has a later sibling, so a tree line runs on past this row there.
+	continues: boolean[],
 }
 
 /**
@@ -31,22 +34,22 @@ export function nestTaskRows<T extends NestableTask>(
 	const rows: NestedTaskRow<T>[] = []
 	const visited = new Set<number>()
 
-	function walk(task: T, depth: number, hidden: boolean) {
+	function walk(task: T, depth: number, hidden: boolean, continues: boolean[]) {
 		visited.add(task.id)
 		const children = childrenOf(task).filter(c => !visited.has(c.id))
-		if (!hidden) rows.push({task, depth, hasChildren: children.length > 0})
+		if (!hidden) rows.push({task, depth, hasChildren: children.length > 0, continues})
 		// Mark the children before descending so a sibling's subtree cannot claim them first.
 		children.forEach(c => visited.add(c.id))
 		const hideChildren = hidden || collapsed.has(task.id)
-		children.forEach(c => walk(c, depth + 1, hideChildren))
+		children.forEach((c, i) => walk(c, depth + 1, hideChildren, [...continues, i < children.length - 1]))
 	}
 
 	tasks.filter(isRoot).forEach(t => {
-		if (!visited.has(t.id)) walk(t, 0, false)
+		if (!visited.has(t.id)) walk(t, 0, false, [])
 	})
 	// A relation cycle has no root on the page: show what is left flat rather than dropping it.
 	tasks.forEach(t => {
-		if (!visited.has(t.id)) walk(t, 0, false)
+		if (!visited.has(t.id)) walk(t, 0, false, [])
 	})
 	return rows
 }

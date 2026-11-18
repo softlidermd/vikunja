@@ -586,7 +586,8 @@
       "sortBy": "Sort by {column}",
       "nestSubtasks": "Nest subtasks",
       "expandSubtasks": "Show subtasks of {task}",
-      "collapseSubtasks": "Hide subtasks of {task}"
+      "collapseSubtasks": "Hide subtasks of {task}",
+      "subtaskOf": "subtask of"
     },
     "kanban": {
       "title": "Kanban",

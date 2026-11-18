@@ -495,7 +495,8 @@
 			"sortBy": "Сортировать по столбцу {column}",
 			"nestSubtasks": "Вложенные подзадачи",
 			"expandSubtasks": "Показать подзадачи «{task}»",
-			"collapseSubtasks": "Скрыть подзадачи «{task}»"
+			"collapseSubtasks": "Скрыть подзадачи «{task}»",
+			"subtaskOf": "подзадача"
 		},
 		"kanban": {
 			"title": "Канбан",

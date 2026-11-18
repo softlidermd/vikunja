@@ -28,6 +28,20 @@ describe('nestTaskRows', () => {
 		])
 	})
 
+	it('tells each row where the tree lines run on past it', () => {
+		// 1 ─┬ 2 ─┬ 4
+		//    │    └ 5
+		//    └ 3
+		const tasks = [task(1, [2, 3]), task(2, [4, 5], [1]), task(3, [], [1]), task(4, [], [2]), task(5, [], [2])]
+		expect(nestTaskRows(tasks).map(r => [r.task.id, r.continues])).toEqual([
+			[1, []],
+			[2, [true]],
+			[4, [true, true]],
+			[5, [true, false]],
+			[3, [false]],
+		])
+	})
+
 	it('keeps a subtask whose parent is not on the page as a top-level row', () => {
 		expect(shape(nestTaskRows([task(5, [], [99])]))).toEqual([[5, 0, false]])
 	})
