@@ -15,7 +15,7 @@
 			<BaseButton
 				v-if="!isModal"
 				class="back-button mbs-2"
-				@click="lastProject ? router.back() : router.push(projectRoute)"
+				@click="goBack()"
 			>
 				<Icon icon="arrow-left" />
 				{{ $t('task.detail.back') }}
@@ -157,8 +157,9 @@
 			</div>
 
 			<div class="properties">
-				<!-- The fields the table edits inline are always here; the rest join once set, via + More. -->
+				<!-- For writers, the fields the table edits inline are always here; the rest join once set, via + More. -->
 				<TaskPropertyChip
+					v-if="canWrite || Boolean(task.priority)"
 					:ref="e => setChipRef('priority', e)"
 					:removable="Boolean(task.priority)"
 					:shortcut="SHORTCUTS.taskDetail.priority"
@@ -180,6 +181,7 @@
 					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
+					v-if="canWrite || Boolean(task.size)"
 					:ref="e => setChipRef('size', e)"
 					:removable="Boolean(task.size)"
 					close-on-change
@@ -197,6 +199,7 @@
 					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
+					v-if="canWrite || Boolean(task.assignees?.length)"
 					:ref="e => setChipRef('assignees', e)"
 					:removable="Boolean(task.assignees?.length)"
 					:shortcut="SHORTCUTS.taskDetail.assignees"
@@ -229,6 +232,7 @@
 					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
+					v-if="canWrite || Boolean(task.labels?.length)"
 					:ref="e => setChipRef('labels', e)"
 					:removable="Boolean(task.labels?.length)"
 					:shortcut="SHORTCUTS.taskDetail.labels"
@@ -259,6 +263,7 @@
 					/>
 				</TaskPropertyChip>
 				<TaskPropertyChip
+					v-if="canWrite || parseDateOrNull(task.due_date) !== null"
 					:removable="parseDateOrNull(task.due_date) !== null"
 					:shortcut="SHORTCUTS.taskDetail.dueDate"
 					class="property date-input"
@@ -989,7 +994,7 @@ type FieldType =
 	| 'startDate'
 	| 'timeTracking'
 
-// '+ Property' menu: field, label key (task.detail.actions.*), icon, shortcut
+// '+ More' menu, the properties that are not always-shown tiles: field, label key (task.detail.actions.*), icon, shortcut
 const PROPERTY_ITEMS: {title?: string, items: {field: FieldType, label: string, icon: IconProp, shortcut?: string}[]}[] = [
 	{title: 'task.detail.dateAndTime', items: [
 		{field: 'startDate', label: 'startDate', icon: 'play'},
@@ -1023,19 +1028,14 @@ const activeFields: { [type in FieldType]: boolean } = reactive({
 
 function setActiveFields() {
 	// Set all active fields based on values in the model
-	activeFields.assignees = (task.value.assignees?.length ?? 0) > 0
 	activeFields.attachments = (task.value.attachments?.length ?? 0) > 0
 	activeFields.timeTracking = (task.value.time_entries_count ?? 0) > 0
-	activeFields.dueDate = Boolean(parseDateOrNull(task.value.due_date))
 	activeFields.endDate = Boolean(parseDateOrNull(task.value.end_date))
-	activeFields.labels = (task.value.labels?.length ?? 0) > 0
 	activeFields.percentDone = (task.value.percent_done ?? 0) > 0
-	activeFields.priority = task.value.priority !== PRIORITIES.UNSET
 	activeFields.relatedTasks = Object.keys(task.value.related_tasks ?? {}).some(kind => kind !== 'subtask')
 	activeFields.reminders = (task.value.reminders?.length ?? 0) > 0
 	activeFields.repeatAfter = (task.value.repeat_after ?? 0) > 0
 		|| task.value.repeat_mode !== TASK_REPEAT_MODES.REPEAT_MODE_DEFAULT
-	activeFields.size = task.value.size !== 0
 	activeFields.startDate = Boolean(parseDateOrNull(task.value.start_date))
 }
 
@@ -1190,8 +1190,11 @@ const showDeleteModal = ref(false)
 async function deleteTask() {
 	await deleteTaskMutation.mutateAsync(task.value.id!)
 	success({message: t('task.detail.deleteSuccess')})
-	// Like the back button: return to the project view it was opened from, keeping that view's filter and page.
-	// A fresh project route would drop them.
+	goBack()
+}
+
+// Back to the project view the task was opened from: a fresh project route would drop its filter and page.
+function goBack() {
 	if (lastProject.value) {
 		router.back()
 	} else {
@@ -1492,14 +1495,13 @@ function setRelatedTasksActive() {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: .5rem;
+	margin-block: .875rem;
+	padding-block-end: 1.125rem;
+	border-block-end: 1px solid var(--grey-200);
 
 	@media screen and (max-width: $tablet) {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
-
-	margin-block: .875rem;
-	padding-block-end: 1.125rem;
-	border-block-end: 1px solid var(--grey-200);
 }
 
 // Line the chips up with the title text, past the done circle.

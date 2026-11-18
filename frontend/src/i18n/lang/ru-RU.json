@@ -984,7 +984,8 @@
 		"subtasks": {
 			"title": "Подзадачи · {done} из {total}",
 			"add": "Подзадача",
-			"hint": "Enter — создать и сразу ввести следующую · Esc — закрыть"
+			"hint": "Enter — создать и сразу ввести следующую · Esc — закрыть",
+			"unlink": "Убрать «{task}» из подзадач"
 		},
 		"quickActions": {
 			"label": "Действия с задачей «{task}»",
@@ -1044,10 +1045,8 @@
 			"title": "Детали задачи",
 			"markAsDone": "Отметить задачу «{task}» завершённой",
 			"scrollToBottom": "Прокрутить до конца страницы",
-			"organization": "Организация",
 			"management": "Управление",
 			"dateAndTime": "Дата и время",
-			"addProperty": "Свойство",
 			"moreProperties": "Ещё",
 			"moreActions": "Ещё действия",
 			"delete": {

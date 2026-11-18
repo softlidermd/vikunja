@@ -4,7 +4,7 @@
 		class="content details task-subtasks"
 	>
 		<h2
-			v-if="subtasks.length > 0 || adding"
+			v-if="subtasks.length > 0"
 			class="task-section-title"
 		>
 			{{ $t('task.subtasks.title', {done: doneCount, total: subtasks.length}) }}
@@ -30,6 +30,15 @@
 				>
 					{{ subtask.title }}
 				</RouterLink>
+				<BaseButton
+					v-if="canWrite"
+					v-tooltip="$t('task.subtasks.unlink', {task: subtask.title})"
+					class="task-subtasks__unlink"
+					:aria-label="$t('task.subtasks.unlink', {task: subtask.title})"
+					@click="unlink(subtask)"
+				>
+					<Icon icon="unlink" />
+				</BaseButton>
 			</li>
 		</ul>
 		<div
@@ -66,7 +75,7 @@ import {computed, ref} from 'vue'
 import {useRoute} from 'vue-router'
 
 import type {Task} from '@/client/generated'
-import {useUpdateTaskMutation} from '@/client/queries/taskMutations'
+import {useDeleteTaskRelationMutation, useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import BaseButton from '@/components/base/BaseButton.vue'
 import Icon from '@/components/misc/Icon'
 import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
@@ -80,6 +89,7 @@ const props = defineProps<{
 
 const route = useRoute()
 const updateTask = useUpdateTaskMutation()
+const deleteRelation = useDeleteTaskRelationMutation()
 const {submitSubtask, isCreating} = useCreateSubtask()
 
 const subtasks = computed(() => props.task.related_tasks?.subtask ?? [])
@@ -103,13 +113,23 @@ function add() {
 
 async function toggleDone(subtask: Task, done: boolean) {
 	try {
-		await updateTask.mutateAsync({...subtask, id: subtask.id!, done})
+		// Only the flag: a subtask here is a partial row, and patching its other fields would clear its reminders.
+		await updateTask.mutateAsync({id: subtask.id!, done})
 	} catch {
 		// Failed mutations already show an error toast (contextMutationOptions).
 		return
 	}
 	if (done) {
 		playPopSound()
+	}
+}
+
+// Only the link goes: the task itself stays in its project.
+async function unlink(subtask: Task) {
+	try {
+		await deleteRelation.mutateAsync({relationKind: 'subtask', task: props.task.id!, otherTask: subtask.id!})
+	} catch {
+		// Failed mutations already show an error toast (contextMutationOptions).
 	}
 }
 </script>
@@ -133,12 +153,27 @@ async function toggleDone(subtask: Task, done: boolean) {
 	}
 
 	a {
+		flex: 1;
 		color: var(--text);
+	}
+
+	&:not(:hover, :focus-within) .task-subtasks__unlink {
+		opacity: 0;
 	}
 
 	// Its padding-block-start would push the box below the title's centre line.
 	.fancy-checkbox {
 		padding: 0;
+	}
+}
+
+.task-subtasks__unlink {
+	padding: .25rem;
+	color: var(--text-muted);
+
+	&:hover,
+	&:focus-visible {
+		color: var(--danger);
 	}
 }
 

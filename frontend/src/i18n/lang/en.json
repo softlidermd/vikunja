@@ -1131,7 +1131,8 @@
     "subtasks": {
       "title": "Subtasks · {done} of {total}",
       "add": "Subtask",
-      "hint": "Enter adds it and keeps the field for the next one · Esc closes"
+      "hint": "Enter adds it and keeps the field for the next one · Esc closes",
+      "unlink": "Remove {task} from the subtasks"
     },
     "quickActions": {
       "label": "Actions for {task}",
@@ -1192,10 +1193,8 @@
       "title": "Task detail",
       "markAsDone": "Mark '{task}' as done",
       "scrollToBottom": "Scroll to bottom",
-      "organization": "Organization",
       "management": "Management",
       "dateAndTime": "Date and time",
-      "addProperty": "Property",
       "moreProperties": "More",
       "moreActions": "More actions",
       "delete": {

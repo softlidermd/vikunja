@@ -351,7 +351,8 @@ async function createAndRelateTask(title: string) {
 }
 
 async function toggleTaskDone(task: ITask) {
-	await updateTask.mutateAsync({...task, id: task.id!})
+	// Only the flag: a related task is a partial row, and patching its other fields would clear its reminders.
+	await updateTask.mutateAsync({id: task.id!, done: task.done})
 	
 	if (task.done) {
 		playPopSound()

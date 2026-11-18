@@ -1,6 +1,7 @@
 import {test, expect} from '../../support/fixtures'
 import {TaskFactory} from '../../factories/task'
 import {createProjects} from './prepareProjects'
+import {TaskReminderFactory} from '../../factories/task_reminders'
 
 test.describe('Subtasks in the table view', () => {
 	test('nests a subtask under its parent and collapses it', async ({authenticatedPage: page, apiContext, userToken}) => {
@@ -64,5 +65,29 @@ test.describe('Subtasks in the table view', () => {
 		await expect(page.getByText('Subtasks · 0 of 1')).toBeVisible()
 		await expect(page.getByPlaceholder('Add a subtask…')).toHaveValue('')
 		await expect(page.getByPlaceholder('Add a subtask…')).toBeFocused()
+	})
+
+	test('ticks a subtask in the task detail without losing its reminder, and unlinks it', async ({authenticatedPage: page, apiContext, userToken}) => {
+		await createProjects(1)
+		const [parent, child] = await TaskFactory.create(2, {
+			project_id: 1,
+			title: (i: number) => i === 1 ? 'Parent task' : 'Child task',
+		})
+		await TaskReminderFactory.create(1, {task_id: child.id, reminder: new Date(Date.now() + 86_400_000).toISOString()})
+		const headers = {Authorization: `Bearer ${userToken}`}
+		await apiContext.post(`/api/v2/tasks/${parent.id}/relations`, {headers, data: {other_task_id: child.id, relation_kind: 'subtask'}})
+		const stored = async (id: number) => (await apiContext.get(`/api/v2/tasks/${id}`, {headers})).json()
+
+		await page.goto(`/tasks/${parent.id}`)
+		const row = page.locator('.task-subtasks__item').filter({hasText: 'Child task'})
+		await row.getByRole('checkbox').check({force: true})
+		await expect.poll(async () => (await stored(child.id)).done).toBe(true)
+		expect((await stored(child.id)).reminders).toHaveLength(1)
+
+		await row.hover()
+		await row.getByRole('button', {name: 'Remove Child task from the subtasks'}).click()
+		await expect(page.locator('.task-subtasks__item')).toHaveCount(0)
+		expect((await stored(parent.id)).related_tasks?.subtask ?? []).toHaveLength(0)
+		expect((await stored(child.id)).title).toBe('Child task')
 	})
 })
