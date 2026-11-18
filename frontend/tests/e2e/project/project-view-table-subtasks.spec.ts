@@ -80,7 +80,7 @@ test.describe('Subtasks in the table view', () => {
 
 		await page.goto(`/tasks/${parent.id}`)
 		const row = page.locator('.task-subtasks__item').filter({hasText: 'Child task'})
-		await row.getByRole('checkbox').check({force: true})
+		await row.locator('.fancy-checkbox').click()
 		await expect.poll(async () => (await stored(child.id)).done).toBe(true)
 		expect((await stored(child.id)).reminders).toHaveLength(1)
 
