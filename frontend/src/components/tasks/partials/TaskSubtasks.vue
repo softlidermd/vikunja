@@ -11,6 +11,7 @@
 		</h2>
 		<ul
 			v-if="subtasks.length > 0"
+			ref="list"
 			class="task-subtasks__list"
 		>
 			<li
@@ -70,6 +71,7 @@
 		</div>
 		<BaseButton
 			v-else-if="canWrite"
+			ref="addButton"
 			class="task-subtasks__add d-print-none"
 			@click="adding = true"
 		>
@@ -82,7 +84,7 @@
 			@submit="deleteSubtask()"
 		>
 			<template #header>
-				<span>{{ $t('task.detail.delete.header') }}</span>
+				<span>{{ $t('task.subtasks.delete', {task: toDelete?.title}) }}</span>
 			</template>
 			<template #text>
 				<p class="tw:text-balance">
@@ -97,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue'
+import {computed, nextTick, ref} from 'vue'
 import {useRoute} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 
@@ -120,6 +122,7 @@ const route = useRoute()
 const {t} = useI18n({useScope: 'global'})
 const updateTask = useUpdateTaskMutation()
 const deleteRelation = useDeleteTaskRelationMutation()
+const deleteTask = useDeleteTaskMutation()
 const {submitSubtask, isCreating} = useCreateSubtask()
 
 const subtasks = computed(() => props.task.related_tasks?.subtask ?? [])
@@ -163,22 +166,31 @@ async function unlink(subtask: Task) {
 	}
 }
 
-const deleteTask = useDeleteTaskMutation()
 const toDelete = ref<Task | null>(null)
+const list = ref<HTMLElement | null>(null)
+const addButton = ref<InstanceType<typeof BaseButton> | null>(null)
 
 async function deleteSubtask() {
 	const subtask = toDelete.value
 	if (subtask?.id === undefined || deleteTask.isPending.value) {
 		return
 	}
+	const index = subtasks.value.findIndex(s => s.id === subtask.id)
 	try {
 		await deleteTask.mutateAsync(subtask.id)
 	} catch {
 		// Failed mutations already show an error toast (contextMutationOptions).
 		return
 	}
-	toDelete.value = null
+	if (toDelete.value === subtask) {
+		toDelete.value = null
+	}
 	success({message: t('task.detail.deleteSuccess')})
+	// The dialog would hand focus back to the trash button, which went away with its row.
+	await nextTick()
+	const links = list.value?.querySelectorAll<HTMLElement>('.task-subtasks__item > a')
+	const neighbour = links?.[Math.min(index, links.length - 1)]
+	;(neighbour ?? addButton.value?.$el as HTMLElement | undefined)?.focus()
 }
 </script>
 

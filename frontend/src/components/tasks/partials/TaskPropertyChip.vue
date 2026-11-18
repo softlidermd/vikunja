@@ -138,8 +138,8 @@ function onKeydown(event: KeyboardEvent) {
 	if (event.key === 'Enter') {
 		keyedSelect = false
 		if (props.closeOnChange) {
-			event.preventDefault()
-			closeAndFocusChip()
+			// After the key's default action: an open list (Firefox) commits the highlighted option on Enter.
+			setTimeout(closeAndFocusChip)
 		}
 		return
 	}

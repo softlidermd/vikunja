@@ -944,11 +944,6 @@ const taskDetailRoutes = computed(() => Object.fromEntries(
 		border: 0;
 		border-radius: 0;
 	}
-
-	// The hover hint takes room from the name even while it is invisible.
-	:deep(.hint-text:not(.is-always-visible)) {
-		display: none;
-	}
 }
 
 // The mobile sheet is the frame there.

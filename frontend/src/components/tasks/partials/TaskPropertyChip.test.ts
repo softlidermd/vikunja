@@ -66,10 +66,27 @@ describe('TaskPropertyChip', () => {
 		expect(trigger.attributes('aria-expanded')).toBe('true')
 
 		await select.trigger('keydown', {key: 'Enter'})
+		await new Promise(resolve => setTimeout(resolve))
 		await flushPromises()
 		expect(trigger.attributes('aria-expanded')).toBe('false')
 		expect(document.activeElement).toBe(trigger.element)
 		wrapper.unmount()
+	})
+
+	it.each([true, false])('opens the select list right away only for single-value chips (closeOnChange %s)', async closeOnChange => {
+		const showPicker = vi.fn()
+		Object.defineProperty(HTMLSelectElement.prototype, 'showPicker', {value: showPicker, configurable: true})
+		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+			cb(0)
+			return 0
+		})
+		const wrapper = mountChip(true, closeOnChange)
+		;(wrapper.vm as unknown as {open: () => void}).open()
+		await flushPromises()
+
+		expect(showPicker).toHaveBeenCalledTimes(closeOnChange ? 1 : 0)
+		wrapper.unmount()
+		vi.unstubAllGlobals()
 	})
 
 	it('emits remove from the × button', async () => {
