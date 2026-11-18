@@ -1564,7 +1564,7 @@ function setRelatedTasksActive() {
 	block-size: .875rem;
 }
 
-// Popover editors: the search field on top, its results right under it, the chosen items below.
+// Popover editors: the chosen items on top, then the search field with its results right under it.
 .chip-editor.multiselect {
 	display: flex;
 	flex-wrap: wrap;
@@ -1608,7 +1608,7 @@ function setRelatedTasksActive() {
 
 	// labels' tags and the assignee list
 	:deep(.input-wrapper > :not(.input)) {
-		order: 1;
+		order: -1;
 	}
 
 	:deep(.assignees-list) {

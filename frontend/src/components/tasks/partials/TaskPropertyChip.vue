@@ -105,6 +105,17 @@ watch(isOpen, open => {
 			if (field && (canAutoFocus() || !field.matches('input[type="text"], textarea'))) {
 				field.focus()
 			}
+			// A select is the whole editor, so open its list straight away. After a frame: the picker
+			// anchors where the select is at that moment, and the popover is positioned asynchronously.
+			if (props.closeOnChange && field instanceof HTMLSelectElement) {
+				requestAnimationFrame(() => {
+					try {
+						field.showPicker()
+					} catch {
+						// Unsupported (Safari) or no user activation left: the select stays one click away.
+					}
+				})
+			}
 		})
 		return
 	}

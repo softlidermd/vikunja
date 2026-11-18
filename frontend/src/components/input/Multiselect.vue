@@ -739,6 +739,11 @@ defineExpose({focus})
 	}
 }
 
+// Inline lists sit in narrow popovers and cells, where the (mostly invisible) hint would cut the option short.
+.search-results-inline .hint-text:not(.is-always-visible) {
+	display: none;
+}
+
 .search-result-hint {
 	padding: .5rem .75rem;
 	color: var(--grey-500);

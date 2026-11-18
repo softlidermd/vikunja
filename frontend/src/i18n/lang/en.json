@@ -1132,7 +1132,8 @@
       "title": "Subtasks · {done} of {total}",
       "add": "Subtask",
       "hint": "Enter adds it and keeps the field for the next one · Esc closes",
-      "unlink": "Remove {task} from the subtasks"
+      "unlink": "Remove {task} from the subtasks",
+      "delete": "Delete {task}"
     },
     "quickActions": {
       "label": "Actions for {task}",

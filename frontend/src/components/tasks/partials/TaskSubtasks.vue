@@ -33,11 +33,20 @@
 				<BaseButton
 					v-if="canWrite"
 					v-tooltip="$t('task.subtasks.unlink', {task: subtask.title})"
-					class="task-subtasks__unlink"
+					class="task-subtasks__action"
 					:aria-label="$t('task.subtasks.unlink', {task: subtask.title})"
 					@click="unlink(subtask)"
 				>
 					<Icon icon="unlink" />
+				</BaseButton>
+				<BaseButton
+					v-if="canWrite"
+					v-tooltip="$t('task.subtasks.delete', {task: subtask.title})"
+					class="task-subtasks__action"
+					:aria-label="$t('task.subtasks.delete', {task: subtask.title})"
+					@click="toDelete = subtask"
+				>
+					<Icon icon="trash-alt" />
 				</BaseButton>
 			</li>
 		</ul>
@@ -67,20 +76,40 @@
 			<Icon icon="plus" />
 			{{ $t('task.subtasks.add') }}
 		</BaseButton>
+		<Modal
+			:enabled="toDelete !== null"
+			@close="toDelete = null"
+			@submit="deleteSubtask()"
+		>
+			<template #header>
+				<span>{{ $t('task.detail.delete.header') }}</span>
+			</template>
+			<template #text>
+				<p class="tw:text-balance">
+					{{ $t('task.detail.delete.text1') }}
+				</p>
+				<p class="tw:text-balance">
+					{{ $t('task.detail.delete.text2') }}
+				</p>
+			</template>
+		</Modal>
 	</div>
 </template>
 
 <script setup lang="ts">
 import {computed, ref} from 'vue'
 import {useRoute} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
 import type {Task} from '@/client/generated'
-import {useDeleteTaskRelationMutation, useUpdateTaskMutation} from '@/client/queries/taskMutations'
+import {useDeleteTaskMutation, useDeleteTaskRelationMutation, useUpdateTaskMutation} from '@/client/queries/taskMutations'
 import BaseButton from '@/components/base/BaseButton.vue'
 import Icon from '@/components/misc/Icon'
+import Modal from '@/components/misc/Modal.vue'
 import FancyCheckbox from '@/components/input/FancyCheckbox.vue'
 import {useCreateSubtask} from '@/composables/useCreateSubtask'
 import {playPopSound} from '@/helpers/playPop'
+import {success} from '@/message'
 
 const props = defineProps<{
 	task: Task,
@@ -88,6 +117,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const {t} = useI18n({useScope: 'global'})
 const updateTask = useUpdateTaskMutation()
 const deleteRelation = useDeleteTaskRelationMutation()
 const {submitSubtask, isCreating} = useCreateSubtask()
@@ -132,6 +162,24 @@ async function unlink(subtask: Task) {
 		// Failed mutations already show an error toast (contextMutationOptions).
 	}
 }
+
+const deleteTask = useDeleteTaskMutation()
+const toDelete = ref<Task | null>(null)
+
+async function deleteSubtask() {
+	const subtask = toDelete.value
+	if (subtask?.id === undefined || deleteTask.isPending.value) {
+		return
+	}
+	try {
+		await deleteTask.mutateAsync(subtask.id)
+	} catch {
+		// Failed mutations already show an error toast (contextMutationOptions).
+		return
+	}
+	toDelete.value = null
+	success({message: t('task.detail.deleteSuccess')})
+}
 </script>
 
 <style lang="scss" scoped>
@@ -157,7 +205,7 @@ async function unlink(subtask: Task) {
 		color: var(--text);
 	}
 
-	&:not(:hover, :focus-within) .task-subtasks__unlink {
+	&:not(:hover, :focus-within) .task-subtasks__action {
 		opacity: 0;
 	}
 
@@ -167,7 +215,7 @@ async function unlink(subtask: Task) {
 	}
 }
 
-.task-subtasks__unlink {
+.task-subtasks__action {
 	padding: .25rem;
 	color: var(--text-muted);
 
