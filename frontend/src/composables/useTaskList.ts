@@ -130,20 +130,24 @@ export function useViewQuery(
 	// Sidebar links omit the query, and project views are reused across navigation.
 	const syncedViewId = shallowRef<number>()
 	watch(
-		[projectViewId, sortQuery, filter, s, page],
-		([viewId, sortValue, filterValue, sValue, pageValue]) => {
+		// The modal flag re-runs this when a task opened by reload closes onto a bare view URL.
+		[projectViewId, sortQuery, filter, s, page, () => router.currentRoute.value.name === 'task.detail'],
+		([viewId, sortValue, filterValue, sValue, pageValue, behindTaskModal]) => {
 			const viewIdChanged = viewId !== syncedViewId.value
 			syncedViewId.value = viewId
 
 			const defaultFilter = defaultFilterGetter()
-			// A filter the user cleared stays in the URL as `filter=` (''), so only navigation empties it.
+			// A filter the user cleared stays in the URL as `filter=` (''), so only navigation removes it.
 			const urlIsEmpty = !sortValue && filterValue == null && !sValue && pageValue === 1
-			if (urlIsEmpty && (viewIdChanged || defaultFilter)) {
+			const needsRestore = urlIsEmpty ? viewIdChanged || !!defaultFilter : !!defaultFilter && filterValue == null
+			if (needsRestore) {
 				// Reloaded behind the task modal: the URL is the task's, so neither restore into it nor store it.
-				if (router.currentRoute.value.name === 'task.detail') return
+				if (behindTaskModal) return
 				const stored = viewFiltersStore.getViewQuery(viewId)
 				// The default fills in until a filter (even a cleared one) is stored.
-				const storedQuery = defaultFilter && !('filter' in stored) ? {filter: defaultFilter, ...stored} : stored
+				const withDefault = defaultFilter && !('filter' in stored) ? {filter: defaultFilter, ...stored} : stored
+				// A link with its own sort or search (a tab link, a bookmark) only lacks the filter.
+				const storedQuery = urlIsEmpty ? withDefault : {filter: withDefault.filter}
 				if (Object.keys(storedQuery).length > 0) {
 					const restore = router.replace({query: {...router.currentRoute.value.query, ...storedQuery}})
 					pendingQueryRestore.value = restore
@@ -196,6 +200,8 @@ export function useTaskList(
 	const projectViewId = computed(() => projectViewIdGetter())
 
 	// Saved filters hide the filter popup and AND the request filter into their own, so no default there.
+	// shortcut: a custom view whose own filter is `done = true` opens empty until its filter is cleared once;
+	// skip the default for views whose filter mentions `done` if that shows up in practice.
 	const defaultFilter = () => isSavedFilterProject({id: projectId.value}) ? undefined : 'done = false'
 	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault, defaultFilter)
 

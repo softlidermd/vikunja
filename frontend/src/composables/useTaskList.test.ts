@@ -178,7 +178,7 @@ describe('useTaskList error reporting', () => {
 	})
 })
 
-async function mountRoutedTaskList() {
+async function mountRoutedTaskList(path = '/projects/1/11') {
 	let taskList: ReturnType<typeof useTaskList>
 	const List = defineComponent({
 		props: {projectId: {type: Number, required: true}, viewId: {type: Number, required: true}},
@@ -197,9 +197,15 @@ async function mountRoutedTaskList() {
 			path: '/projects/:projectId/:viewId',
 			component: View,
 			props: route => ({projectId: Number(route.params.projectId), viewId: Number(route.params.viewId)}),
+		}, {
+			// Stands in for a reloaded task modal with its project view behind it.
+			path: '/projects/:projectId/:viewId/task',
+			name: 'task.detail',
+			component: View,
+			props: route => ({projectId: Number(route.params.projectId), viewId: Number(route.params.viewId)}),
 		}],
 	})
-	await router.push('/projects/1/11')
+	await router.push(path)
 	mount(defineComponent({render: () => h(RouterView)}), {global: {plugins: [router, [VueQueryPlugin, {queryClient}]]}})
 	await flushPromises()
 	return {router, taskList: taskList!}
@@ -274,6 +280,17 @@ describe('useTaskList navigation and pagination', () => {
 		expect(lastQuery().filter).toBe('done = false')
 	})
 
+	it('adds the done filter when a task opened by reload closes onto its view', async () => {
+		const {router} = await mountRoutedTaskList('/projects/1/11/task')
+		expect(router.currentRoute.value.query.filter).toBeUndefined()
+
+		await router.push('/projects/1/11')
+		await flushPromises()
+
+		expect(router.currentRoute.value.query.filter).toBe('done = false')
+		expect(lastQuery().filter).toBe('done = false')
+	})
+
 	it('adds no done filter to a saved filter', async () => {
 		const {router} = await mountRoutedTaskList()
 
@@ -288,7 +305,8 @@ describe('useTaskList navigation and pagination', () => {
 		const {router} = await mountRoutedTaskList()
 		useViewFiltersStore().setViewQuery(21, {sort: 'due_date:asc'})
 
-		await router.push('/projects/2/21')
+		// Tab links carry the stored query.
+		await router.push('/projects/2/21?sort=due_date:asc')
 		await flushPromises()
 
 		expect(router.currentRoute.value.query).toEqual({sort: 'due_date:asc', filter: 'done = false'})
