@@ -60,7 +60,8 @@ test.describe('Project View Table', () => {
 			priority: (i: number) => (i - 1) % priorities.length,
 			done: (i: number) => i > priorities.length,
 		})
-		await page.goto('/projects/1/3')
+		// An empty filter drops the default `done = false`, so done tasks show too.
+		await page.goto('/projects/1/3?filter=')
 
 		for (const task of tasks) {
 			const row = page.locator('.project-table tbody tr').filter({
@@ -82,7 +83,7 @@ test.describe('Project View Table', () => {
 			project_id: 1,
 			priority: 0,
 		})
-		await page.goto('/projects/1/3')
+		await page.goto('/projects/1/3?filter=')
 		const row = page.locator('.project-table tbody tr').filter({
 			has: page.getByRole('link', {name: task.title, exact: true}),
 		})

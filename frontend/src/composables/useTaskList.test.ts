@@ -260,8 +260,39 @@ describe('useTaskList navigation and pagination', () => {
 		await router.push('/projects/1/11')
 		await flushPromises()
 
+		expect(router.currentRoute.value.query.filter).toBe('')
+		expect(lastQuery().filter).toBe('')
+	})
+
+	it('restores the done filter when the same view is opened without a query', async () => {
+		const {router} = await mountRoutedTaskList()
+
+		await router.push('/projects/1/11')
+		await flushPromises()
+
+		expect(router.currentRoute.value.query.filter).toBe('done = false')
+		expect(lastQuery().filter).toBe('done = false')
+	})
+
+	it('adds no done filter to a saved filter', async () => {
+		const {router} = await mountRoutedTaskList()
+
+		await router.push('/projects/-2/31')
+		await flushPromises()
+
 		expect(router.currentRoute.value.query.filter).toBeUndefined()
 		expect(lastQuery().filter).toBe('')
+	})
+
+	it('adds the done filter to a view that only remembers its sort', async () => {
+		const {router} = await mountRoutedTaskList()
+		useViewFiltersStore().setViewQuery(21, {sort: 'due_date:asc'})
+
+		await router.push('/projects/2/21')
+		await flushPromises()
+
+		expect(router.currentRoute.value.query).toEqual({sort: 'due_date:asc', filter: 'done = false'})
+		expect(lastQuery().filter).toBe('done = false')
 	})
 
 	it('moves a restored page past the end to the last page', async () => {

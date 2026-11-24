@@ -9,6 +9,7 @@ import {
 	type TaskFilterParams,
 } from '@/client/queries/tasks'
 import {normalizePageNumber} from '@/client/queries/pagination'
+import {isSavedFilterProject} from '@/client/queries/projects'
 import {isRequestContextAbort} from '@/client/requestContext'
 import {useTasks} from '@/composables/useTasks'
 import {useClampedPage} from '@/composables/useClampedPage'
@@ -98,7 +99,11 @@ export function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskF
  * A project view's sort, filter, search and page in the URL, remembered per view so they
  * come back when the view is opened again without a query (tab links, closing a task).
  */
-export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortByDefault: SortBy, defaultFilter?: string) {
+export function useViewQuery(
+	projectViewIdGetter: ComputedGetter<number>,
+	sortByDefault: SortBy,
+	defaultFilterGetter: () => string | undefined = () => undefined,
+) {
 	const projectViewId = computed(() => projectViewIdGetter())
 	const router = useRouter()
 	const viewFiltersStore = useViewFiltersStore()
@@ -130,11 +135,15 @@ export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortBy
 			const viewIdChanged = viewId !== syncedViewId.value
 			syncedViewId.value = viewId
 
-			const urlIsEmpty = !sortValue && !filterValue && !sValue && pageValue === 1
-			if (viewIdChanged && urlIsEmpty) {
-				// The default only seeds views never visited: an empty stored entry means the user cleared it.
-				const storedQuery = viewFiltersStore.viewQueries[viewId]
-					?? (defaultFilter ? {filter: defaultFilter} : {})
+			const defaultFilter = defaultFilterGetter()
+			// A filter the user cleared stays in the URL as `filter=` (''), so only navigation empties it.
+			const urlIsEmpty = !sortValue && filterValue == null && !sValue && pageValue === 1
+			if (urlIsEmpty && (viewIdChanged || defaultFilter)) {
+				// Reloaded behind the task modal: the URL is the task's, so neither restore into it nor store it.
+				if (router.currentRoute.value.name === 'task.detail') return
+				const stored = viewFiltersStore.getViewQuery(viewId)
+				// The default fills in until a filter (even a cleared one) is stored.
+				const storedQuery = defaultFilter && !('filter' in stored) ? {filter: defaultFilter, ...stored} : stored
 				if (Object.keys(storedQuery).length > 0) {
 					const restore = router.replace({query: {...router.currentRoute.value.query, ...storedQuery}})
 					pendingQueryRestore.value = restore
@@ -157,7 +166,12 @@ export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortBy
 				s: sValue as string | undefined,
 				page: pageValue,
 			})
-			viewFiltersStore.setViewQuery(viewId, query)
+			if (filterValue === '') query.filter = ''
+			if (Object.keys(query).length > 0) {
+				viewFiltersStore.setViewQuery(viewId, query)
+			} else {
+				viewFiltersStore.clearViewQuery(viewId)
+			}
 		},
 		{immediate: true},
 	)
@@ -181,7 +195,9 @@ export function useTaskList(
 	const projectId = computed(() => projectIdGetter())
 	const projectViewId = computed(() => projectViewIdGetter())
 
-	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault, 'done = false')
+	// Saved filters hide the filter popup and AND the request filter into their own, so no default there.
+	const defaultFilter = () => isSavedFilterProject({id: projectId.value}) ? undefined : 'done = false'
+	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault, defaultFilter)
 
 	const params = ref<TaskFilterParams>({...getDefaultTaskFilterParams()})
 
@@ -189,7 +205,11 @@ export function useTaskList(
 	watch(filter, v => { params.value.filter = String(v ?? '') }, { immediate: true, flush: 'sync' })
 	watch(s, v => { params.value.q = String(v ?? '') }, { immediate: true, flush: 'sync' })
 
-	watch(() => params.value.filter, v => { filter.value = v || undefined })
+	watch(() => params.value.filter, v => {
+		// Skip echoes of the URL itself, so a view switch doesn't write `filter=` into the next view.
+		if ((v || undefined) === (filter.value || undefined)) return
+		filter.value = v || (defaultFilter() ? '' : undefined)
+	})
 	watch(() => params.value.q, v => { s.value = v || undefined })
 
 	const allParams = computed(() => {
