@@ -248,6 +248,22 @@ describe('useTaskList navigation and pagination', () => {
 		}])
 	})
 
+	it('hides done tasks on a first visit until the user clears the filter', async () => {
+		const {router, taskList} = await mountRoutedTaskList()
+		expect(router.currentRoute.value.query.filter).toBe('done = false')
+		expect(lastQuery().filter).toBe('done = false')
+
+		taskList.params.value.filter = ''
+		await flushPromises()
+		await router.push('/projects/2/21')
+		await flushPromises()
+		await router.push('/projects/1/11')
+		await flushPromises()
+
+		expect(router.currentRoute.value.query.filter).toBeUndefined()
+		expect(lastQuery().filter).toBe('')
+	})
+
 	it('moves a restored page past the end to the last page', async () => {
 		const {router, taskList} = await mountRoutedTaskList()
 		useViewFiltersStore().setViewQuery(21, {page: '7'})

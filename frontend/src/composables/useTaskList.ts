@@ -98,7 +98,7 @@ export function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskF
  * A project view's sort, filter, search and page in the URL, remembered per view so they
  * come back when the view is opened again without a query (tab links, closing a task).
  */
-export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortByDefault: SortBy) {
+export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortByDefault: SortBy, defaultFilter?: string) {
 	const projectViewId = computed(() => projectViewIdGetter())
 	const router = useRouter()
 	const viewFiltersStore = useViewFiltersStore()
@@ -132,7 +132,9 @@ export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortBy
 
 			const urlIsEmpty = !sortValue && !filterValue && !sValue && pageValue === 1
 			if (viewIdChanged && urlIsEmpty) {
-				const storedQuery = viewFiltersStore.getViewQuery(viewId)
+				// The default only seeds views never visited: an empty stored entry means the user cleared it.
+				const storedQuery = viewFiltersStore.viewQueries[viewId]
+					?? (defaultFilter ? {filter: defaultFilter} : {})
 				if (Object.keys(storedQuery).length > 0) {
 					const restore = router.replace({query: {...router.currentRoute.value.query, ...storedQuery}})
 					pendingQueryRestore.value = restore
@@ -155,11 +157,7 @@ export function useViewQuery(projectViewIdGetter: ComputedGetter<number>, sortBy
 				s: sValue as string | undefined,
 				page: pageValue,
 			})
-			if (Object.keys(query).length > 0) {
-				viewFiltersStore.setViewQuery(viewId, query)
-			} else {
-				viewFiltersStore.clearViewQuery(viewId)
-			}
+			viewFiltersStore.setViewQuery(viewId, query)
 		},
 		{immediate: true},
 	)
@@ -183,12 +181,13 @@ export function useTaskList(
 	const projectId = computed(() => projectIdGetter())
 	const projectViewId = computed(() => projectViewIdGetter())
 
-	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault)
+	const {page, filter, s, sortQuery, sortBy, isReady} = useViewQuery(projectViewIdGetter, sortByDefault, 'done = false')
 
 	const params = ref<TaskFilterParams>({...getDefaultTaskFilterParams()})
 
-	watch(filter, v => { params.value.filter = String(v ?? '') }, { immediate: true })
-	watch(s, v => { params.value.q = String(v ?? '') }, { immediate: true })
+	// sync: a restored query must reach params in the same flush as its page, or the page reset below fires.
+	watch(filter, v => { params.value.filter = String(v ?? '') }, { immediate: true, flush: 'sync' })
+	watch(s, v => { params.value.q = String(v ?? '') }, { immediate: true, flush: 'sync' })
 
 	watch(() => params.value.filter, v => { filter.value = v || undefined })
 	watch(() => params.value.q, v => { s.value = v || undefined })
